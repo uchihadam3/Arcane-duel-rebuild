@@ -23,49 +23,51 @@ sem build prévio. Arquivos que precisam de DOM declaram
 
 ## Publicação
 
-O cliente é um site estático: `npm run build` gera `apps/web/dist`, servido por
-qualquer host com HTTPS. A branch `main` é a fonte da publicação.
+O destino oficial e único é o **GitHub Pages**:
 
-### Vercel
+**https://uchihadam3.github.io/Arcane-duel-rebuild/**
 
-`vercel.json` na raiz já contém toda a configuração. O build parte da raiz do
-monorepo e publica `apps/web/dist` — não existe cópia separada do cliente.
+O cliente é um site estático. `npm run build` gera `apps/web/dist`, e a branch
+`main` é a fonte da publicação. Nenhum serviço externo participa do deploy, e
+nenhum segredo é necessário.
 
-Configuração do projeto na Vercel:
+### Como o deploy acontece
 
-| Campo             | Valor                            |
-| ----------------- | -------------------------------- |
-| Repositório       | `uchihadam3/Arcane-duel-rebuild` |
-| Production Branch | `main`                           |
-| Framework Preset  | Other                            |
-| Root Directory    | `.` (a raiz do repositório)      |
-| Install Command   | `npm ci`                         |
-| Build Command     | `npm run build`                  |
-| Output Directory  | `apps/web/dist`                  |
-| Node.js Version   | 22.x                             |
+`.github/workflows/pages.yml` roda a cada push em `main`:
 
-Nenhuma variável de ambiente é necessária. O projeto não usa segredo nenhum.
+1. instala com `npm ci` e constrói com `npm run build`, a partir da raiz do
+   monorepo — não existe cópia separada do cliente;
+2. passa `BASE_PATH` com o nome do repositório, porque o Pages serve o site
+   sob `/Arcane-duel-rebuild/` e não na raiz do domínio;
+3. copia `index.html` para `404.html`, que é como o Pages faz fallback de SPA
+   — ele não tem reescrita de rota;
+4. cria `.nojekyll`, senão o Pages reprocessaria o site pelo Jekyll;
+5. publica o conteúdo de `apps/web/dist` na branch `gh-pages`, com um commit
+   por deploy. Sem force push: o histórico do que já foi publicado é
+   preservado.
 
-A Vercel expõe `VERCEL_GIT_COMMIT_SHA` durante o build; o cliente embute esse
-valor e mostra o commit no painel de versões, então dá para conferir na própria
-página publicada se ela corresponde ao commit atual da `main`.
+A branch `gh-pages` guarda apenas o resultado do build. Ela é gerada — nada
+deve ser editado à mão nela.
 
-Depois de conectado, todo push em `main` gera um deploy de produção
-automaticamente, e cada pull request ganha um deploy de pré-visualização.
+`apps/web/src/deploy.test.ts` verifica essas garantias lendo o próprio
+workflow. Um erro ali só apareceria depois do deploy, com o jogo no ar.
 
-### O que `vercel.json` garante
+### Prefixo de publicação
 
-- **Fallback de SPA com exceção.** Qualquer rota que não seja arquivo cai em
-  `index.html`, para que `/login`, `/builds`, `/match` e `/profile` possam ser
-  recarregadas direto sem 404. Ficam de fora `/assets/`, `/icons/`, `/app/`,
-  `sw.js`, `registerSW.js`, `workbox-*` e `manifest.webmanifest`: um asset que
-  falta precisa devolver 404 de verdade, não HTML com status 200.
-  `apps/web/src/deploy.test.ts` verifica essa expressão nos dois sentidos.
-- **Service worker sempre revalidado.** `sw.js` e `index.html` vão com
-  `max-age=0, must-revalidate`, senão a atualização nunca chegaria ao jogador.
-- **Bundles com hash em cache longo** (`/app/*`, um ano, `immutable`).
-- **Manifesto com `application/manifest+json`**, que é o que o navegador
-  espera para oferecer a instalação.
+O prefixo vem de `BASE_PATH` e alimenta três coisas ao mesmo tempo: o `base`
+do Vite, os padrões do service worker e o `start_url`/`scope` do manifesto.
+`start_url` e `scope` são o que decide se o navegador aceita instalar, então
+eles nunca podem divergir do caminho servido.
+
+Sem `BASE_PATH`, o build sai servido na raiz — que é o caso do
+desenvolvimento local.
+
+### Rotas
+
+`/login`, `/builds`, `/match` e `/profile` podem ser recarregadas direto: o
+Pages devolve `404.html`, que é o mesmo documento do cliente. Um asset que
+falta continua devolvendo status 404 de verdade, e é isso que faz o
+`<AssetImage>` cair para o placeholder técnico em vez de tentar desenhar HTML.
 
 ### Estratégia de cache da PWA
 
@@ -79,6 +81,17 @@ automaticamente, e cada pull request ganha um deploy de pré-visualização.
 - A atualização é `prompt`, nunca automática: o service worker baixa a versão
   nova em segundo plano e a troca só acontece quando o jogador aceita. Uma
   partida em andamento não pode ser recarregada por baixo do jogador.
+
+Como `name`, `start_url`, `scope` e os ícones não mudam entre deploys, a
+identidade do aplicativo é sempre a mesma: quem já instalou recebe as versões
+novas sem precisar reinstalar.
+
+### Rastreabilidade
+
+O build embute o commit que o originou — `GITHUB_SHA` no workflow, `git
+rev-parse HEAD` no desenvolvimento local — e a tela mostra o hash curto no
+painel de versões. Dá para conferir na própria página publicada se ela
+corresponde ao commit atual da `main`.
 
 ### Instalação
 

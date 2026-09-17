@@ -30,10 +30,10 @@ export interface ManifestoDaAplicacao {
 /**
  * Normaliza o prefixo de publicação: sempre começa e termina com barra.
  *
- * Na Vercel o cliente é servido na raiz; no GitHub Pages ele fica em
- * `/Arcane-duel-rebuild/`. `start_url` e `scope` precisam seguir o prefixo,
- * senão o navegador se recusa a instalar ou instala apontando para o lugar
- * errado.
+ * No GitHub Pages o cliente é servido sob o nome do repositório, em
+ * `/Arcane-duel-rebuild/`, e não na raiz do domínio. `start_url` e `scope`
+ * precisam seguir esse prefixo, senão o navegador se recusa a instalar ou
+ * instala apontando para o lugar errado.
  */
 export const normalizarBase = (base: string): string => {
   const comInicio = base.startsWith('/') ? base : `/${base}`;

@@ -8,6 +8,9 @@ aleatória, sem dano variável, sem crítico e sem esquiva.
 As regras completas estão em [`docs/FULL_GAME_SPEC.md`](docs/FULL_GAME_SPEC.md),
 que é a fonte de verdade do projeto.
 
+Publicado em **https://uchihadam3.github.io/Arcane-duel-rebuild/**, a partir da
+branch `main`. O cliente é instalável como PWA no Android e no iPhone.
+
 > **Estado atual: fundação.** O motor de regras ainda não resolve combate e o
 > catálogo de cartas está vazio. Esta entrega monta a estrutura, as camadas, as
 > ferramentas e a integração dos assets aprovados. A tela inicial é um

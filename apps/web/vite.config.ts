@@ -15,19 +15,20 @@ import { criarManifesto, normalizarBase } from './src/pwa/manifest';
 const { version } = createRequire(import.meta.url)('./package.json') as { version: string };
 
 /**
- * Prefixo de publicação. Na Vercel o cliente é servido na raiz; no GitHub
- * Pages ele fica sob o nome do repositório, informado por `BASE_PATH`.
+ * Prefixo de publicação. No GitHub Pages o cliente fica sob o nome do
+ * repositório, informado pelo workflow em `BASE_PATH`. Sem a variável, o
+ * build sai servido na raiz — que é o caso do desenvolvimento local.
  */
 const base = normalizarBase(process.env.BASE_PATH ?? '/');
 
 /**
- * Commit que originou este build. Nos serviços de publicação vem da variável
- * de ambiente; no desenvolvimento local vem do próprio git. Serve para
- * conferir, olhando a página publicada, se ela corresponde à `main`.
+ * Commit que originou este build. No GitHub Actions vem de `GITHUB_SHA`; no
+ * desenvolvimento local vem do próprio git. Serve para conferir, olhando a
+ * página publicada, se ela corresponde à `main`.
  */
 const descobrirCommit = (): string => {
-  const doServico = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
-  if (doServico !== undefined && doServico !== '') return doServico;
+  const doWorkflow = process.env.GITHUB_SHA;
+  if (doWorkflow !== undefined && doWorkflow !== '') return doWorkflow;
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   } catch {
