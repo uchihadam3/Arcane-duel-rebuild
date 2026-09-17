@@ -112,18 +112,41 @@ const somarUso = (usoPorCarta: Map<string, number>, carta: CardId): void => {
   usoPorCarta.set(carta, (usoPorCarta.get(carta) ?? 0) + 1);
 };
 
+/*
+ * Regra única da frequência por carta.
+ *
+ * Cada utilização real incrementa a frequência **exatamente uma vez**. Os
+ * eventos abaixo são os seis que representam uma carta sendo posta em uso, e
+ * cada um deles vale um:
+ *
+ *   acao-declarada .............. a carta ocupou um espaço de Ação
+ *   resposta-registrada ......... a carta de Reação ocupou o espaço de Resposta
+ *   carta-de-classe-ativada ..... a Carta de Classe foi Ativada
+ *   carta-de-classe-exaurida .... a Carta de Classe foi Exaurida
+ *   passiva-revelada ............ a Passiva entrou em jogo
+ *   passiva-ativada ............. a Passiva foi Ativada
+ *
+ * `ultimate-consumida` **não** entra nessa conta: a Ultimate já foi contada
+ * quando ocupou o espaço de Ação ou de Resposta, e somá-la de novo aqui era o
+ * que dobrava a frequência dela. Ela continua alimentando o contador próprio
+ * `ultimatesUsadas`, que é outra métrica e mede outra coisa.
+ *
+ * Os contadores específicos — Ultimates, Passivas reveladas, Passivas
+ * Ativadas, Cartas de Classe por Ativar e por Exaurir — seguem separados e
+ * nenhum deles duplica a frequência geral.
+ */
 const contar = (acumulador: Acumulador, eventos: readonly EventoUniversal[]): void => {
   for (const evento of eventos) {
     if (evento.tipo === 'ruptura') acumulador.rupturas += 1;
-    else if (evento.tipo === 'ultimate-consumida') {
-      acumulador.ultimatesUsadas += 1;
-      somarUso(acumulador.usoPorCarta, evento.carta);
-    } else if (evento.tipo === 'defesa-inata-usada') acumulador.respostasComDefesaInata += 1;
+    else if (evento.tipo === 'ultimate-consumida') acumulador.ultimatesUsadas += 1;
+    else if (evento.tipo === 'defesa-inata-usada') acumulador.respostasComDefesaInata += 1;
     else if (evento.tipo === 'passiva-revelada') {
       acumulador.passivasReveladas += 1;
       somarUso(acumulador.usoPorCarta, evento.carta);
-    } else if (evento.tipo === 'passiva-ativada') acumulador.passivasAtivadas += 1;
-    else if (evento.tipo === 'carta-de-classe-ativada') {
+    } else if (evento.tipo === 'passiva-ativada') {
+      acumulador.passivasAtivadas += 1;
+      somarUso(acumulador.usoPorCarta, evento.carta);
+    } else if (evento.tipo === 'carta-de-classe-ativada') {
       acumulador.cartasDeClassePorAtivar += 1;
       somarUso(acumulador.usoPorCarta, evento.carta);
     } else if (evento.tipo === 'carta-de-classe-exaurida') {

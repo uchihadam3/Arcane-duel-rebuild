@@ -309,7 +309,7 @@ describe('Guerreiro — Cartas de Classe', () => {
   });
 
   it('WC06 Ativada soma +1 D e +1 I a um Ataque logo depois de outro Ataque', () => {
-    const inicial = duelo(guerreiro(['W01', 'W01'], { cartasDeClasse: ['WC06', 'WC02'] }), mago);
+    const inicial = duelo(guerreiro(['W01', 'W02'], { cartasDeClasse: ['WC06', 'WC02'] }), mago);
     const primeira = jogar(inicial, A, { pedido: { carta: 'W01' as never } }).partida;
     const antes = jogador(primeira, B).vida;
     const { partida: depois } = jogar(primeira, A, {

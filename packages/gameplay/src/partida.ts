@@ -12,6 +12,7 @@ import type {
   ReforcoEscolhido,
   Resultado,
   SlotDeAcao,
+  TipoDeCarta,
   ZonaDeCooldown,
 } from '@arcane-duel/shared-types';
 import { falha, sucesso, temTag, valorDaAnotacao } from '@arcane-duel/shared-types';
@@ -21,8 +22,10 @@ import type {
   ErroDeDominio,
   EventoUniversal,
   ResultadoDoComando,
+  SlotDaBuild,
 } from '@arcane-duel/rules-engine';
 import {
+  COMPOSICAO_DA_BUILD,
   adiantarCartaNoCooldown,
   ativarCartaDeClasse,
   ativarPassiva,
@@ -44,6 +47,7 @@ import {
   CARD_DATA_VERSION,
   CATALOGO,
   PERSONAGEM_DA_CLASSE,
+  ehPersonagem,
   perfilDaCarta,
 } from '@arcane-duel/card-data';
 
@@ -95,6 +99,14 @@ import { podeUsarUltimoBastiao } from './efeitos/guerreiro.js';
  * buscados no catálogo. Não existe caminho por onde um cliente possa afirmar
  * que a carta dele custa menos ou causa mais.
  */
+
+/** Os quatro slots da build, na ordem em que a composição os descreve (§3). */
+const SLOTS_DA_BUILD: readonly SlotDaBuild[] = [
+  'habilidades',
+  'passivas',
+  'cartas-de-classe',
+  'ultimate',
+];
 
 export interface UsoDeCartaDeClasse {
   readonly carta: CardId;
@@ -174,19 +186,40 @@ export interface ConfiguracaoDePartidaDoCatalogo {
   readonly jogadores: readonly [ConfiguracaoDeJogadorDoCatalogo, ConfiguracaoDeJogadorDoCatalogo];
 }
 
-/** Confere que toda carta da build existe no catálogo e é da classe certa. */
+/*
+ * Validação da build.
+ *
+ * Esta é uma fronteira autoritativa: a build vai chegar do cliente ou de um
+ * servidor, e nada garante que ela respeite os tipos do TypeScript quando
+ * atravessa a rede. Por isso a conferência é de execução, não de compilação, e
+ * cobre a composição inteira — quantidade por slot, tipo de cada carta, classe,
+ * repetição e Personagem (FULL_GAME_SPEC.md §3).
+ */
+
+/** Os tipos de carta que cada slot da build aceita. */
+const TIPOS_POR_SLOT: Readonly<Record<SlotDaBuild, readonly TipoDeCarta[]>> = {
+  habilidades: ['ataque', 'tecnica', 'reacao'],
+  passivas: ['passiva'],
+  'cartas-de-classe': ['carta-de-classe'],
+  ultimate: ['ultimate'],
+};
+
+/** Quantas cartas cada slot exige, exatamente. */
+const QUANTIDADE_POR_SLOT: Readonly<Record<SlotDaBuild, number>> = {
+  habilidades: COMPOSICAO_DA_BUILD.habilidades,
+  passivas: COMPOSICAO_DA_BUILD.passivas,
+  'cartas-de-classe': COMPOSICAO_DA_BUILD.cartasDeClasse,
+  ultimate: COMPOSICAO_DA_BUILD.ultimates,
+};
+
+/**
+ * Confere a build inteira e devolve todos os problemas encontrados.
+ *
+ * Devolve a lista completa em vez de parar no primeiro: quem montou a build
+ * merece ver tudo o que está errado de uma vez.
+ */
 export const validarBuild = (build: BuildEquipada): readonly ErroDeDominio[] => {
   const problemas: ErroDeDominio[] = [];
-  const conferir = (carta: CardId): void => {
-    const definicao = CATALOGO.porId(carta);
-    if (definicao === undefined) {
-      problemas.push({ tipo: 'carta-desconhecida', carta });
-      return;
-    }
-    if (definicao.classe !== build.classe) {
-      problemas.push({ tipo: 'carta-de-outra-classe', carta, classe: build.classe });
-    }
-  };
 
   // O Personagem não é carta do catálogo: ele é a identidade técnica da classe,
   // e a única coisa a conferir é se é o da classe escolhida.
@@ -200,10 +233,60 @@ export const validarBuild = (build: BuildEquipada): readonly ErroDeDominio[] => 
     });
   }
 
-  for (const carta of build.habilidades) conferir(carta);
-  for (const carta of build.passivas) conferir(carta);
-  for (const carta of build.cartasDeClasse) conferir(carta);
-  conferir(build.ultimate);
+  const porSlot: Readonly<Record<SlotDaBuild, readonly CardId[]>> = {
+    habilidades: build.habilidades,
+    passivas: build.passivas,
+    'cartas-de-classe': build.cartasDeClasse,
+    ultimate: [build.ultimate],
+  };
+
+  const vistas = new Set<CardId>();
+
+  for (const slot of SLOTS_DA_BUILD) {
+    const cartas = porSlot[slot];
+
+    if (cartas.length !== QUANTIDADE_POR_SLOT[slot]) {
+      problemas.push({
+        tipo: 'composicao-invalida',
+        slot,
+        esperado: QUANTIDADE_POR_SLOT[slot],
+        recebido: cartas.length,
+      });
+    }
+
+    for (const carta of cartas) {
+      if (vistas.has(carta)) {
+        problemas.push({ tipo: 'carta-repetida-na-build', carta });
+        continue;
+      }
+      vistas.add(carta);
+
+      // O Personagem técnico não é jogável: ele não ocupa slot nenhum.
+      if (ehPersonagem(carta)) {
+        problemas.push({ tipo: 'personagem-em-slot-jogavel', carta, slot });
+        continue;
+      }
+
+      const definicao = CATALOGO.porId(carta);
+      if (definicao === undefined) {
+        problemas.push({ tipo: 'carta-desconhecida', carta });
+        continue;
+      }
+      if (definicao.classe !== build.classe) {
+        problemas.push({ tipo: 'carta-de-outra-classe', carta, classe: build.classe });
+        continue;
+      }
+      if (!TIPOS_POR_SLOT[slot].includes(definicao.tipo)) {
+        problemas.push({
+          tipo: 'tipo-invalido-no-slot',
+          carta,
+          slot,
+          recebido: definicao.tipo,
+        });
+      }
+    }
+  }
+
   return problemas;
 };
 

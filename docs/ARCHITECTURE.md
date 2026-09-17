@@ -478,6 +478,12 @@ partida interrompida por ele é contada como interrompida, nunca como vitória,
 derrota ou empate. O mesmo vale para uma recusa de `interacao-nao-definida`, que
 é contada à parte como bloqueio de regra.
 
+A build é conferida em **tempo de execução** antes de virar estado de partida:
+quantidade exata por slot, tipo de cada carta no slot certo, classe, nenhuma
+carta repetida e o Personagem técnico da classe — que não pode ocupar slot
+jogável nenhum. O TypeScript não acompanha um objeto que atravessou a rede, e
+`montarPartida` recusa a configuração inteira antes de construir qualquer coisa.
+
 **Comando ilegal é bug do simulador.** Uma política só pode produzir comandos
 legais. Qualquer outra recusa do motor é registrada em `comandosIlegais`,
 encerra a partida como inválida e faz o processo terminar com código de erro —
@@ -487,6 +493,15 @@ Defesas Inatas, Ultimates, Passivas reveladas, Passivas Ativadas, Cartas de
 Classe por Ativar e por Exaurir, Vida média do vencedor, frequência por carta
 (mapa por identificador, aceitando qualquer build legal), bloqueios por regra
 indefinida, limite técnico e comandos ilegais.
+
+Na frequência por carta, cada utilização real vale **exatamente um**.
+`ultimate-consumida` não entra nessa conta — a Ultimate já foi contada quando
+ocupou o espaço de Ação ou de Resposta —, e continua alimentando só o contador
+próprio de Ultimates.
+
+O veredito de um lote não depende do formato de saída: em texto e em JSON, um
+lote com comando ilegal termina o processo com código diferente de zero. O JSON
+continua sendo impresso, para diagnóstico.
 
 O relatório da linha de base está em `SIMULATION_STAGE3_BASELINE.md`.
 

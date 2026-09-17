@@ -3,6 +3,7 @@ import type {
   ClassId,
   PlayerId,
   RecursoDeCusto,
+  TipoDeCarta,
   TipoDeHabilidade,
 } from '@arcane-duel/shared-types';
 
@@ -67,6 +68,28 @@ export type ErroDeDominio =
   | { readonly tipo: 'carta-fora-da-build'; readonly carta: CardId }
   /** A carta existe, mas não é da classe do jogador. */
   | { readonly tipo: 'carta-de-outra-classe'; readonly carta: CardId; readonly classe: ClassId }
+  /** Um slot da build não tem a quantidade exata de cartas exigida (§3). */
+  | {
+      readonly tipo: 'composicao-invalida';
+      readonly slot: SlotDaBuild;
+      readonly esperado: number;
+      readonly recebido: number;
+    }
+  /** A mesma carta aparece mais de uma vez na build. */
+  | { readonly tipo: 'carta-repetida-na-build'; readonly carta: CardId }
+  /** A carta existe, mas o tipo dela não é o do slot em que foi posta. */
+  | {
+      readonly tipo: 'tipo-invalido-no-slot';
+      readonly carta: CardId;
+      readonly slot: SlotDaBuild;
+      readonly recebido: TipoDeCarta;
+    }
+  /** O Personagem técnico foi posto em um slot que se joga. */
+  | {
+      readonly tipo: 'personagem-em-slot-jogavel';
+      readonly carta: CardId;
+      readonly slot: SlotDaBuild;
+    }
   /** O Personagem da build não é o da classe escolhida. */
   | {
       readonly tipo: 'personagem-invalido';
@@ -99,6 +122,9 @@ export type ErroDeDominio =
    * O motor recusa em vez de escolher uma interpretação por conta própria.
    */
   | { readonly tipo: 'interacao-nao-definida'; readonly detalhe: InteracaoNaoDefinida };
+
+/** Os slots que compõem uma build para a batalha (FULL_GAME_SPEC.md §3). */
+export type SlotDaBuild = 'habilidades' | 'passivas' | 'cartas-de-classe' | 'ultimate';
 
 /** Interações que o FULL_GAME_SPEC.md ainda não resolve. */
 export type InteracaoNaoDefinida = 'lento-com-impulso-inicial';

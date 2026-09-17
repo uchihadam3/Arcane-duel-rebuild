@@ -1,11 +1,9 @@
 import process from 'node:process';
 
-import { RULES_VERSION } from '@arcane-duel/rules-engine';
-import { CARD_DATA_VERSION } from '@arcane-duel/card-data';
 import { rodarLote } from '@arcane-duel/gameplay';
 
 import { lerArgumentos } from './argumentos.js';
-import { formatarResumo } from './relatorio.js';
+import { codigoDeSaida, renderizar } from './saida.js';
 
 /*
  * Ponto de entrada do simulador headless.
@@ -24,28 +22,12 @@ const executar = (): void => {
     exploracao: argumentos.exploracao,
   });
 
-  const duracao = Date.now() - inicio;
+  process.stdout.write(renderizar(resumo, argumentos.formato, Date.now() - inicio));
 
-  if (argumentos.formato === 'json') {
-    process.stdout.write(
-      `${JSON.stringify({ rulesVersion: RULES_VERSION, cardDataVersion: CARD_DATA_VERSION, duracaoEmMs: duracao, ...resumo }, null, 2)}\n`,
-    );
-    return;
-  }
-
-  process.stdout.write(
-    [
-      `rulesVersion ................ ${RULES_VERSION}`,
-      `cardDataVersion ............. ${CARD_DATA_VERSION}`,
-      formatarResumo(resumo),
-      `duração ..................... ${String(duracao)} ms`,
-      '',
-    ].join('\n'),
-  );
-
-  // Um lote com comando ilegal não vale como medição: o processo termina com
-  // erro para que ninguém publique esses números por engano.
-  if (resumo.comandosIlegais > 0) process.exitCode = 1;
+  // Um lote com comando ilegal não vale como medição, seja qual for o formato:
+  // o processo termina com erro para que ninguém publique esses números por
+  // engano.
+  process.exitCode = codigoDeSaida(resumo);
 };
 
 executar();

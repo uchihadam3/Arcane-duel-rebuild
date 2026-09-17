@@ -44,6 +44,32 @@ Duas exceções continuam sendo exceções, contadas separadamente:
   `AMBIGUIDADES.md`). É lacuna do documento, não bug.
 - **limite técnico de turnos** — trava do simulador, não regra de jogo.
 
+## Como a frequência por carta é contada
+
+Cada utilização real de uma carta incrementa a frequência dela **exatamente uma
+vez**. Os eventos que contam são os seis que representam uma carta entrando em
+uso:
+
+| Evento                     | Vale |
+| -------------------------- | ---: |
+| `acao-declarada`           |    1 |
+| `resposta-registrada`      |    1 |
+| `carta-de-classe-ativada`  |    1 |
+| `carta-de-classe-exaurida` |    1 |
+| `passiva-revelada`         |    1 |
+| `passiva-ativada`          |    1 |
+| `ultimate-consumida`       |    0 |
+
+`ultimate-consumida` vale zero **de propósito**: a Ultimate já foi contada
+quando ocupou o espaço de Ação ou de Resposta. Somá-la de novo dobrava a
+frequência dela — era o que fazia MU01 aparecer 20 000 vezes em um lote com
+2,00 Ultimates por partida. Ela continua alimentando o contador próprio
+`ultimatesUsadas`, que mede outra coisa.
+
+Os contadores específicos — Ultimates, Passivas reveladas, Passivas Ativadas,
+Cartas de Classe por Ativar e por Exaurir — seguem separados, e nenhum deles
+duplica a frequência geral.
+
 ## O primeiro resultado é sobre o simulador, não sobre o jogo
 
 Com a política de base pura — PRNG usado **apenas** para desempatar opções de
@@ -90,7 +116,19 @@ explicitamente.
 | bloqueios Lento + Impulso Inicial   |     0 |
 | **comandos ilegais**                | **0** |
 
-Cartas distintas jogadas: 24.
+Cartas distintas jogadas: 24. Cada Ultimate aparece 10 000 vezes — uma por
+partida —, o que fecha com as 2,00 Ultimates por partida do lote.
+
+| Carta | Vezes | Carta | Vezes | Carta | Vezes |
+| ----- | ----: | ----- | ----: | ----- | ----: |
+| W02   | 40000 | M03   | 15000 | W10   | 10000 |
+| M01   | 30000 | M15   | 15000 | WP01  | 10000 |
+| M02   | 20000 | MP01  | 10000 | WP04  | 10000 |
+| M04   | 20000 | MP06  | 10000 | WP07  | 10000 |
+| W08   | 20000 | MP10  | 10000 | WP08  | 10000 |
+| MU01  | 10000 | WU01  | 10000 | W03   | 10000 |
+| M12   |  5007 | M17   |  5000 | W11   |  5000 |
+| W15   |  5000 | W19   |  5000 | M11   |  4993 |
 
 ## Lote B — com exploração pedida (`--exploracao 0.25`)
 
@@ -131,15 +169,15 @@ distintas, que são as das duas Receitas 1 mais as Passivas reveladas.
 
 | Carta | Vezes | Carta | Vezes | Carta | Vezes |
 | ----- | ----: | ----- | ----: | ----- | ----: |
-| W02   | 35072 | MU01  | 20000 | MP01  |  9772 |
-| M01   | 28662 | WU01  | 19920 | W10   |  8688 |
-| M02   | 21069 | M04   | 19499 | WP01  |  8371 |
-| W08   | 18476 | M15   | 15869 | M12   |  8295 |
-| M03   | 15103 | W03   | 12754 | W15   |  6256 |
-| M11   | 10403 | W11   | 10265 | M17   |  4604 |
-| MP06  | 10000 | MP10  | 10000 | W19   |  4083 |
-| WP07  | 10000 | WP08  | 10000 | W16   |    60 |
-| WP04  |  9998 |       |       |       |       |
+| W02   | 35072 | M03   | 15103 | WP08  | 10000 |
+| M01   | 28662 | W03   | 12754 | WP04  |  9998 |
+| M02   | 21069 | M11   | 10403 | WU01  |  9960 |
+| M04   | 19499 | W11   | 10265 | MP01  |  9772 |
+| W08   | 18476 | MP06  | 10000 | W10   |  8688 |
+| M15   | 15869 | MP10  | 10000 | WP01  |  8371 |
+| MU01  | 10000 | WP07  | 10000 | M12   |  8295 |
+| W15   |  6256 | M17   |  4604 | W19   |  4083 |
+| W16   |    60 |       |       |       |       |
 
 ## O que os números dizem
 
