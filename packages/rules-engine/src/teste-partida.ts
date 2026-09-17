@@ -2,8 +2,11 @@ import type {
   CardId,
   EstadoDaPartida,
   EstadoDeJogador,
+  ParcelaDeRecurso,
+  ParcelaVariavelDeRecurso,
   PerfilDeHabilidade,
   PlayerId,
+  TagDeCarta,
   ZonaDeCooldown,
 } from '@arcane-duel/shared-types';
 import { cardId, matchId } from '@arcane-duel/shared-types';
@@ -49,13 +52,22 @@ export interface OpcoesDePerfil {
   readonly impacto?: number;
   readonly cooldown?: ZonaDeCooldown;
   readonly tipo?: PerfilDeHabilidade['tipo'];
+  readonly tags?: readonly TagDeCarta[];
+  readonly recurso?: ParcelaDeRecurso;
+  readonly variavel?: ParcelaVariavelDeRecurso;
 }
 
 /** Perfil impresso de uma habilidade sintética, para os testes universais. */
 export const perfil = (carta: CardId, opcoes: OpcoesDePerfil = {}): PerfilDeHabilidade => ({
   carta,
   tipo: opcoes.tipo ?? 'ataque',
-  custo: { moeda: 'ap', valor: opcoes.custo ?? 1 },
+  tags: opcoes.tags ?? [],
+  custo: {
+    moeda: 'ap',
+    valor: opcoes.custo ?? 1,
+    ...(opcoes.recurso === undefined ? {} : { recurso: opcoes.recurso }),
+    ...(opcoes.variavel === undefined ? {} : { variavel: opcoes.variavel }),
+  },
   cooldown: opcoes.cooldown ?? 1,
   valores:
     opcoes.tipo === 'tecnica' ? null : { dano: opcoes.dano ?? 0, impacto: opcoes.impacto ?? 0 },
@@ -81,11 +93,21 @@ export { ID_A, ID_B };
  */
 export const perfilDeReacao = (
   carta: CardId,
-  opcoes: { readonly custo?: number; readonly cooldown?: ZonaDeCooldown } = {},
+  opcoes: {
+    readonly custo?: number;
+    readonly cooldown?: ZonaDeCooldown;
+    readonly recurso?: ParcelaDeRecurso;
+    readonly tags?: readonly TagDeCarta[];
+  } = {},
 ): PerfilDeHabilidade => ({
   carta,
   tipo: 'reacao',
-  custo: { moeda: 'reserva', valor: opcoes.custo ?? 1 },
+  tags: opcoes.tags ?? [],
+  custo: {
+    moeda: 'reserva',
+    valor: opcoes.custo ?? 1,
+    ...(opcoes.recurso === undefined ? {} : { recurso: opcoes.recurso }),
+  },
   cooldown: opcoes.cooldown ?? 1,
   valores: null,
 });

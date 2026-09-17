@@ -1,5 +1,7 @@
 import type { CardId, ClassId, MatchId, PlayerId } from './ids.js';
 import type { PerfilDeHabilidade, ZonaDeCooldown } from './cards.js';
+import type { Anotacoes } from './anotacoes.js';
+import type { EscolhasDaAcao } from './escolhas.js';
 import type { IndiceDeAcao } from './zones.js';
 import type { CondicaoId } from './conditions.js';
 import type { EstadoDeCartaDeClasse, EstadoDePassiva, EstadoDeUltimate } from './card-state.js';
@@ -60,8 +62,23 @@ export interface SlotDeResposta {
   readonly voluntaria: RespostaVoluntaria | null;
 }
 
-/** Em que ponto da resolução o espaço de Ação está. */
-export type SituacaoDaAcao = 'vazio' | 'declarada' | 'resolvida';
+/**
+ * Em que ponto da resolução o espaço de Ação está.
+ *
+ * `indisponivel` é o estado do quarto espaço enquanto ele não existe. Ele
+ * existe no tipo porque uma carta do catálogo — a Runa Prismática Exaurida —
+ * libera explicitamente uma quarta Ação; deixar isso representável é o que
+ * impede a exceção de virar um caso escondido fora do estado.
+ */
+export type SituacaoDaAcao = 'indisponivel' | 'vazio' | 'declarada' | 'resolvida';
+
+/** Como uma Carta de Classe foi usada dentro de uma Ação. */
+export type ModoDeUso = 'ativar' | 'exaurir';
+
+export interface UsoDeCartaDeClasseNaAcao {
+  readonly carta: CardId;
+  readonly modo: ModoDeUso;
+}
 
 /**
  * Modificadores acumulados sobre uma Ação antes de ela resolver.
@@ -75,23 +92,59 @@ export interface ModificadoresDaAcao {
   readonly impacto: number;
 }
 
-/** Um dos três espaços centrais de Ação, com a sua Resposta correspondente. */
+/** Um dos espaços centrais de Ação, com a sua Resposta correspondente. */
 export interface SlotDeAcao {
   readonly indice: IndiceDeAcao;
   readonly situacao: SituacaoDaAcao;
   /** A carta declarada, com os valores impressos dela. */
   readonly perfil: PerfilDeHabilidade | null;
+  /** As escolhas legais informadas na declaração, já validadas contra a carta. */
+  readonly escolhas: EscolhasDaAcao;
   readonly resposta: SlotDeResposta;
   readonly modificadores: ModificadoresDaAcao;
   /**
+   * Redução trazida pela Resposta, separada dos demais modificadores.
+   *
+   * Ela é separada porque várias cartas falam explicitamente do momento dela:
+   * "+3 D **depois** que a redução da Reação for aplicada", "se o Dano final
+   * for 0". Somar tudo em um número só apagaria essa ordem.
+   */
+  readonly reducaoDaResposta: ModificadoresDaAcao;
+  /**
+   * Dano final imposto por carta ("o Dano final deste Ataque se torna 0").
+   *
+   * É um valor definido, não um modificador enorme de sinal negativo: o texto
+   * fixa o resultado, e fixar o resultado é o último passo da conta.
+   */
+  readonly danoFinalDefinido: number | null;
+  /** Uma carta impediu a Ruptura desta Ação (Postura da Fortaleza Exaurida). */
+  readonly impedirRuptura: boolean;
+  /** Bônus de Ruptura desta Ação, quando uma carta substitui o valor universal. */
+  readonly bonusDeRupturaSubstituto: number | null;
+  /** Dano somado depois da redução da Resposta (Postura do Duelista Exaurida). */
+  readonly bonusAposReducao: number;
+  /** O texto da carta foi cancelado (Contrafeitiço). Custo e espaço continuam gastos. */
+  readonly textoCancelado: boolean;
+  /** Recurso de classe efetivamente gasto nesta Ação, incluindo a parcela variável. */
+  readonly recursoGasto: number;
+  /**
    * Cartas de Classe já usadas nesta Ação. Uma Carta de Classe só pode ser
    * usada uma vez na mesma Ação, seja por Ativação ou por Exaustão (§8).
+   *
+   * O modo fica registrado junto porque Ativar e Exaurir são efeitos
+   * diferentes da mesma carta: sem o modo, a resolução não saberia qual dos
+   * dois textos aplicar.
    */
-  readonly cartasDeClasseUsadas: readonly CardId[];
+  readonly cartasDeClasseUsadas: readonly UsoDeCartaDeClasseNaAcao[];
 }
 
-/** Os três espaços de Ação de um jogador, na ordem em que são ocupados. */
-export type SlotsDeAcao = readonly [SlotDeAcao, SlotDeAcao, SlotDeAcao];
+/**
+ * Os espaços de Ação de um jogador, na ordem em que são ocupados.
+ *
+ * São três espaços (§8). O quarto existe apenas como espaço `indisponivel`,
+ * porque uma única carta do catálogo o libera como exceção explícita.
+ */
+export type SlotsDeAcao = readonly [SlotDeAcao, SlotDeAcao, SlotDeAcao, SlotDeAcao];
 
 /**
  * As três zonas de cooldown.
@@ -142,8 +195,16 @@ export interface EstadoDeJogador<TClasse extends ClassId = ClassId> {
   readonly ultimate: UltimateEquipada;
 
   readonly acoes: SlotsDeAcao;
+  /**
+   * Quantas Ações este jogador pode realizar no turno atual. São três (§8); só
+   * uma exceção impressa aumenta esse número, e ela volta a três no turno
+   * seguinte.
+   */
+  readonly acoesPermitidasNoTurno: number;
   readonly condicoes: EstadoDeCondicoes;
   readonly recurso: RecursoDa<TClasse>;
+  /** Estado temporário criado por texto de carta (ver `anotacoes.ts`). */
+  readonly anotacoes: Anotacoes;
 
   /** Cartas de Classe Exauridas, removidas da partida em definitivo. */
   readonly removidas: readonly CardId[];

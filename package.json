@@ -20,6 +20,7 @@
     "icons:placeholder": "node scripts/generate-pwa-icons.mjs",
     "typecheck": "node scripts/typecheck.mjs",
     "build": "npm run typecheck && npm run build --workspace @arcane-duel/web",
+    "simulate": "tsc --build tsconfig.build.json && node apps/simulator/dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

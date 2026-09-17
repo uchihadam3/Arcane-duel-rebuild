@@ -55,7 +55,7 @@ const semCondicoes = (): EstadoDeCondicoes => ({
   sangramento: 0,
 });
 
-/** Os três espaços centrais de Ação, todos vazios. */
+/** Os espaços centrais de Ação no começo de um turno. */
 export const criarSlotsDeAcao = (): SlotsDeAcao => slotsVazios();
 
 /**
@@ -89,8 +89,10 @@ export const criarEstadoDeJogador = (configuracao: ConfiguracaoDeJogador): Estad
     ultimate: { carta: build.ultimate, estado: 'disponivel' },
 
     acoes: criarSlotsDeAcao(),
+    acoesPermitidasNoTurno: REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno,
     condicoes: semCondicoes(),
     recurso: recursoInicialDaClasse(build.classe),
+    anotacoes: [],
     removidas: [],
   };
 };

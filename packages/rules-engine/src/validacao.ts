@@ -94,8 +94,19 @@ export const validarEstadoDeJogador = (
     anotar('cartasDeClasse', `esperadas ${String(COMPOSICAO_DA_BUILD.cartasDeClasse)}`);
   }
 
-  if (jogador.acoes.length !== REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno) {
-    anotar('acoes', `esperados ${String(REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno)} espaços de Ação`);
+  // Três espaços do jogo-base mais o espaço da exceção impressa, que fica
+  // `indisponivel` enquanto nenhuma carta o libera.
+  const espacosRepresentados = REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno + 1;
+  if (jogador.acoes.length !== espacosRepresentados) {
+    anotar('acoes', `esperados ${String(espacosRepresentados)} espaços de Ação`);
+  }
+  const extra = jogador.acoes[REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno];
+  if (
+    extra !== undefined &&
+    extra.situacao !== 'indisponivel' &&
+    jogador.acoesPermitidasNoTurno <= REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno
+  ) {
+    anotar('acoes', 'quarto espaço aberto sem carta que o libere');
   }
   jogador.acoes.forEach((slot, posicao) => {
     problemas.push(
@@ -122,8 +133,11 @@ export const validarEstadoDeJogador = (
   if (jogador.reserva > REGRAS_UNIVERSAIS.maximoDeReserva) {
     anotar('reserva', `acima do máximo de ${String(REGRAS_UNIVERSAIS.maximoDeReserva)}`);
   }
-  if (jogador.acoesRealizadasNoTurno > REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno) {
-    anotar('acoesRealizadasNoTurno', 'acima do máximo de Ações por turno');
+  if (jogador.acoesPermitidasNoTurno < REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno) {
+    anotar('acoesPermitidasNoTurno', 'abaixo das três Ações do jogo-base');
+  }
+  if (jogador.acoesRealizadasNoTurno > jogador.acoesPermitidasNoTurno) {
+    anotar('acoesRealizadasNoTurno', 'acima do máximo de Ações permitido neste turno');
   }
 
   return problemas.length === 0 ? sucesso(true) : falha(problemas);
@@ -176,9 +190,12 @@ const cartasEmTransitoDe = (
   partida: EstadoDaPartida,
   jogador: EstadoDeJogador,
 ): readonly string[] => {
+  // A Ultimate também ocupa um espaço de Ação enquanto resolve, mas ela não é
+  // uma das oito habilidades: contá-la aqui faria a composição parecer errada.
   const proprias = jogador.acoes
     .filter((slot) => slot.situacao === 'declarada' && slot.perfil !== null)
-    .map((slot) => slot.perfil?.carta ?? '');
+    .map((slot) => slot.perfil?.carta ?? '')
+    .filter((carta) => carta !== jogador.ultimate.carta);
 
   const reacoes = partida.jogadores
     .filter((outro) => outro.id !== jogador.id)

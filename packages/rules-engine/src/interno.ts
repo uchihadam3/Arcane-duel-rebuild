@@ -32,16 +32,36 @@ export const substituirSlot = (jogador: EstadoDeJogador, slot: SlotDeAcao): Esta
   ) as unknown as SlotsDeAcao,
 });
 
-export const slotVazio = (indice: IndiceDeAcao): SlotDeAcao => ({
+export const slotVazio = (
+  indice: IndiceDeAcao,
+  situacao: 'vazio' | 'indisponivel' = 'vazio',
+): SlotDeAcao => ({
   indice,
-  situacao: 'vazio',
+  situacao,
   perfil: null,
+  escolhas: {},
   resposta: { voluntaria: null },
   modificadores: { dano: 0, impacto: 0 },
+  reducaoDaResposta: { dano: 0, impacto: 0 },
+  danoFinalDefinido: null,
+  impedirRuptura: false,
+  bonusDeRupturaSubstituto: null,
+  bonusAposReducao: 0,
+  textoCancelado: false,
+  recursoGasto: 0,
   cartasDeClasseUsadas: [],
 });
 
-export const slotsVazios = (): SlotsDeAcao => [slotVazio(0), slotVazio(1), slotVazio(2)];
+/**
+ * Os espaços do começo do turno: três abertos e o quarto indisponível, porque
+ * só uma carta impressa o libera.
+ */
+export const slotsVazios = (): SlotsDeAcao => [
+  slotVazio(0),
+  slotVazio(1),
+  slotVazio(2),
+  slotVazio(3, 'indisponivel'),
+];
 
 export const adversarioDe = (partida: EstadoDaPartida, jogador: PlayerId): EstadoDeJogador => {
   const outro = partida.jogadores.find((atual) => atual.id !== jogador);

@@ -1,8 +1,10 @@
 import type {
   CardId,
   CondicaoId,
+  EscopoDaAnotacao,
   IndiceDeAcao,
   PlayerId,
+  RecursoDeCusto,
   RespostaVoluntaria,
   ZonaDeCooldown,
 } from '@arcane-duel/shared-types';
@@ -51,6 +53,7 @@ export type EventoUniversal =
       readonly ap: number;
       readonly reserva: number;
       readonly impulso: number;
+      readonly recurso: number;
     }
   | { readonly tipo: 'lento-consumido'; readonly jogador: PlayerId; readonly restante: number }
   | {
@@ -73,6 +76,7 @@ export type EventoUniversal =
       readonly guardaDepois: number;
     }
   | { readonly tipo: 'ruptura'; readonly alvo: PlayerId; readonly danoAdicional: number }
+  | { readonly tipo: 'ruptura-impedida'; readonly alvo: PlayerId }
   | {
       readonly tipo: 'dano-aplicado';
       readonly alvo: PlayerId;
@@ -110,6 +114,82 @@ export type EventoUniversal =
   | { readonly tipo: 'reserva-convertida'; readonly jogador: PlayerId; readonly valor: number }
   | { readonly tipo: 'impulso-inicial-descartado'; readonly jogador: PlayerId }
   | { readonly tipo: 'turno-encerrado'; readonly jogador: PlayerId; readonly numero: number }
+  | {
+      readonly tipo: 'recurso-alterado';
+      readonly jogador: PlayerId;
+      readonly recurso: RecursoDeCusto;
+      readonly delta: number;
+      readonly valor: number;
+    }
+  | {
+      readonly tipo: 'anotacao-registrada';
+      readonly jogador: PlayerId;
+      readonly chave: string;
+      readonly origem: CardId;
+      readonly escopo: EscopoDaAnotacao;
+      readonly valor: number;
+    }
+  | { readonly tipo: 'acao-extra-liberada'; readonly jogador: PlayerId; readonly origem: CardId }
+  | { readonly tipo: 'defesa-inata-usada'; readonly jogador: PlayerId }
+  | {
+      readonly tipo: 'reducao-da-resposta';
+      readonly jogador: PlayerId;
+      readonly indice: IndiceDeAcao;
+      readonly dano: number;
+      readonly impacto: number;
+    }
+  | {
+      readonly tipo: 'dano-final-definido';
+      readonly indice: IndiceDeAcao;
+      readonly valor: number;
+    }
+  | { readonly tipo: 'texto-cancelado'; readonly indice: IndiceDeAcao; readonly carta: CardId }
+  | {
+      readonly tipo: 'condicao-aplicada';
+      readonly alvo: PlayerId;
+      readonly condicao: CondicaoId;
+      readonly quantidade: number;
+      readonly total: number;
+    }
+  | {
+      readonly tipo: 'condicao-removida';
+      readonly alvo: PlayerId;
+      readonly condicao: CondicaoId;
+      readonly quantidade: number;
+    }
+  | {
+      readonly tipo: 'carta-devolvida-a-mao';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly de: ZonaDeCooldown;
+    }
+  | {
+      readonly tipo: 'carta-adiantada-no-cooldown';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly de: ZonaDeCooldown;
+      readonly para: ZonaDeCooldown;
+    }
+  | {
+      readonly tipo: 'guarda-ajustada';
+      readonly jogador: PlayerId;
+      readonly valor: number;
+    }
+  | {
+      readonly tipo: 'vida-perdida';
+      readonly alvo: PlayerId;
+      readonly valor: number;
+      readonly vidaDepois: number;
+      readonly origem: CardId;
+    }
+  | { readonly tipo: 'ap-recuperado'; readonly jogador: PlayerId; readonly valor: number }
+  | { readonly tipo: 'reserva-ganha'; readonly jogador: PlayerId; readonly valor: number }
+  | {
+      readonly tipo: 'carta-de-classe-prontificada-por-efeito';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly origem: CardId;
+    }
   | {
       readonly tipo: 'partida-encerrada';
       readonly vencedor: PlayerId | null;

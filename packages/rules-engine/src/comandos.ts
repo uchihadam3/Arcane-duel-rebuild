@@ -1,4 +1,5 @@
 import type {
+  EscolhasDaAcao,
   EstadoDaPartida,
   EstadoDeJogador,
   IndiceDeAcao,
@@ -7,7 +8,7 @@ import type {
   RespostaVoluntaria,
   SlotDeAcao,
 } from '@arcane-duel/shared-types';
-import { falha, sucesso } from '@arcane-duel/shared-types';
+import { expirarAnotacoes, falha, sucesso } from '@arcane-duel/shared-types';
 
 import type { RespostaDeComando } from './comando.js';
 import { encerrarSeVidaZerou, exigirJogadorDaPartida, exigirTurnoEmAndamento } from './comando.js';
@@ -15,7 +16,8 @@ import { REGRAS_UNIVERSAIS } from './constants.js';
 import { concluiuASegundaAcao, consumirLento, resolverSangramento } from './condicoes.js';
 import { resolverAtaque } from './combate.js';
 import { enviarParaCooldown } from './cooldown.js';
-import { pagarComPontosDeAcao, pagarComReserva } from './custos.js';
+import type { DescontosDeCusto } from './custos.js';
+import { pagarCustoCompleto } from './custos.js';
 import type { EventoUniversal } from './eventos.js';
 import { adversarioDe, substituirJogador, substituirSlot } from './interno.js';
 
@@ -76,15 +78,17 @@ export const declararAcao = (
   partida: EstadoDaPartida,
   jogador: PlayerId,
   perfil: PerfilDeHabilidade,
+  escolhas: EscolhasDaAcao = {},
+  descontos: DescontosDeCusto = {},
 ): RespostaDeComando => {
   const ativo = exigirTurnoEmAndamento(partida, jogador);
   if (!ativo.ok) return ativo;
 
   const atacante = ativo.valor;
-  if (atacante.acoesRealizadasNoTurno >= REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno) {
+  if (atacante.acoesRealizadasNoTurno >= atacante.acoesPermitidasNoTurno) {
     return falha({
       tipo: 'limite-de-acoes-atingido',
-      limite: REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno,
+      limite: atacante.acoesPermitidasNoTurno,
     });
   }
   if (perfil.custo.moeda !== 'ap')
@@ -97,11 +101,11 @@ export const declararAcao = (
   if (slot === undefined) {
     return falha({
       tipo: 'limite-de-acoes-atingido',
-      limite: REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno,
+      limite: atacante.acoesPermitidasNoTurno,
     });
   }
 
-  const pagamento = pagarComPontosDeAcao(atacante, perfil.custo.valor);
+  const pagamento = pagarCustoCompleto(atacante, perfil.carta, perfil.custo, escolhas, descontos);
   if (!pagamento.ok) return pagamento;
 
   const eventos: EventoUniversal[] = [
@@ -112,6 +116,7 @@ export const declararAcao = (
       ap: pagamento.valor.ap,
       reserva: 0,
       impulso: pagamento.valor.impulso,
+      recurso: pagamento.valor.recurso,
     },
   ];
 
@@ -125,7 +130,90 @@ export const declararAcao = (
     ...atualizado,
     mao: atualizado.mao.filter((carta) => carta !== perfil.carta),
   };
-  atualizado = substituirSlot(atualizado, { ...slot, situacao: 'declarada', perfil });
+  atualizado = substituirSlot(atualizado, {
+    ...slot,
+    situacao: 'declarada',
+    perfil,
+    escolhas,
+    recursoGasto: pagamento.valor.recurso,
+  });
+
+  return sucesso({ partida: substituirJogador(partida, atualizado), eventos });
+};
+
+/**
+ * Ajustes de resolução que o texto de uma carta impõe a uma Ação declarada.
+ *
+ * Cada campo corresponde a uma frase impressa em alguma carta; nenhum deles é
+ * um modificador numérico disfarçado. Um Dano final de zero é `danoFinal: 0`,
+ * e não um modificador de menos novecentos e noventa e nove.
+ */
+export interface AjusteDeResolucao {
+  readonly reducaoDeDano?: number;
+  readonly reducaoDeImpacto?: number;
+  readonly bonusAposReducao?: number;
+  readonly danoFinal?: number;
+  readonly impedirRuptura?: boolean;
+  readonly bonusDeRupturaSubstituto?: number;
+  readonly cancelarTexto?: boolean;
+}
+
+/**
+ * Aplica um ajuste de resolução ao espaço de Ação.
+ *
+ * O ajuste vive no espaço da Ação até a resolução, junto com os modificadores,
+ * para que a conta inteira aconteça uma vez só e na ordem documentada.
+ */
+export const ajustarResolucao = (
+  partida: EstadoDaPartida,
+  atacante: PlayerId,
+  indice: IndiceDeAcao,
+  ajuste: AjusteDeResolucao,
+): RespostaDeComando => {
+  const encontrado = exigirJogadorDaPartida(partida, atacante);
+  if (!encontrado.ok) return encontrado;
+
+  const slot = buscarSlot(encontrado.valor, indice);
+  if (slot === undefined) return falha({ tipo: 'acao-inexistente', indice });
+  if (slot.situacao === 'vazio' || slot.situacao === 'indisponivel' || slot.perfil === null) {
+    return falha({ tipo: 'acao-nao-declarada', indice });
+  }
+  if (slot.situacao === 'resolvida') return falha({ tipo: 'acao-ja-resolvida', indice });
+
+  const eventos: EventoUniversal[] = [];
+  const reducaoDeDano = ajuste.reducaoDeDano ?? 0;
+  const reducaoDeImpacto = ajuste.reducaoDeImpacto ?? 0;
+  if (reducaoDeDano !== 0 || reducaoDeImpacto !== 0) {
+    eventos.push({
+      tipo: 'reducao-da-resposta',
+      jogador: adversarioDe(partida, atacante).id,
+      indice,
+      dano: reducaoDeDano,
+      impacto: reducaoDeImpacto,
+    });
+  }
+  if (ajuste.danoFinal !== undefined) {
+    eventos.push({ tipo: 'dano-final-definido', indice, valor: ajuste.danoFinal });
+  }
+  if (ajuste.impedirRuptura === true) {
+    eventos.push({ tipo: 'ruptura-impedida', alvo: adversarioDe(partida, atacante).id });
+  }
+  if (ajuste.cancelarTexto === true) {
+    eventos.push({ tipo: 'texto-cancelado', indice, carta: slot.perfil.carta });
+  }
+
+  const atualizado = substituirSlot(encontrado.valor, {
+    ...slot,
+    reducaoDaResposta: {
+      dano: slot.reducaoDaResposta.dano + reducaoDeDano,
+      impacto: slot.reducaoDaResposta.impacto + reducaoDeImpacto,
+    },
+    bonusAposReducao: slot.bonusAposReducao + (ajuste.bonusAposReducao ?? 0),
+    danoFinalDefinido: ajuste.danoFinal ?? slot.danoFinalDefinido,
+    impedirRuptura: slot.impedirRuptura || ajuste.impedirRuptura === true,
+    bonusDeRupturaSubstituto: ajuste.bonusDeRupturaSubstituto ?? slot.bonusDeRupturaSubstituto,
+    textoCancelado: slot.textoCancelado || ajuste.cancelarTexto === true,
+  });
 
   return sucesso({ partida: substituirJogador(partida, atualizado), eventos });
 };
@@ -150,6 +238,7 @@ export const registrarResposta = (
   defensor: PlayerId,
   indice: IndiceDeAcao,
   resposta: RespostaVoluntaria,
+  descontos: DescontosDeCusto = {},
 ): RespostaDeComando => {
   if (partida.situacao !== 'em-andamento' || partida.turno === null) {
     return falha({ tipo: 'partida-nao-iniciada' });
@@ -163,7 +252,9 @@ export const registrarResposta = (
   const atacante = adversarioDe(partida, defensor);
   const slot = buscarSlot(atacante, indice);
   if (slot === undefined) return falha({ tipo: 'acao-inexistente', indice });
-  if (slot.situacao === 'vazio') return falha({ tipo: 'acao-nao-declarada', indice });
+  if (slot.situacao === 'vazio' || slot.situacao === 'indisponivel') {
+    return falha({ tipo: 'acao-nao-declarada', indice });
+  }
   if (slot.situacao === 'resolvida') return falha({ tipo: 'acao-ja-resolvida', indice });
   if (slot.resposta.voluntaria !== null) {
     return falha({ tipo: 'segunda-resposta-voluntaria', indice });
@@ -190,18 +281,19 @@ export const registrarResposta = (
       return falha({ tipo: 'carta-fora-da-mao', carta: perfil.carta });
     }
 
-    const pagamento = pagarComReserva(atualizado, perfil.custo.valor);
+    const pagamento = pagarCustoCompleto(atualizado, perfil.carta, perfil.custo, {}, descontos);
     if (!pagamento.ok) return pagamento;
     atualizado = {
-      ...pagamento.valor,
-      mao: pagamento.valor.mao.filter((carta) => carta !== perfil.carta),
+      ...pagamento.valor.jogador,
+      mao: pagamento.valor.jogador.mao.filter((carta) => carta !== perfil.carta),
     };
     eventos.push({
       tipo: 'custo-pago',
       jogador: defensor,
       ap: 0,
-      reserva: perfil.custo.valor,
+      reserva: pagamento.valor.reserva,
       impulso: 0,
+      recurso: pagamento.valor.recurso,
     });
   }
 
@@ -232,7 +324,9 @@ export const registrarModificador = (
 
   const slot = buscarSlot(encontrado.valor, indice);
   if (slot === undefined) return falha({ tipo: 'acao-inexistente', indice });
-  if (slot.situacao === 'vazio') return falha({ tipo: 'acao-nao-declarada', indice });
+  if (slot.situacao === 'vazio' || slot.situacao === 'indisponivel') {
+    return falha({ tipo: 'acao-nao-declarada', indice });
+  }
   if (slot.situacao === 'resolvida') return falha({ tipo: 'acao-ja-resolvida', indice });
 
   const dano = modificador.dano ?? 0;
@@ -269,7 +363,7 @@ export const resolverAcao = (
 
   const slot = buscarSlot(ativo.valor, indice);
   if (slot === undefined) return falha({ tipo: 'acao-inexistente', indice });
-  if (slot.situacao === 'vazio' || slot.perfil === null) {
+  if (slot.situacao === 'vazio' || slot.situacao === 'indisponivel' || slot.perfil === null) {
     return falha({ tipo: 'acao-nao-declarada', indice });
   }
   if (slot.situacao === 'resolvida') return falha({ tipo: 'acao-ja-resolvida', indice });
@@ -280,7 +374,13 @@ export const resolverAcao = (
   let defensor = adversarioDe(partida, atacanteId);
 
   if (perfil.valores !== null) {
-    const resolucao = resolverAtaque(defensor, perfil.valores, slot.modificadores);
+    const resolucao = resolverAtaque(defensor, perfil.valores, slot.modificadores, {
+      reducaoDaResposta: slot.reducaoDaResposta,
+      bonusAposReducao: slot.bonusAposReducao,
+      impedirRuptura: slot.impedirRuptura,
+      bonusDeRupturaSubstituto: slot.bonusDeRupturaSubstituto,
+      danoFinalDefinido: slot.danoFinalDefinido,
+    });
     defensor = resolucao.alvo;
 
     eventos.push({
@@ -297,6 +397,9 @@ export const resolverAcao = (
         danoAdicional: resolucao.danoAdicionalDeRuptura,
       });
     }
+    if (resolucao.rupturaImpedida) {
+      eventos.push({ tipo: 'ruptura-impedida', alvo: defensor.id });
+    }
     eventos.push({
       tipo: 'dano-aplicado',
       alvo: defensor.id,
@@ -306,13 +409,17 @@ export const resolverAcao = (
     });
   }
 
-  atacante = enviarParaCooldown(atacante, perfil.carta, perfil.cooldown);
-  eventos.push({
-    tipo: 'carta-para-cooldown',
-    jogador: atacanteId,
-    carta: perfil.carta,
-    zona: perfil.cooldown,
-  });
+  // Uma carta sem zona impressa não vai para cooldown: ela foi consumida e sai
+  // da partida, como a Ultimate (§14).
+  if (perfil.cooldown !== null) {
+    atacante = enviarParaCooldown(atacante, perfil.carta, perfil.cooldown);
+    eventos.push({
+      tipo: 'carta-para-cooldown',
+      jogador: atacanteId,
+      carta: perfil.carta,
+      zona: perfil.cooldown,
+    });
+  }
 
   const respostaComCarta = slot.resposta.voluntaria;
   if (respostaComCarta?.tipo === 'carta-de-reacao') {
@@ -320,13 +427,15 @@ export const resolverAcao = (
     // **nela** — não na Ação a que respondeu. Cada carta tem o próprio
     // cooldown (§11).
     const perfilDaReacao = respostaComCarta.perfil;
-    defensor = enviarParaCooldown(defensor, perfilDaReacao.carta, perfilDaReacao.cooldown);
-    eventos.push({
-      tipo: 'carta-para-cooldown',
-      jogador: defensor.id,
-      carta: perfilDaReacao.carta,
-      zona: perfilDaReacao.cooldown,
-    });
+    if (perfilDaReacao.cooldown !== null) {
+      defensor = enviarParaCooldown(defensor, perfilDaReacao.carta, perfilDaReacao.cooldown);
+      eventos.push({
+        tipo: 'carta-para-cooldown',
+        jogador: defensor.id,
+        carta: perfilDaReacao.carta,
+        zona: perfilDaReacao.cooldown,
+      });
+    }
   }
 
   atacante = {
@@ -349,6 +458,8 @@ export const resolverAcao = (
   }
 
   atacante = substituirSlot(atacante, { ...slot, situacao: 'resolvida' });
+  atacante = { ...atacante, anotacoes: expirarAnotacoes(atacante.anotacoes, 'acao') };
+  defensor = { ...defensor, anotacoes: expirarAnotacoes(defensor.anotacoes, 'acao') };
   eventos.push({ tipo: 'acao-resolvida', indice });
 
   const comAmbos = substituirJogador(substituirJogador(partida, defensor), atacante);

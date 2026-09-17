@@ -139,7 +139,7 @@ const usarCartaDeClasse = (
   if (acao !== undefined && localizada === undefined) {
     return falha({ tipo: 'acao-nao-declarada', indice: acao });
   }
-  if (localizada?.slot.cartasDeClasseUsadas.includes(carta) === true) {
+  if (localizada?.slot.cartasDeClasseUsadas.some((uso) => uso.carta === carta) === true) {
     return falha({ tipo: 'carta-de-classe-ja-usada-nesta-acao', carta });
   }
 
@@ -177,7 +177,7 @@ const usarCartaDeClasse = (
     const donoAtualizado = localizada.dono.id === jogador ? atualizado : localizada.dono;
     const comUso = substituirSlot(donoAtualizado, {
       ...localizada.slot,
-      cartasDeClasseUsadas: [...localizada.slot.cartasDeClasseUsadas, carta],
+      cartasDeClasseUsadas: [...localizada.slot.cartasDeClasseUsadas, { carta, modo: uso }],
     });
     atualizado = comUso.id === jogador ? comUso : atualizado;
     proxima = substituirJogador(proxima, comUso);

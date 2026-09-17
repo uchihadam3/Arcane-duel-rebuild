@@ -11,11 +11,13 @@ jogo mora dentro de um PNG.
 
 ```text
 apps/web ──────────┐
-                   ├── packages/ui ──────┐
-apps/game-server ──┤                     ├── packages/shared-types
-                   ├── packages/card-data┤
-                   ├── packages/rules-engine
-                   ├── packages/ai ──────┘
+                   ├── packages/ui ──────────┐
+apps/game-server ──┤                         │
+                   ├── packages/gameplay ────┤
+apps/simulator ────┤        │                ├── packages/shared-types
+                   │        ├── card-data ───┤
+                   │        └── rules-engine ┤
+                   ├── packages/ai ──────────┘
                    ├── packages/audio
                    └── packages/vfx
 ```
@@ -24,9 +26,14 @@ A seta aponta para o que o pacote pode importar. As setas nunca voltam:
 
 - `shared-types` não importa ninguém;
 - `rules-engine`, `card-data` e `ai` importam apenas `shared-types`;
+- `card-data` e `rules-engine` **não se conhecem**: o motor recebe o perfil
+  impresso de uma carta, e quem vai buscá-lo no catálogo é a camada de cima;
+- `gameplay` é essa camada de cima — ela é a única que importa os dois, e é
+  onde o texto das cartas vira comportamento;
 - `ui` conhece React e o DOM, mas nenhuma regra de combate;
 - `apps/web` compõe tudo;
-- `apps/game-server` usa regras e dados, nunca `ui`, `vfx` ou `audio`.
+- `apps/game-server` e `apps/simulator` usam regras e dados, nunca `ui`, `vfx`
+  ou `audio`.
 
 Isso não é só convenção: o ESLint proíbe, nas camadas puras, importar React,
 Three.js ou qualquer pacote de apresentação, e proíbe tocar em `window`,
@@ -339,6 +346,103 @@ explicitamente o que ainda não faz. O servidor final é autoritativo — o clie
 envia intenção de ação e o servidor valida custo, alvo, estado, informação
 escondida e sequência. O cliente nunca é fonte de verdade de uma partida
 online.
+
+## Composição: como o texto de uma carta vira comportamento
+
+O `card-data` diz **o que está impresso**. O `rules-engine` diz **como o
+tabuleiro funciona**. Nenhum dos dois conhece o outro, e é de propósito: o motor
+foi testável antes de existir uma carta, e o catálogo continua sendo dado puro.
+
+`packages/gameplay` é a costura entre os dois, e é a fronteira autoritativa da
+partida.
+
+### O catálogo é autoritativo
+
+O cliente informa **identidade de carta e escolhas legais**. Custo, tipo, Dano,
+Impacto e zona de cooldown não viajam na jogada: eles são buscados no catálogo
+pelo identificador. Um cliente não tem por onde afirmar que "W03 custa 0 e causa
+99" — o tipo `PedidoDeAcao` não tem campo nenhum para isso, e
+`packages/gameplay/src/autoridade.test.ts` prende essa garantia com
+`@ts-expect-error`, que quebra a verificação de tipos se o campo voltar a
+existir.
+
+### Custo atômico e multi-recurso
+
+Uma carta pode custar pontos de Ação **e** recurso de classe — "2 AP + 1 Mana",
+"3 AP e 3 Momentum" — e a parcela variável ("1 a 3 Mana", "gaste até 2
+Momentum") é uma escolha impressa, validada contra o intervalo da carta.
+
+O pagamento é atômico: as parcelas são conferidas todas antes de qualquer uma
+ser debitada. Um Ataque de "3 AP + 2 Mana" declarado com 5 AP e 1 Mana não gasta
+nada — não existe estado intermediário em que os pontos de Ação já saíram e a
+Mana faltou.
+
+### Janelas de efeito
+
+Cada carta declara só as janelas que usa, e o despachante percorre todas as
+fontes de uma Ação em ordem fixa — a ordem é o que torna o replay reproduzível:
+
+1. `legalidade` — a carta pode ser declarada agora?
+2. `descontos` — o custo impresso é alterado antes de ser pago;
+3. `ao-declarar` — custo pago, Ação ocupando o espaço;
+4. `ao-responder` — o defensor colocou a Resposta dele;
+5. `antes-de-resolver` — última chance de somar Dano, Impacto ou trava;
+6. resolução universal do motor;
+7. `apos-resolver` — Ruptura, Dano e cooldown já são fatos consumados.
+
+As fontes, em ordem: a carta declarada, as Cartas de Classe usadas naquela Ação,
+a carta de Reação, as Passivas reveladas do atacante e depois as do defensor.
+
+### Coisas que o texto pede e não são modificador numérico
+
+- **"O Dano final se torna 0"** é um valor fixado (`danoFinalDefinido`), não um
+  modificador de menos novecentos e noventa e nove. Ele é a última palavra da
+  conta, e é por isso que "se o Dano final for 0" consegue perguntar por ele.
+- **"Quando um Ataque causaria Ruptura"** é respondido por **previsão**
+  (`preverRuptura`), não aplicando a Ação para desfazer depois. Desfazer
+  deixaria rastro em log, em contadores e em qualquer gatilho intermediário.
+- **"Impeça a Ruptura"** e **"o bônus de Ruptura é +3 em vez de +2"** são campos
+  próprios do espaço de Ação, porque mexem no evento e não no número.
+- **"Cancele o texto dela"** desliga os ganchos da carta declarada, e só dela.
+
+### Estado temporário: anotações
+
+Muita carta cria estado que não cabe em campo fixo: "seu próximo Ataque neste
+turno recebe +2 I", "uma vez por turno inimigo", "na primeira vez que isso
+ocorrer". Em vez de um campo por carta, o estado do jogador carrega anotações
+com escopo `acao`, `turno` ou `partida`. A **forma** da anotação está em
+`shared-types`; o **vocabulário** de chaves está em
+`packages/gameplay/src/chaves.ts`, onde cada chave é declarada e documentada.
+
+Anotações de escopo `turno` expiram no início de **qualquer** turno, dos dois
+jogadores. É essa regra única que sustenta tanto "uma vez por turno" quanto "uma
+vez por turno inimigo".
+
+## Simulador headless
+
+`apps/simulator` roda milhares de partidas sem interface:
+
+```
+npm run simulate -- --games 10000 --seed etapa3-baseline
+```
+
+A política de base decide olhando **apenas** a projeção do próprio jogador — a
+mesma visão que um cliente receberia, sem a mão do adversário. Ela não tem
+acesso ao estado canônico, então não tem como trapacear.
+
+O PRNG semeado serve só para desempatar opções de mesma pontuação; o combate não
+tem aleatoriedade nenhuma. Como consequência, um lote com a política de base
+pura repete poucas linhas de jogo — o simulador relata isso na métrica `linhas
+de jogo distintas` em vez de escondê-lo atrás de médias. O parâmetro
+`--exploracao` existe para medir distribuição e **não** faz parte da linha de
+base.
+
+O teto de turnos é uma trava técnica do simulador, não regra de jogo: uma
+partida interrompida por ele é contada como interrompida, nunca como vitória,
+derrota ou empate. O mesmo vale para uma recusa de `interacao-nao-definida`, que
+é contada à parte como bloqueio de regra.
+
+O relatório da linha de base está em `SIMULATION_STAGE3_BASELINE.md`.
 
 ## Ferramentas
 

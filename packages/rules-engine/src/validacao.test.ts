@@ -87,6 +87,7 @@ describe('validação do estado do jogador', () => {
         { ...base.acoes[0], resposta: { voluntaria: { tipo: 'defesa-inata' } } },
         base.acoes[1],
         base.acoes[2],
+        base.acoes[3],
       ],
     };
     expect(problemasDe(validarEstadoDeJogador(orfã))).toContain('acoes[0].resposta');

@@ -6,6 +6,8 @@
 2. `npm run dev` para o cliente, `npm run dev:server` para o servidor
 3. escreva o teste junto com o código
 4. `npm run check` antes de commitar
+5. `npm run simulate -- --games 10000 --seed etapa3-baseline` para medir o jogo
+   sem interface
 
 ## Regras de qualidade
 

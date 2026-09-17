@@ -15,6 +15,7 @@ export default defineConfig({
       '@arcane-duel/shared-types': fromRoot('./packages/shared-types/src/index.ts'),
       '@arcane-duel/rules-engine': fromRoot('./packages/rules-engine/src/index.ts'),
       '@arcane-duel/card-data': fromRoot('./packages/card-data/src/index.ts'),
+      '@arcane-duel/gameplay': fromRoot('./packages/gameplay/src/index.ts'),
       '@arcane-duel/ai': fromRoot('./packages/ai/src/index.ts'),
       '@arcane-duel/audio': fromRoot('./packages/audio/src/index.ts'),
       '@arcane-duel/vfx': fromRoot('./packages/vfx/src/index.ts'),

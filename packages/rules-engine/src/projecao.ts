@@ -79,9 +79,14 @@ export const projetarJogador = (jogador: EstadoDeJogador, dono: boolean): VisaoD
     { ...jogador.acoes[0], resposta: { ...jogador.acoes[0].resposta } },
     { ...jogador.acoes[1], resposta: { ...jogador.acoes[1].resposta } },
     { ...jogador.acoes[2], resposta: { ...jogador.acoes[2].resposta } },
+    { ...jogador.acoes[3], resposta: { ...jogador.acoes[3].resposta } },
   ],
+  acoesPermitidasNoTurno: jogador.acoesPermitidasNoTurno,
   condicoes: { ...jogador.condicoes },
   recurso: { ...jogador.recurso },
+  // Anotações só nascem quando o texto de uma carta resolve em público, então
+  // não há identidade escondida para vazar por aqui.
+  anotacoes: jogador.anotacoes.map((anotacao) => ({ ...anotacao })),
   removidas: [...jogador.removidas],
 });
 

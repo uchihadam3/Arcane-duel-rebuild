@@ -1,5 +1,6 @@
 import type { CardId, ClassId, MatchId, PlayerId } from './ids.js';
 import type { ZonaDeCooldown } from './cards.js';
+import type { Anotacoes } from './anotacoes.js';
 import type { EstadoDePassiva } from './card-state.js';
 import type { RecursoDeClasse } from './recursos-de-classe.js';
 import type { CarimboDeVersao } from './versions.js';
@@ -59,8 +60,10 @@ export interface VisaoDeJogador {
   readonly ultimate: UltimateEquipada;
 
   readonly acoes: SlotsDeAcao;
+  readonly acoesPermitidasNoTurno: number;
   readonly condicoes: EstadoDeCondicoes;
   readonly recurso: RecursoDeClasse;
+  readonly anotacoes: Anotacoes;
   readonly removidas: readonly CardId[];
 }
 

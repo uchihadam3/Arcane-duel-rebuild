@@ -15,6 +15,7 @@ import { ZONAS_DE_COOLDOWN, cardId } from './index.js';
 const reacaoImpressa: PerfilDeHabilidade = {
   carta: cardId('W15'),
   tipo: 'reacao',
+  tags: [],
   custo: { moeda: 'reserva', valor: 1 },
   cooldown: 2,
   valores: null,

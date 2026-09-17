@@ -167,7 +167,7 @@ describe('fim de turno', () => {
 
   it('limpa os espaços de Ação', () => {
     const encerrado = exigirSucesso(encerrarTurno(partidaEmAndamento(), ID_A)).partida;
-    for (const slot of jogadorDe(encerrado, ID_A).acoes) {
+    for (const slot of jogadorDe(encerrado, ID_A).acoes.slice(0, 3)) {
       expect(slot.situacao).toBe('vazio');
       expect(slot.perfil).toBeNull();
     }

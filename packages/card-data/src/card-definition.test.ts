@@ -1,7 +1,7 @@
 import { cardId } from '@arcane-duel/shared-types';
 import { describe, expect, it } from 'vitest';
 
-import { CATALOGO, criarCatalogo } from './card-definition.js';
+import { criarCatalogo, perfilDaDefinicao } from './card-definition.js';
 import type { DefinicaoDeCarta } from './card-definition.js';
 
 const cartaDeExemplo: DefinicaoDeCarta = {
@@ -9,6 +9,7 @@ const cartaDeExemplo: DefinicaoDeCarta = {
   classe: 'guerreiro',
   nome: 'Corte de Sondagem',
   tipo: 'ataque',
+  tags: [],
   custo: { moeda: 'ap', valor: 1 },
   valores: { dano: 2, impacto: 1 },
   cooldown: 1,
@@ -16,9 +17,28 @@ const cartaDeExemplo: DefinicaoDeCarta = {
 };
 
 describe('catálogo de cartas', () => {
-  it('começa vazio: as cartas entram junto com as regras e os testes delas', () => {
-    expect(CATALOGO.todas).toHaveLength(0);
-    expect(CATALOGO.porClasse('guerreiro')).toHaveLength(0);
+  it('monta o perfil impresso a partir da definição, e não de quem pergunta', () => {
+    expect(perfilDaDefinicao(cartaDeExemplo)).toEqual({
+      carta: cardId('W01'),
+      tipo: 'ataque',
+      tags: [],
+      custo: { moeda: 'ap', valor: 1 },
+      cooldown: 1,
+      valores: { dano: 2, impacto: 1 },
+    });
+  });
+
+  it('não produz perfil para uma carta que não é jogada da mão', () => {
+    expect(
+      perfilDaDefinicao({
+        id: cardId('WP01'),
+        classe: 'guerreiro',
+        nome: 'Instinto de Ferro',
+        tipo: 'passiva',
+        tags: [],
+        texto: 'Passiva não é jogada da mão.',
+      }),
+    ).toBeUndefined();
   });
 
   it('indexa por id e por classe', () => {

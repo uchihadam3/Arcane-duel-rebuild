@@ -17,11 +17,13 @@ const PROJETOS = [
   'packages/shared-types',
   'packages/rules-engine',
   'packages/card-data',
+  'packages/gameplay',
   'packages/ai',
   'packages/audio',
   'packages/vfx',
   'packages/ui',
   'apps/game-server',
+  'apps/simulator',
   'apps/web',
 ];
 

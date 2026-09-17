@@ -1,0 +1,222 @@
+import type {
+  CardId,
+  EstadoDaPartida,
+  EstadoDeJogador,
+  IndiceDeAcao,
+  PlayerId,
+} from '@arcane-duel/shared-types';
+import { cardId, matchId, playerId } from '@arcane-duel/shared-types';
+import type { BuildEquipada, ErroDeDominio, EventoUniversal } from '@arcane-duel/rules-engine';
+
+import type { PedidoDeAcao, PedidoDeResposta, Resposta } from './partida.js';
+import {
+  abrirTurno,
+  declarar,
+  fecharTurno,
+  iniciar,
+  montarPartida,
+  resolver,
+  responder,
+} from './partida.js';
+
+/*
+ * Apoio dos testes de carta.
+ *
+ * Cada teste monta uma mesa mínima e controlada: a carta que ele quer provar
+ * está na mão, o resto do estado é posto à mão para isolar o efeito. Nada aqui
+ * contorna o motor — as jogadas passam pela mesma API autoritativa que uma
+ * partida de verdade usa.
+ */
+
+export const A: PlayerId = playerId('jogador-a');
+export const B: PlayerId = playerId('jogador-b');
+
+const HABILIDADES_DE_ENCHIMENTO = {
+  guerreiro: ['W01', 'W02', 'W03', 'W04', 'W05', 'W06', 'W07', 'W08'],
+  mago: ['M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07', 'M08'],
+} as const;
+
+/*
+ * Passivas padrão dos testes.
+ *
+ * São escolhidas de propósito entre as que **não** interferem em combate
+ * comum: Instinto de Ferro e Véu Prismático, por exemplo, se revelam sozinhos
+ * diante de qualquer Ataque que ameace Ruptura e mudariam o resultado de quase
+ * todo teste de Ataque. Cada teste que quer uma Passiva específica pede por ela.
+ */
+const PADROES = {
+  guerreiro: {
+    passivas: ['WP02', 'WP05', 'WP09', 'WP10'],
+    cartasDeClasse: ['WC01', 'WC02'],
+    ultimate: 'WU01',
+    personagem: 'W00',
+  },
+  mago: {
+    passivas: ['MP01', 'MP02', 'MP04', 'MP09'],
+    cartasDeClasse: ['MC01', 'MC02'],
+    ultimate: 'MU01',
+    personagem: 'M00',
+  },
+} as const;
+
+export interface OpcoesDeBuild {
+  readonly habilidades?: readonly string[];
+  readonly passivas?: readonly string[];
+  readonly cartasDeClasse?: readonly string[];
+  readonly ultimate?: string;
+}
+
+/**
+ * Monta uma build válida a partir de códigos de carta.
+ *
+ * As habilidades informadas entram primeiro; o resto é completado com cartas da
+ * própria classe até as oito exigidas pela composição (§3).
+ */
+export const build = (classe: 'guerreiro' | 'mago', opcoes: OpcoesDeBuild = {}): BuildEquipada => {
+  const pedidas = opcoes.habilidades ?? [];
+  const enchimento = HABILIDADES_DE_ENCHIMENTO[classe].filter(
+    (codigo) => !pedidas.includes(codigo),
+  );
+  const habilidades = [...pedidas, ...enchimento].slice(0, 8);
+
+  const padrao = PADROES[classe];
+  const passivas = opcoes.passivas ?? padrao.passivas;
+  const cartasDeClasse = opcoes.cartasDeClasse ?? padrao.cartasDeClasse;
+
+  return {
+    classe,
+    personagem: cardId(padrao.personagem),
+    habilidades: habilidades.map((codigo) => cardId(codigo)),
+    passivas: passivas.map((codigo) => cardId(codigo)),
+    cartasDeClasse: cartasDeClasse.map((codigo) => cardId(codigo)),
+    ultimate: cardId(opcoes.ultimate ?? padrao.ultimate),
+  };
+};
+
+export const exigir = (resposta: Resposta): EstadoDaPartida => {
+  if (!resposta.ok) throw new Error(`comando recusado: ${JSON.stringify(resposta.erro)}`);
+  return resposta.valor.partida;
+};
+
+export const eventosDe = (resposta: Resposta): readonly EventoUniversal[] => {
+  if (!resposta.ok) throw new Error(`comando recusado: ${JSON.stringify(resposta.erro)}`);
+  return resposta.valor.eventos;
+};
+
+export const erroDe = (resposta: Resposta): ErroDeDominio => {
+  if (resposta.ok) throw new Error('o comando deveria ter sido recusado');
+  return resposta.erro;
+};
+
+/** Mesa montada com o turno de A já aberto. */
+export const duelo = (
+  buildA: BuildEquipada,
+  buildB: BuildEquipada,
+  primeiro: PlayerId = A,
+): EstadoDaPartida => {
+  const montada = montarPartida({
+    id: matchId('partida-de-teste'),
+    semente: 'teste',
+    jogadores: [
+      { id: A, build: buildA },
+      { id: B, build: buildB },
+    ],
+  });
+  if (!montada.ok) throw new Error(`build inválida: ${JSON.stringify(montada.erro)}`);
+
+  return exigir(abrirTurno(exigir(iniciar(montada.valor, primeiro)), primeiro));
+};
+
+export const jogador = (partida: EstadoDaPartida, id: PlayerId): EstadoDeJogador => {
+  const encontrado = partida.jogadores.find((atual) => atual.id === id);
+  if (encontrado === undefined) throw new Error(`jogador ${id} fora da partida`);
+  return encontrado;
+};
+
+/** Reescreve campos de um jogador para isolar o que o teste quer provar. */
+export const com = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  mudanca: Partial<EstadoDeJogador>,
+): EstadoDaPartida => {
+  const atual = { ...jogador(partida, id), ...mudanca };
+  return {
+    ...partida,
+    jogadores: [
+      partida.jogadores[0].id === id ? atual : partida.jogadores[0],
+      partida.jogadores[1].id === id ? atual : partida.jogadores[1],
+    ],
+  };
+};
+
+/** Põe um recurso de classe em um valor exato. */
+export const comRecurso = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  valor: number,
+): EstadoDaPartida => {
+  const atual = jogador(partida, id);
+  if (atual.recurso.classe === 'guerreiro') {
+    return com(partida, id, { recurso: { classe: 'guerreiro', momentum: valor } });
+  }
+  if (atual.recurso.classe === 'mago') {
+    return com(partida, id, { recurso: { classe: 'mago', mana: valor } });
+  }
+  return partida;
+};
+
+export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'guerreiro' ? recurso.momentum : -1;
+};
+
+export const manaDe = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'mago' ? recurso.mana : -1;
+};
+
+/** Declara, responde e resolve uma Ação em um passo só. */
+export interface Jogada {
+  readonly pedido: PedidoDeAcao;
+  readonly resposta?: PedidoDeResposta;
+  readonly indice?: IndiceDeAcao;
+}
+
+export interface ResultadoDaJogada {
+  readonly partida: EstadoDaPartida;
+  readonly eventos: readonly EventoUniversal[];
+}
+
+export const jogar = (
+  partida: EstadoDaPartida,
+  atacante: PlayerId,
+  jogada: Jogada,
+): ResultadoDaJogada => {
+  const defensor = atacante === A ? B : A;
+  const indice =
+    jogada.indice ?? (jogador(partida, atacante).acoesRealizadasNoTurno as IndiceDeAcao);
+
+  const eventos: EventoUniversal[] = [];
+  const declarada = declarar(partida, atacante, jogada.pedido);
+  eventos.push(...eventosDe(declarada));
+  let atual = exigir(declarada);
+
+  if (jogada.resposta !== undefined && jogada.resposta.tipo !== 'sem-resposta') {
+    const respondida = responder(atual, defensor, indice, jogada.resposta);
+    eventos.push(...eventosDe(respondida));
+    atual = exigir(respondida);
+  }
+
+  const resolvida = resolver(atual, atacante, indice);
+  eventos.push(...eventosDe(resolvida));
+  return { partida: exigir(resolvida), eventos };
+};
+
+export const virarTurno = (partida: EstadoDaPartida, deQuem: PlayerId): EstadoDaPartida => {
+  const fechada = exigir(fecharTurno(partida, deQuem));
+  const proximo = fechada.turno?.jogadorAtivo;
+  if (proximo === undefined) throw new Error('partida sem próximo turno');
+  return exigir(abrirTurno(fechada, proximo));
+};
+
+export const carta = (codigo: string): CardId => cardId(codigo);

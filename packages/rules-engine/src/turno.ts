@@ -1,5 +1,5 @@
 import type { EstadoDaPartida, EstadoDeJogador, PlayerId } from '@arcane-duel/shared-types';
-import { falha, sucesso } from '@arcane-duel/shared-types';
+import { expirarAnotacoes, falha, sucesso } from '@arcane-duel/shared-types';
 
 import type { RespostaDeComando, ResultadoDoComando } from './comando.js';
 import { encerrarSeVidaZerou, exigirJogadorDaPartida } from './comando.js';
@@ -27,7 +27,12 @@ import { adversarioDe, slotsVazios, substituirJogador } from './interno.js';
  * 5. Murchar é aplicado **depois** da recuperação e é removido por inteiro (§15);
  * 6. o cooldown avança: CD1 para a mão, CD2 para CD1, CD3 para CD2 (§11);
  * 7. Passivas e Cartas de Classe Ativadas voltam a ficar Prontas (§12 e §13);
- * 8. o contador de Ações do turno zera.
+ * 8. o contador de Ações do turno zera e os três espaços voltam a ser três.
+ *
+ * As anotações de escopo `turno` dos **dois** jogadores expiram aqui. É isso
+ * que faz "uma vez por turno" e "uma vez por turno inimigo" funcionarem com uma
+ * regra só: cada limite é contado durante o turno a que ele se refere, e todo
+ * turno novo limpa a contagem dos dois lados.
  */
 export const iniciarTurno = (partida: EstadoDaPartida, jogador: PlayerId): RespostaDeComando => {
   if (partida.situacao === 'aguardando-inicio') return falha({ tipo: 'partida-nao-iniciada' });
@@ -101,9 +106,21 @@ export const iniciarTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respo
     ),
   };
 
-  atual = { ...atual, acoesRealizadasNoTurno: 0, acoes: slotsVazios() };
+  atual = {
+    ...atual,
+    acoesRealizadasNoTurno: 0,
+    acoes: slotsVazios(),
+    acoesPermitidasNoTurno: REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno,
+    anotacoes: expirarAnotacoes(atual.anotacoes, 'turno'),
+  };
 
-  const comJogador = substituirJogador(partida, atual);
+  const oponente = adversarioDe(partida, jogador);
+  const oponenteLimpo: EstadoDeJogador = {
+    ...oponente,
+    anotacoes: expirarAnotacoes(oponente.anotacoes, 'turno'),
+  };
+
+  const comJogador = substituirJogador(substituirJogador(partida, oponenteLimpo), atual);
   return sucesso({
     partida: { ...comJogador, turno: { ...partida.turno, iniciado: true } },
     eventos,

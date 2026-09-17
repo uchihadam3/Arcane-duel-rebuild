@@ -182,7 +182,11 @@ describe('Cartas de Classe', () => {
       declararAcao(partidaEmAndamento(), ID_A, perfil(CARTA_A1)),
     ).partida;
     const usada = exigirSucesso(ativarCartaDeClasse(declarada, ID_A, CLASSE_1, 0)).partida;
-    expect(jogadorDe(usada, ID_A).acoes[0].cartasDeClasseUsadas).toContain(CLASSE_1);
+    // O registro guarda o modo junto: Ativar e Exaurir são efeitos diferentes
+    // da mesma carta, e a resolução precisa saber qual dos dois foi usado.
+    expect(jogadorDe(usada, ID_A).acoes[0].cartasDeClasseUsadas).toEqual([
+      { carta: CLASSE_1, modo: 'ativar' },
+    ]);
   });
 
   it('recusa indicar uma Ação que não foi declarada', () => {

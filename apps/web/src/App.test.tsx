@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CARD_DATA_VERSION } from '@arcane-duel/card-data';
+import { CARD_DATA_VERSION, CATALOGO } from '@arcane-duel/card-data';
 import { RULES_VERSION } from '@arcane-duel/rules-engine';
 import { MANIFESTO_DE_ASSETS } from '@arcane-duel/ui';
 import { render, screen, within } from '@testing-library/react';
@@ -44,11 +44,14 @@ describe('tela de fundação', () => {
     expect(aviso?.getAttribute('data-visivel')).toBe('false');
   });
 
-  it('não exibe nenhuma carta: o catálogo ainda está vazio', () => {
+  it('mostra o tamanho real do catálogo carregado', () => {
     render(<App />);
     const painel = screen.getByText('Conteúdo carregado').closest('section');
     expect(painel).not.toBeNull();
     const linhaDeCartas = within(painel!).getByText('Cartas no catálogo');
-    expect(linhaDeCartas.nextElementSibling?.textContent).toBe('0');
+    // Guerreiro e Mago completos: Personagem, 20 habilidades, 10 Passivas,
+    // 6 Cartas de Classe e 3 Ultimates de cada um.
+    expect(linhaDeCartas.nextElementSibling?.textContent).toBe(String(CATALOGO.todas.length));
+    expect(CATALOGO.todas).toHaveLength(80);
   });
 });

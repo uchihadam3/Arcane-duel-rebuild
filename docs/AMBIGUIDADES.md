@@ -160,3 +160,54 @@ inventado.
     cobra o custo dela, mas a redução de Dano e de Impacto é texto de carta.
     Ela entra pelos modificadores da Ação, e os valores chegam com as cartas
     reais nas etapas seguintes.
+
+## Levantados na Etapa 3 (Guerreiro e Mago completos)
+
+29. **Runa Ativada e o momento em que ela volta a ficar Pronta.** O §13 diz que
+    uma Carta de Classe Ativada volta a ficar Pronta "no momento normal", e o
+    motor aplica o início do turno do dono (item 23). Isso convive com o texto
+    das cartas do Mago: uma Runa Ativada fica Ativada durante todo o turno
+    inimigo, que é quando Barreira Prismática e Runa da Égide agem, e voltar a
+    deixá-la Pronta **dentro do próprio turno** é exatamente o que Recalibrar
+    Runa, Barreira Prismática e Sobrecarga Temporal compram. Não há contradição,
+    mas a leitura depende do item 23 continuar valendo: se o playtest decidir
+    outro momento, essas três cartas mudam de valor.
+30. **Ativações opcionais de Passiva são automáticas no motor.** Instinto de
+    Ferro e Véu Prismático dizem "Ative e gaste 1 Momentum/Mana para reduzir
+    1 I de um Ataque que causaria Ruptura". Isso é uma escolha do jogador, e o
+    motor hoje a toma sozinho: ele ativa **somente** quando a redução de fato
+    impede a Ruptura, e nunca em outra situação. É uma decisão de implementação,
+    não uma regra do documento — quando a interface existir, a escolha precisa
+    voltar para o jogador.
+31. **Ordem entre "o Dano final se torna 0" e o bônus de Ruptura.** Imagem
+    Espelhada, Runa da Égide Exaurida e Última Palavra fixam o Dano final em
+    zero; a Ruptura soma Dano ao mesmo Ataque (§9). O motor aplica o valor
+    fixado **por último**, porque as cartas que perguntam "se o Dano final for
+    0" só fazem sentido se o valor fixado for o valor aplicado à Vida. Isso é
+    leitura do texto, não invenção, mas está registrado porque a ordem inversa
+    seria defensável para quem lesse a Ruptura como parte do próprio Ataque.
+32. **A quarta Ação da Runa Prismática.** O §8 fixa três Ações por turno; a Runa
+    Prismática Exaurida abre uma quarta. O estado representa isso com um quarto
+    espaço que nasce `indisponivel` e um limite de Ações por turno que a carta
+    levanta de três para quatro. O documento não diz o que acontece se duas
+    cartas futuras abrirem Ações extras no mesmo turno.
+33. **"Reduza 1 D ou 1 I" sem interface para escolher.** Guarda Marcial, Guarda
+    de Veterano e Runa da Égide Ativada deixam a escolha com o jogador. Sem
+    cliente, o motor escolhe por uma regra fixa e documentada: Impacto quando o
+    Ataque ainda ameaça romper a Guarda, Dano nos demais casos. A escolha real
+    precisa voltar para o jogador quando a interface existir.
+34. **Contrafeitiço e o que é "o texto" de uma Técnica.** A carta cancela "o
+    texto" da Técnica e mantém custo e espaço de Ação. O motor cancela os
+    ganchos da **carta declarada**, e só dela: Passivas reveladas e Cartas de
+    Classe usadas naquela Ação continuam valendo, porque o texto delas não é o
+    texto da Técnica. O documento não trata o caso explicitamente.
+35. **Runa do Eco Exaurida e o "+1 AP se for utilizado novamente neste turno".**
+    O acréscimo vale para a carta devolvida, dentro do turno em que ela voltou.
+    O documento não diz o que acontece se a mesma carta for devolvida duas vezes
+    no mesmo turno; o motor não acumula o acréscimo.
+36. **Ordem entre efeitos simultâneos de fontes diferentes.** Quando a carta
+    declarada, uma Carta de Classe e uma Passiva agem na mesma janela, o motor
+    percorre sempre a mesma ordem — carta declarada, Cartas de Classe na ordem
+    de uso, carta de Reação, Passivas do atacante e depois do defensor. A ordem
+    é fixa para que o replay reproduza, mas o documento não define prioridade de
+    gatilhos simultâneos (item 20 continua aberto).

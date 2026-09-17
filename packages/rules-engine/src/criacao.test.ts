@@ -54,8 +54,13 @@ describe('estado inicial do jogador', () => {
   });
 
   it('abre os três espaços de Ação vazios, cada um com o seu espaço de Resposta', () => {
-    expect(jogador.acoes).toHaveLength(REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno);
-    jogador.acoes.forEach((slot, posicao) => {
+    const abertos = jogador.acoes.slice(0, REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno);
+    expect(abertos).toHaveLength(REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno);
+    expect(jogador.acoesPermitidasNoTurno).toBe(REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno);
+    // O quarto espaço existe no tipo mas nasce indisponível: só a exceção
+    // impressa na Runa Prismática o abre.
+    expect(jogador.acoes[3].situacao).toBe('indisponivel');
+    abertos.forEach((slot, posicao) => {
       expect(slot.indice).toBe(posicao);
       expect(slot.situacao).toBe('vazio');
       expect(slot.perfil).toBeNull();

@@ -22,6 +22,7 @@ const PACOTES_PUROS = [
   'packages/shared-types/**/*.ts',
   'packages/rules-engine/**/*.ts',
   'packages/card-data/**/*.ts',
+  'packages/gameplay/**/*.ts',
   'packages/ai/**/*.ts',
 ];
 

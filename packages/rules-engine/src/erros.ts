@@ -1,4 +1,10 @@
-import type { CardId, PlayerId, TipoDeHabilidade } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  ClassId,
+  PlayerId,
+  RecursoDeCusto,
+  TipoDeHabilidade,
+} from '@arcane-duel/shared-types';
 
 /*
  * Erros de domínio.
@@ -44,6 +50,38 @@ export type ErroDeDominio =
   | { readonly tipo: 'carta-de-classe-ja-exaurida'; readonly carta: CardId }
   | { readonly tipo: 'carta-de-classe-ja-usada-nesta-acao'; readonly carta: CardId }
   | { readonly tipo: 'ultimate-ja-consumida' }
+  | {
+      readonly tipo: 'recurso-insuficiente';
+      readonly recurso: RecursoDeCusto;
+      readonly necessario: number;
+      readonly disponivel: number;
+    }
+  | {
+      readonly tipo: 'recurso-indisponivel';
+      readonly recurso: RecursoDeCusto;
+      readonly classe: ClassId;
+    }
+  /** A carta não existe no catálogo oficial. */
+  | { readonly tipo: 'carta-desconhecida'; readonly carta: CardId }
+  /** A carta existe, mas não pertence à build deste jogador. */
+  | { readonly tipo: 'carta-fora-da-build'; readonly carta: CardId }
+  /** A carta existe, mas não é da classe do jogador. */
+  | { readonly tipo: 'carta-de-outra-classe'; readonly carta: CardId; readonly classe: ClassId }
+  /** A escolha informada não é uma das opções impressas na carta. */
+  | { readonly tipo: 'escolha-invalida'; readonly carta: CardId; readonly detalhe: string }
+  /** A carta exige uma escolha que não veio. */
+  | { readonly tipo: 'escolha-obrigatoria'; readonly carta: CardId; readonly detalhe: string }
+  /** A condição impressa para jogar a carta não está satisfeita. */
+  | {
+      readonly tipo: 'condicao-de-uso-nao-satisfeita';
+      readonly carta: CardId;
+      readonly detalhe: string;
+    }
+  /** A quarta Ação só existe depois que uma carta a libera. */
+  | { readonly tipo: 'acao-extra-nao-liberada' }
+  /** A Defesa Inata já foi usada neste turno inimigo. */
+  | { readonly tipo: 'defesa-inata-ja-usada' }
+  | { readonly tipo: 'carta-fora-do-cooldown'; readonly carta: CardId }
   | { readonly tipo: 'condicao-acima-do-limite'; readonly limite: number }
   /**
    * A regra existe, mas o documento não define como duas regras interagem.

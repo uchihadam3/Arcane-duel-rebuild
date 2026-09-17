@@ -1,0 +1,26 @@
+{
+  "name": "@arcane-duel/gameplay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Camada de composição: liga o catálogo oficial ao motor de regras e resolve o texto das cartas.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json"
+  },
+  "dependencies": {
+    "@arcane-duel/shared-types": "*",
+    "@arcane-duel/rules-engine": "*",
+    "@arcane-duel/card-data": "*"
+  }
+}

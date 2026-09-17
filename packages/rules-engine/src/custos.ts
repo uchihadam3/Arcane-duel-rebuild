@@ -1,9 +1,16 @@
-import type { EstadoDeJogador, Resultado } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  CustoDeCarta,
+  EscolhasDaAcao,
+  EstadoDeJogador,
+  Resultado,
+} from '@arcane-duel/shared-types';
 import { falha, sucesso } from '@arcane-duel/shared-types';
 
 import { REGRAS_UNIVERSAIS } from './constants.js';
 import { custoAdicionalDeLento } from './condicoes.js';
 import type { ErroDeDominio } from './erros.js';
+import { somarRecurso, valorDoRecurso } from './recursos.js';
 
 /*
  * Pagamento de custos.
@@ -109,4 +116,140 @@ export const converterEmReserva = (
     jogador: { ...jogador, reserva: convertido, pontosDeAcao: 0 },
     reserva: convertido,
   };
+};
+
+/*
+ * Custo completo, com parcela de recurso de classe.
+ *
+ * O pagamento é atômico: as parcelas são conferidas todas antes de qualquer uma
+ * ser debitada, e o jogador só é substituído quando todas passam. Não existe
+ * estado intermediário em que os pontos de Ação já saíram e a Mana faltou.
+ */
+
+export interface PagamentoCompleto {
+  readonly jogador: EstadoDeJogador;
+  readonly ap: number;
+  readonly reserva: number;
+  readonly impulso: number;
+  readonly recurso: number;
+  readonly consumiuLento: boolean;
+}
+
+export interface DescontosDeCusto {
+  /** Redução no custo em pontos de Ação, aplicada antes do mínimo impresso. */
+  readonly ap?: number;
+  /** Piso do custo em pontos de Ação depois do desconto ("mínimo 1"). */
+  readonly apMinimo?: number;
+  /** Redução no custo em Reserva, com piso zero. */
+  readonly reserva?: number;
+  /** Redução na parcela de recurso de classe, com piso zero. */
+  readonly recurso?: number;
+  /** O custo de recurso de classe é inteiramente ignorado (Runa do Conduíte). */
+  readonly ignorarRecurso?: boolean;
+  /** Acréscimo no custo em pontos de Ação (Runa do Eco Exaurida). */
+  readonly apAdicional?: number;
+}
+
+const semNegativoLocal = (valor: number): number => (valor < 0 ? 0 : valor);
+
+/** Quanto da parcela variável o jogador escolheu gastar, validado contra a carta. */
+export const quantidadeVariavelEscolhida = (
+  carta: CardId,
+  custo: CustoDeCarta,
+  escolhas: EscolhasDaAcao,
+): Resultado<number, ErroDeDominio> => {
+  const variavel = custo.variavel;
+  if (variavel === undefined) {
+    return escolhas.recursoAdicional === undefined || escolhas.recursoAdicional === 0
+      ? sucesso(0)
+      : falha({
+          tipo: 'escolha-invalida',
+          carta,
+          detalhe: 'a carta não tem parcela variável de custo',
+        });
+  }
+  const escolhido = escolhas.recursoAdicional ?? variavel.minimo;
+  if (!Number.isInteger(escolhido) || escolhido < variavel.minimo || escolhido > variavel.maximo) {
+    return falha({
+      tipo: 'escolha-invalida',
+      carta,
+      detalhe: `parcela variável fora do intervalo impresso ${String(variavel.minimo)}–${String(variavel.maximo)}`,
+    });
+  }
+  return sucesso(escolhido);
+};
+
+/**
+ * Paga o custo impresso inteiro de uma carta.
+ *
+ * A moeda decide o caminho: pontos de Ação no próprio turno, Reserva no turno
+ * inimigo. A parcela de recurso de classe é somada à conta e conferida junto
+ * com as outras — é isso que torna o custo atômico.
+ */
+export const pagarCustoCompleto = (
+  jogador: EstadoDeJogador,
+  carta: CardId,
+  custo: CustoDeCarta,
+  escolhas: EscolhasDaAcao = {},
+  descontos: DescontosDeCusto = {},
+): Resultado<PagamentoCompleto, ErroDeDominio> => {
+  const variavel = quantidadeVariavelEscolhida(carta, custo, escolhas);
+  if (!variavel.ok) return variavel;
+
+  const parcelaFixa = custo.recurso?.quantidade ?? 0;
+  const recursoAlvo = custo.recurso?.recurso ?? custo.variavel?.recurso ?? null;
+  const totalDeRecurso =
+    descontos.ignorarRecurso === true
+      ? 0
+      : semNegativoLocal(parcelaFixa + variavel.valor - (descontos.recurso ?? 0));
+
+  if (recursoAlvo !== null && totalDeRecurso > 0) {
+    const disponivel = valorDoRecurso(jogador, recursoAlvo);
+    if (disponivel === null) {
+      return falha({ tipo: 'recurso-indisponivel', recurso: recursoAlvo, classe: jogador.classe });
+    }
+    if (disponivel < totalDeRecurso) {
+      return falha({
+        tipo: 'recurso-insuficiente',
+        recurso: recursoAlvo,
+        necessario: totalDeRecurso,
+        disponivel,
+      });
+    }
+  }
+
+  const debitarRecurso = (alvo: EstadoDeJogador): EstadoDeJogador =>
+    recursoAlvo === null || totalDeRecurso === 0
+      ? alvo
+      : somarRecurso(alvo, recursoAlvo, -totalDeRecurso);
+
+  if (custo.moeda === 'reserva') {
+    const valor = semNegativoLocal(custo.valor - (descontos.reserva ?? 0));
+    const pago = pagarComReserva(jogador, valor);
+    if (!pago.ok) return pago;
+    return sucesso({
+      jogador: debitarRecurso(pago.valor),
+      ap: 0,
+      reserva: valor,
+      impulso: 0,
+      recurso: totalDeRecurso,
+      consumiuLento: false,
+    });
+  }
+
+  const comDesconto = semNegativoLocal(custo.valor - (descontos.ap ?? 0));
+  const comPiso = Math.max(comDesconto, descontos.apMinimo ?? 0);
+  const valorDeAp = comPiso + (descontos.apAdicional ?? 0);
+
+  const pago = pagarComPontosDeAcao(jogador, valorDeAp);
+  if (!pago.ok) return pago;
+
+  return sucesso({
+    jogador: debitarRecurso(pago.valor.jogador),
+    ap: pago.valor.ap,
+    reserva: 0,
+    impulso: pago.valor.impulso,
+    recurso: totalDeRecurso,
+    consumiuLento: pago.valor.consumiuLento,
+  });
 };

@@ -99,7 +99,7 @@ describe('Queimadura', () => {
     );
     expect(daQueimadura).toHaveLength(1);
     expect(resultado.eventos.some((evento) => evento.tipo === 'resposta-registrada')).toBe(false);
-    for (const slot of jogadorDe(resultado.partida, ID_A).acoes) {
+    for (const slot of jogadorDe(resultado.partida, ID_A).acoes.slice(0, 3)) {
       expect(slot.situacao).toBe('vazio');
     }
   });
