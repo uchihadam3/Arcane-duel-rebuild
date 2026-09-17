@@ -5,10 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Publicar é escrever na branch gh-pages; nada além disso é necessário.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 # Um deploy de cada vez, e sem cancelar um que já começou.
 concurrency:
@@ -16,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  construir:
-    name: Construir o cliente
+  publicar:
+    name: Construir e publicar
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,35 +29,48 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Configurar o Pages
-        id: pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
       - name: Construir
         run: npm run build
         env:
           # No Pages o cliente é servido sob o nome do repositório, não na raiz.
-          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          BASE_PATH: /${{ github.event.repository.name }}/
 
-      - name: Fallback de SPA
-        # O Pages não tem reescrita de rota. Servir o mesmo documento em
-        # 404.html faz /login, /builds, /match e /profile abrirem o cliente.
-        # Um asset que falta continua devolvendo status 404, que é o correto.
-        run: cp apps/web/dist/index.html apps/web/dist/404.html
+      - name: Preparar o site
+        run: |
+          # O Pages não tem reescrita de rota: servir o mesmo documento em
+          # 404.html faz /login, /builds, /match e /profile abrirem o cliente.
+          # Um asset que falta continua devolvendo status 404, que é o correto.
+          cp apps/web/dist/index.html apps/web/dist/404.html
+          # Sem isto o Pages passaria o site pelo Jekyll.
+          touch apps/web/dist/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/web/dist
+      - name: Publicar na branch gh-pages
+        env:
+          BRANCH: gh-pages
+        run: |
+          set -e
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-  publicar:
-    name: Publicar
-    needs: construir
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          # A gh-pages guarda só o resultado do build. O histórico é preservado
+          # commit a commit — nada de reescrever o que já foi publicado.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH" --depth=1
+            git worktree add ../site "origin/$BRANCH"
+            git -C ../site switch -c "$BRANCH" 2>/dev/null || git -C ../site switch "$BRANCH"
+          else
+            git worktree add --detach ../site
+            git -C ../site switch --orphan "$BRANCH"
+          fi
+
+          find ../site -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r apps/web/dist/. ../site/
+
+          cd ../site
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Nada mudou no site publicado.'
+          else
+            git commit -q -m "deploy: ${GITHUB_SHA}"
+            git push origin "$BRANCH"
+          fi
