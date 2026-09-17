@@ -78,6 +78,7 @@ scripts/          ferramentas de manutenção do repositório
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — camadas, dependências e decisões técnicas
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — fluxo de trabalho e publicação
 - [`docs/ASSETS.md`](docs/ASSETS.md) — como os assets entram no projeto
+- [`docs/VIDEO_ANALYSIS.md`](docs/VIDEO_ANALYSIS.md) — o que o vídeo de referência ensina, e o que não copiar
 - [`docs/AMBIGUIDADES.md`](docs/AMBIGUIDADES.md) — pontos em aberto nos documentos de design
 
 Documentos de design (não editar sem atualizar as regras junto):

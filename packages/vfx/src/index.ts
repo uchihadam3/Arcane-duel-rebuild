@@ -35,3 +35,62 @@ export const PREFERENCIAS_PADRAO: PreferenciasDeApresentacao = {
 /** Duração efetiva de uma animação, em milissegundos. */
 export const duracaoEfetiva = (duracaoBaseMs: number, velocidade: VelocidadeDeAnimacao): number =>
   Math.round(duracaoBaseMs * MULTIPLICADOR_DE_DURACAO[velocidade]);
+
+/**
+ * Orçamento de apresentação.
+ *
+ * Medido no vídeo de referência: as faixas de transição de turno e de fase
+ * duram entre 0,9 s e 1,3 s; a apresentação de uma carta em tamanho grande
+ * fica cerca de 1 s no centro antes de ir para o seu lugar; a sequência mais
+ * longa observada é um ataque completo, com o efeito viajando pelo campo por
+ * cerca de 2,6 s até o impacto, totalizando cerca de 3,2 s.
+ *
+ * Esses números viram teto, não meta. O documento é explícito: nenhum efeito
+ * pode demorar tanto que atrapalhe o ritmo competitivo. Um momento isolado
+ * fica abaixo de `momentoMs`; só uma sequência inteira, e só nos momentos
+ * grandes (Ruptura, Ultimate), pode chegar perto de `sequenciaMs`.
+ */
+export const ORCAMENTO_DE_APRESENTACAO_MS = {
+  momento: 1200,
+  sequencia: 3200,
+} as const;
+
+/**
+ * Um momento de apresentação.
+ *
+ * O motor de regras já resolveu tudo quando isto toca: o estado canônico não
+ * espera a animação. `bloqueiaEntrada` diz apenas se a interface deve segurar
+ * o clique do jogador enquanto o momento acontece, para ele não agir sobre um
+ * campo que ainda está se rearranjando na tela.
+ */
+export interface MomentoDeApresentacao {
+  readonly id: string;
+  readonly duracaoBaseMs: number;
+  readonly bloqueiaEntrada: boolean;
+}
+
+/** Duração total de uma sequência, já ajustada pela preferência de velocidade. */
+export const duracaoDaSequencia = (
+  momentos: readonly MomentoDeApresentacao[],
+  velocidade: VelocidadeDeAnimacao,
+): number =>
+  momentos.reduce((total, momento) => total + duracaoEfetiva(momento.duracaoBaseMs, velocidade), 0);
+
+export type EstouroDeOrcamento = 'momento' | 'sequencia';
+
+/**
+ * Aponta o que estourou o orçamento, ou `undefined` quando a sequência cabe.
+ * A verificação usa a velocidade normal de propósito: acelerar animação não
+ * pode ser desculpa para desenhar uma sequência longa demais.
+ */
+export const estouroDeOrcamento = (
+  momentos: readonly MomentoDeApresentacao[],
+): EstouroDeOrcamento | undefined => {
+  if (momentos.some((momento) => momento.duracaoBaseMs > ORCAMENTO_DE_APRESENTACAO_MS.momento)) {
+    return 'momento';
+  }
+  if (duracaoDaSequencia(momentos, 'normal') > ORCAMENTO_DE_APRESENTACAO_MS.sequencia) {
+    return 'sequencia';
+  }
+  return undefined;
+};
