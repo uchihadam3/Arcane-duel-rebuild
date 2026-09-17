@@ -1,0 +1,64 @@
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy de cada vez, e sem cancelar um que já começou.
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    name: Construir o cliente
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Configurar o Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Construir
+        run: npm run build
+        env:
+          # No Pages o cliente é servido sob o nome do repositório, não na raiz.
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Fallback de SPA
+        # O Pages não tem reescrita de rota. Servir o mesmo documento em
+        # 404.html faz /login, /builds, /match e /profile abrirem o cliente.
+        # Um asset que falta continua devolvendo status 404, que é o correto.
+        run: cp apps/web/dist/index.html apps/web/dist/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  publicar:
+    name: Publicar
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

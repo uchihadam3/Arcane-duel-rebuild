@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MANIFESTO } from './manifest.js';
+import { MANIFESTO, criarManifesto, normalizarBase } from './manifest.js';
 
 describe('manifesto da PWA', () => {
   it('identifica o jogo com o nome acordado', () => {
@@ -37,5 +37,36 @@ describe('manifesto da PWA', () => {
       expect(icone.src.startsWith('icons/')).toBe(true);
       expect(icone.type).toBe('image/png');
     }
+  });
+});
+
+describe('manifesto sob um prefixo de publicação', () => {
+  it('normaliza o prefixo com barra no começo e no fim', () => {
+    expect(normalizarBase('/')).toBe('/');
+    expect(normalizarBase('Arcane-duel-rebuild')).toBe('/Arcane-duel-rebuild/');
+    expect(normalizarBase('/Arcane-duel-rebuild')).toBe('/Arcane-duel-rebuild/');
+    expect(normalizarBase('/Arcane-duel-rebuild/')).toBe('/Arcane-duel-rebuild/');
+  });
+
+  it('faz start_url e scope seguirem o prefixo', () => {
+    const manifesto = criarManifesto('/Arcane-duel-rebuild');
+    expect(manifesto.start_url).toBe('/Arcane-duel-rebuild/');
+    expect(manifesto.scope).toBe('/Arcane-duel-rebuild/');
+    expect(manifesto.start_url.startsWith(manifesto.scope)).toBe(true);
+  });
+
+  it('mantém os ícones relativos, para acompanharem o prefixo sozinhos', () => {
+    for (const icone of criarManifesto('/Arcane-duel-rebuild').icons) {
+      expect(icone.src.startsWith('/')).toBe(false);
+      expect(icone.src.startsWith('icons/')).toBe(true);
+    }
+  });
+
+  it('não muda nada que identifique o jogo', () => {
+    const naRaiz = criarManifesto('/');
+    const noSubcaminho = criarManifesto('/Arcane-duel-rebuild/');
+    expect(noSubcaminho.name).toBe(naRaiz.name);
+    expect(noSubcaminho.display).toBe('standalone');
+    expect(noSubcaminho.orientation).toBe('landscape');
   });
 });

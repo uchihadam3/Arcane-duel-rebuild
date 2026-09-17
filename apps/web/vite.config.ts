@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-import { MANIFESTO } from './src/pwa/manifest';
+import { criarManifesto, normalizarBase } from './src/pwa/manifest';
 
 /**
  * A pasta `public/assets` é um espelho gerado de `/assets` na raiz do
@@ -15,13 +15,19 @@ import { MANIFESTO } from './src/pwa/manifest';
 const { version } = createRequire(import.meta.url)('./package.json') as { version: string };
 
 /**
- * Commit que originou este build. Na Vercel vem da variável de ambiente; no
- * desenvolvimento local vem do próprio git. Serve para conferir, olhando a
- * página publicada, se ela corresponde ao commit atual da `main`.
+ * Prefixo de publicação. Na Vercel o cliente é servido na raiz; no GitHub
+ * Pages ele fica sob o nome do repositório, informado por `BASE_PATH`.
+ */
+const base = normalizarBase(process.env.BASE_PATH ?? '/');
+
+/**
+ * Commit que originou este build. Nos serviços de publicação vem da variável
+ * de ambiente; no desenvolvimento local vem do próprio git. Serve para
+ * conferir, olhando a página publicada, se ela corresponde à `main`.
  */
 const descobrirCommit = (): string => {
-  const daVercel = process.env.VERCEL_GIT_COMMIT_SHA;
-  if (daVercel !== undefined && daVercel !== '') return daVercel;
+  const doServico = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+  if (doServico !== undefined && doServico !== '') return doServico;
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   } catch {
@@ -29,7 +35,10 @@ const descobrirCommit = (): string => {
   }
 };
 
+const comoRegex = (valor: string): string => valor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export default defineConfig({
+  base,
   define: {
     __VERSAO_DO_CLIENTE__: JSON.stringify(version),
     __COMMIT_DO_CLIENTE__: JSON.stringify(descobrirCommit()),
@@ -50,11 +59,14 @@ export default defineConfig({
       // no meio de uma partida sem o jogador mandar.
       registerType: 'prompt',
       includeAssets: ['icons/apple-touch-icon.png'],
-      manifest: {
-        ...MANIFESTO,
-        categories: [...MANIFESTO.categories],
-        icons: [...MANIFESTO.icons],
-      },
+      manifest: (() => {
+        const manifesto = criarManifesto(base);
+        return {
+          ...manifesto,
+          categories: [...manifesto.categories],
+          icons: [...manifesto.icons],
+        };
+      })(),
       workbox: {
         // O shell da aplicação é pré-cacheado. Os PNGs aprovados são grandes e
         // ficam em cache sob demanda, para a primeira instalação não baixar
@@ -62,7 +74,12 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,webmanifest}'],
         // Nada que não seja navegação pode cair no index.html, e nada
         // autenticado ou de partida pode ser servido do cache de navegação.
-        navigateFallbackDenylist: [/^\/assets\//, /^\/api\//, /^\/auth\//, /^\/socket/],
+        navigateFallbackDenylist: [
+          new RegExp(`^${comoRegex(base)}assets/`),
+          /^\/api\//,
+          /^\/auth\//,
+          /^\/socket/,
+        ],
         runtimeCaching: [
           {
             // Rede e só rede: sessão, partida, matchmaking e dados privados
@@ -77,7 +94,7 @@ export default defineConfig({
             // Os PNGs aprovados aparecem na hora, vindos do cache, e a versão
             // nova é buscada em segundo plano — trocar um asset não exige
             // esperar a expiração do cache.
-            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+            urlPattern: ({ url }) => url.pathname.startsWith(`${base}assets/`),
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'arcane-duel-assets',
