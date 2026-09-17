@@ -3,6 +3,7 @@ import { COMPOSICAO_DA_BUILD, REGRAS_UNIVERSAIS, RULES_VERSION } from '@arcane-d
 import { AssetProvider, MANIFESTO_DE_ASSETS } from '@arcane-duel/ui';
 
 import { AvisoDeOrientacao } from './components/AvisoDeOrientacao.js';
+import { BotaoDeInstalacao } from './components/BotaoDeInstalacao.js';
 import { BarraDeAtualizacao } from './components/BarraDeAtualizacao.js';
 import { GradeDeAssets } from './components/GradeDeAssets.js';
 import { useInventarioDeAssets } from './hooks/useInventarioDeAssets.js';
@@ -28,6 +29,7 @@ export const App = (): React.JSX.Element => {
           <h1>Arcane Duel</h1>
           <span className="selo">fundação</span>
           <span className="selo selo--aviso">combate não implementado</span>
+          <BotaoDeInstalacao />
         </header>
 
         <BarraDeAtualizacao />
@@ -48,6 +50,10 @@ export const App = (): React.JSX.Element => {
                 <dt>Cliente</dt>
                 <dd>
                   <code>{__VERSAO_DO_CLIENTE__}</code>
+                </dd>
+                <dt>Commit</dt>
+                <dd>
+                  <code title={__COMMIT_DO_CLIENTE__}>{__COMMIT_DO_CLIENTE__.slice(0, 7)}</code>
                 </dd>
               </dl>
             </section>
@@ -95,7 +101,7 @@ export const App = (): React.JSX.Element => {
                 <dt>Orientação</dt>
                 <dd>{orientacao}</dd>
                 <dt>Exibição</dt>
-                <dd>{modo}</dd>
+                <dd>{modo === 'standalone' ? 'Aplicativo instalado' : 'Navegador'}</dd>
               </dl>
             </section>
           </div>

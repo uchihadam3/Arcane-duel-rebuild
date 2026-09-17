@@ -167,3 +167,26 @@
   font: inherit;
   cursor: pointer;
 }
+
+.botao-instalar {
+  margin-left: auto;
+  border: 1px solid var(--destaque);
+  border-radius: 6px;
+  background: transparent;
+  padding: 5px 14px;
+  color: var(--destaque);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.botao-instalar:hover,
+.botao-instalar:focus-visible {
+  background: #1a1608;
+}
+
+.instalacao-aviso {
+  margin: 0 0 0 auto;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+}

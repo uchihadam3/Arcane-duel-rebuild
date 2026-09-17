@@ -24,6 +24,7 @@ export default defineConfig({
   },
   define: {
     __VERSAO_DO_CLIENTE__: JSON.stringify('0.1.0-test'),
+    __COMMIT_DO_CLIENTE__: JSON.stringify('0000000000000000000000000000000000000000'),
   },
   test: {
     environment: 'node',
