@@ -1,0 +1,48 @@
+{
+  "descricao": "Inventário canônico dos assets visuais aprovados (docs/ASSET_CATALOG.md). Os caminhos são relativos à pasta /assets na raiz do repositório.",
+  "assets": [
+    { "id": "card-frame-ataque", "arquivo": "card_frame_attack_red.png", "caminho": "cards/frames/card_frame_attack_red.png", "categoria": "card-frame", "camada": "cartas", "papel": "Moldura de habilidade do tipo Ataque." },
+    { "id": "card-frame-tecnica", "arquivo": "card_frame_technique_blue.png", "caminho": "cards/frames/card_frame_technique_blue.png", "categoria": "card-frame", "camada": "cartas", "papel": "Moldura de Técnica." },
+    { "id": "card-frame-reacao", "arquivo": "card_frame_reaction_green.png", "caminho": "cards/frames/card_frame_reaction_green.png", "categoria": "card-frame", "camada": "cartas", "papel": "Moldura de Reação." },
+    { "id": "card-frame-passiva", "arquivo": "card_frame_passive_ivory_gold.png", "caminho": "cards/frames/card_frame_passive_ivory_gold.png", "categoria": "card-frame", "camada": "cartas", "papel": "Moldura de Passiva." },
+    { "id": "card-frame-classe", "arquivo": "card_frame_class_purple.png", "caminho": "cards/frames/card_frame_class_purple.png", "categoria": "card-frame", "camada": "cartas", "papel": "Moldura de Carta de Classe." },
+    { "id": "card-frame-ultimate", "arquivo": "card_frame_ultimate_orange_gold.png", "caminho": "cards/frames/card_frame_ultimate_orange_gold.png", "categoria": "card-frame", "camada": "cartas", "papel": "Moldura de Ultimate." },
+
+    { "id": "card-back", "arquivo": "card_back_default_gold.png", "caminho": "cards/backs/card_back_default_gold.png", "categoria": "card-back", "camada": "cartas", "papel": "Verso neutro de qualquer carta oculta. Nunca revela tipo, classe ou informação privada." },
+
+    { "id": "arena", "arquivo": "arena_board_clean_vertical.png", "caminho": "arenas/arena_board_clean_vertical.png", "categoria": "arena", "camada": "arena", "papel": "Arena limpa, sem HUD e sem slots desenhados. É cenário: não define hitbox nem zona lógica." },
+
+    { "id": "slot-acao", "arquivo": "board_action_slot.png", "caminho": "board/slots/board_action_slot.png", "categoria": "board-slot", "camada": "slots", "papel": "Slot base de Ação. Repetido três vezes no centro do campo." },
+    { "id": "slot-resposta", "arquivo": "board_response_slot.png", "caminho": "board/slots/board_response_slot.png", "categoria": "board-slot", "camada": "slots", "papel": "Slot de Resposta, montado em código logo abaixo do slot de Ação correspondente." },
+    { "id": "slot-carta-de-classe", "arquivo": "board_class_slot_purple.png", "caminho": "board/slots/board_class_slot_purple.png", "categoria": "board-slot", "camada": "slots", "papel": "Slot de Carta de Classe. Dois por jogador." },
+    { "id": "slot-passiva", "arquivo": "board_passive_slot_purple.png", "caminho": "board/slots/board_passive_slot_purple.png", "categoria": "board-slot", "camada": "slots", "papel": "Slot de Passiva. Quatro por jogador." },
+    { "id": "slot-ultimate", "arquivo": "board_ultimate_slot.png", "caminho": "board/slots/board_ultimate_slot.png", "categoria": "board-slot", "camada": "slots", "papel": "Slot especial de Ultimate, com ornamentação própria." },
+
+    { "id": "tray-cooldown", "arquivo": "board_cooldown_tray_three_slots.png", "caminho": "board/trays/board_cooldown_tray_three_slots.png", "categoria": "board-tray", "camada": "slots", "papel": "Trilha física de cooldown: CD1, CD2 e CD3." },
+    { "id": "tray-condicoes", "arquivo": "board_conditions_tray_four_slots.png", "caminho": "board/trays/board_conditions_tray_four_slots.png", "categoria": "board-tray", "camada": "slots", "papel": "Bandeja de Condições: Queimadura, Lento, Murchar e Sangramento." },
+
+    { "id": "hud-retrato-primario", "arquivo": "hud_portrait_frame_primary_red.png", "caminho": "hud/hud_portrait_frame_primary_red.png", "categoria": "hud", "camada": "texto", "papel": "Moldura principal de retrato do Personagem." },
+    { "id": "hud-retrato-secundario", "arquivo": "hud_portrait_frame_secondary_red.png", "caminho": "hud/hud_portrait_frame_secondary_red.png", "categoria": "hud", "camada": "texto", "papel": "Moldura circular secundária de retrato." },
+    { "id": "hud-nameplate", "arquivo": "hud_nameplate_red.png", "caminho": "hud/hud_nameplate_red.png", "categoria": "hud", "camada": "texto", "papel": "Placa horizontal para nome e informação textual." },
+    { "id": "hud-barra-vida", "arquivo": "hud_health_bar_red.png", "caminho": "hud/hud_health_bar_red.png", "categoria": "hud", "camada": "texto", "papel": "Barra de Vida. O valor é renderizado por código." },
+    { "id": "hud-barra-guarda", "arquivo": "hud_guard_bar_red.png", "caminho": "hud/hud_guard_bar_red.png", "categoria": "hud", "camada": "texto", "papel": "Barra de Guarda. O valor é renderizado por código." },
+    { "id": "hud-barra-reserva", "arquivo": "hud_reserve_bar_red.png", "caminho": "hud/hud_reserve_bar_red.png", "categoria": "hud", "camada": "texto", "papel": "Barra de Reserva. O valor é renderizado por código." },
+    { "id": "hud-estandarte", "arquivo": "hud_faction_banner_red.png", "caminho": "hud/hud_faction_banner_red.png", "categoria": "hud", "camada": "texto", "papel": "Estandarte decorativo de facção." },
+    { "id": "hud-faixa-de-turno", "arquivo": "hud_turn_banner_red.png", "caminho": "hud/hud_turn_banner_red.png", "categoria": "hud", "camada": "texto", "papel": "Faixa de transição de turno." },
+
+    { "id": "overlay-selecionavel", "arquivo": "overlay_selectable_blue.png", "caminho": "overlays/overlay_selectable_blue.png", "categoria": "overlay", "camada": "overlays", "papel": "Indica que a carta ou o slot pode ser escolhido." },
+    { "id": "overlay-selecionado", "arquivo": "overlay_selected_gold.png", "caminho": "overlays/overlay_selected_gold.png", "categoria": "overlay", "camada": "overlays", "papel": "Indica a carta ou o slot atualmente selecionado." },
+    { "id": "overlay-alvo-valido", "arquivo": "overlay_valid_target_green.png", "caminho": "overlays/overlay_valid_target_green.png", "categoria": "overlay", "camada": "overlays", "papel": "Indica um alvo válido." },
+
+    { "id": "icone-vida", "arquivo": "icon_health.png", "caminho": "icons/icon_health.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Vida (coração)." },
+    { "id": "icone-guarda", "arquivo": "icon_guard.png", "caminho": "icons/icon_guard.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Guarda (escudo)." },
+    { "id": "icone-pontos-de-acao", "arquivo": "icon_action_points.png", "caminho": "icons/icon_action_points.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de pontos de Ação (vórtice azul)." },
+    { "id": "icone-reserva", "arquivo": "icon_reserve.png", "caminho": "icons/icon_reserve.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Reserva (ampulheta)." },
+    { "id": "icone-dano", "arquivo": "icon_damage.png", "caminho": "icons/icon_damage.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Dano (explosão vermelha)." },
+    { "id": "icone-impacto", "arquivo": "icon_impact.png", "caminho": "icons/icon_impact.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Impacto (impacto roxo)." },
+    { "id": "icone-cooldown", "arquivo": "icon_cooldown.png", "caminho": "icons/icon_cooldown.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de cooldown (relógio / seta circular)." },
+    { "id": "icone-ruptura", "arquivo": "icon_rupture.png", "caminho": "icons/icon_rupture.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Ruptura (fissura vermelha)." },
+    { "id": "icone-ativar", "arquivo": "icon_activate.png", "caminho": "icons/icon_activate.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Ativar (seta verde para cima). Efeito renovável." },
+    { "id": "icone-exaurir", "arquivo": "icon_exhaust.png", "caminho": "icons/icon_exhaust.png", "categoria": "icone", "camada": "texto", "papel": "Ícone de Exaurir (fumaça/cinza). Exclusivo de Carta de Classe." }
+  ]
+}

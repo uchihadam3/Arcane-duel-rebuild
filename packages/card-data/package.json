@@ -1,0 +1,24 @@
+{
+  "name": "@arcane-duel/card-data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Catálogo de cartas e descritores de classe do Arcane Duel.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json"
+  },
+  "dependencies": {
+    "@arcane-duel/shared-types": "*"
+  }
+}

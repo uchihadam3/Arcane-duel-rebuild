@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+assets/
+apps/web/public/
+apps/web/dev-dist/
+package-lock.json
+
+# Documentos de design: preservados exatamente como entregues.
+docs/FULL_GAME_SPEC.md
+docs/CARD_CATALOG.md
+docs/PRESET_BUILDS.md
+docs/ASSET_CATALOG.md
+docs/VIDEO_VISUAL_TARGET.md
+docs/ROADMAP_CODEX.md
+docs/CODEX_START_HERE.md

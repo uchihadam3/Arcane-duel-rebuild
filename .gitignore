@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+apps/web/dev-dist/
+
+# generated asset mirror (source of truth is /assets)
+apps/web/public/assets/
+
+# environment / secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets.json
+
+# tooling caches
+.eslintcache
+coverage/
+.vite/
+.cache/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json

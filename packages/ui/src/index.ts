@@ -1,0 +1,8 @@
+export * from './assets/manifest.js';
+export * from './assets/resolver.js';
+export { gerarPlaceholder } from './assets/placeholder.js';
+export * from './theme/tokens.js';
+export { AssetProvider, useResolvedorDeAssets } from './components/AssetProvider.js';
+export type { AssetProviderProps } from './components/AssetProvider.js';
+export { AssetImage } from './components/AssetImage.js';
+export type { AssetImageProps, EstadoDoAsset } from './components/AssetImage.js';

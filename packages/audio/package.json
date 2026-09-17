@@ -1,0 +1,21 @@
+{
+  "name": "@arcane-duel/audio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vocabulário de eventos sonoros e barramentos de áudio. Implementação na etapa treze.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json"
+  }
+}

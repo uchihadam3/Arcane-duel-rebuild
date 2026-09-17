@@ -1,0 +1,30 @@
+{
+  "name": "@arcane-duel/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cliente web do Arcane Duel. React + Vite + TypeScript, landscape-first, instalável como PWA.",
+  "scripts": {
+    "predev": "node ../../scripts/sync-assets.mjs",
+    "dev": "vite",
+    "prebuild": "node ../../scripts/sync-assets.mjs",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@arcane-duel/ai": "*",
+    "@arcane-duel/audio": "*",
+    "@arcane-duel/card-data": "*",
+    "@arcane-duel/rules-engine": "*",
+    "@arcane-duel/shared-types": "*",
+    "@arcane-duel/ui": "*",
+    "@arcane-duel/vfx": "*",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.1.0",
+    "vite-plugin-pwa": "^1.0.0"
+  }
+}

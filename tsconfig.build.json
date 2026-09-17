@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared-types/tsconfig.build.json" },
+    { "path": "./packages/rules-engine/tsconfig.build.json" },
+    { "path": "./packages/card-data/tsconfig.build.json" },
+    { "path": "./packages/ai/tsconfig.build.json" },
+    { "path": "./packages/audio/tsconfig.build.json" },
+    { "path": "./packages/vfx/tsconfig.build.json" },
+    { "path": "./packages/ui/tsconfig.build.json" },
+    { "path": "./apps/game-server/tsconfig.build.json" }
+  ]
+}

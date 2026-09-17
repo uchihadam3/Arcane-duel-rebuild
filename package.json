@@ -1,0 +1,48 @@
+{
+  "name": "arcane-duel-rebuild",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Arcane Duel — card battler de classes 1v1. Fundação do projeto.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @arcane-duel/web",
+    "dev:server": "npm run dev --workspace @arcane-duel/game-server",
+    "assets:sync": "node scripts/sync-assets.mjs",
+    "assets:check": "node scripts/check-assets.mjs",
+    "icons:placeholder": "node scripts/generate-pwa-icons.mjs",
+    "typecheck": "node scripts/typecheck.mjs",
+    "build": "npm run typecheck && npm run build --workspace @arcane-duel/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rm -rf packages/*/dist apps/*/dist apps/web/public/assets packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo",
+    "check": "npm run format:check && npm run lint && npm run assets:check && npm run build && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "eslint": "^9.37.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.0",
+    "globals": "^16.4.0"
+  }
+}

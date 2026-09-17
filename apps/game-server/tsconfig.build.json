@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false,
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [
+    { "path": "../../packages/shared-types/tsconfig.build.json" },
+    { "path": "../../packages/rules-engine/tsconfig.build.json" },
+    { "path": "../../packages/card-data/tsconfig.build.json" }
+  ]
+}

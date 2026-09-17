@@ -1,0 +1,70 @@
+/*
+ * A batalha é desenhada primeiro para landscape e precisa caber inteira na
+ * tela: nenhuma rolagem de página durante o combate (FULL_GAME_SPEC.md §42).
+ * Esta folha já estabelece essa restrição para a fundação.
+ */
+
+:root {
+  --fundo: #0b0d13;
+  --fundo-painel: #131722;
+  --borda: #262c3a;
+  --texto: #e6e9f0;
+  --texto-suave: #9aa4b8;
+  --destaque: #c9a227;
+  --ok: #4ea672;
+  --alerta: #d8a23a;
+  --espaco: 12px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#raiz {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  /* Sem rolagem de página: cada painel rola dentro de si quando precisa. */
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+#raiz {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  color: var(--destaque);
+}
