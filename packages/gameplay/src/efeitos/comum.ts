@@ -1,9 +1,16 @@
-import type { CardId, EscopoDaAnotacao, PlayerId } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EscolhasDaAcao,
+  EscopoDaAnotacao,
+  PerfilDeHabilidade,
+  PlayerId,
+} from '@arcane-duel/shared-types';
 import { semAnotacoesDaChave, temTag, valorDaAnotacao } from '@arcane-duel/shared-types';
+import type { ErroDeDominio } from '@arcane-duel/rules-engine';
 
 import { CHAVE } from '../chaves.js';
 import type { Contexto } from '../contexto.js';
-import { emitir, gravarJogador, jogadorDo, registrarAnotacao } from '../contexto.js';
+import { emitir, gravarJogador, jogadorDo, registrarAnotacao, slotDe } from '../contexto.js';
 import type { AlvoDoEfeito } from '../ganchos.js';
 import { somarAoAtaque } from '../apoio.js';
 
@@ -105,3 +112,77 @@ export const emitirProntificacao = (
 ): void => {
   emitir(ctx, { tipo: 'carta-de-classe-prontificada-por-efeito', jogador, carta, origem });
 };
+
+/*
+ * Conferência de escolhas.
+ *
+ * O motor não escolhe no lugar do jogador. Quando o texto impresso diz
+ * "escolha", "você pode", "gaste até" ou "deixe Pronta uma", a decisão precisa
+ * chegar no comando — e, se não chegar, a jogada é recusada com erro tipado em
+ * vez de o motor completar a frase sozinho.
+ */
+
+/** Exige "escolha +1 D ou +1 I". */
+export const exigirReforco = (
+  escolhas: EscolhasDaAcao,
+  carta: CardId,
+  detalhe: string,
+): ErroDeDominio | null =>
+  escolhas.reforco === undefined ? { tipo: 'escolha-obrigatoria', carta, detalhe } : null;
+
+/** Recusa um reforço informado quando a carta não oferece a escolha agora. */
+export const recusarReforco = (
+  escolhas: EscolhasDaAcao,
+  carta: CardId,
+  detalhe: string,
+): ErroDeDominio | null =>
+  escolhas.reforco === undefined ? null : { tipo: 'escolha-invalida', carta, detalhe };
+
+/** Exige uma carta escolhida dentro de uma lista de opções legais. */
+export const exigirCartaEntre = (
+  escolhida: CardId | undefined,
+  opcoes: readonly CardId[],
+  carta: CardId,
+  detalhe: string,
+): ErroDeDominio | null => {
+  if (escolhida === undefined) return { tipo: 'escolha-obrigatoria', carta, detalhe };
+  return opcoes.includes(escolhida) ? null : { tipo: 'escolha-invalida', carta, detalhe };
+};
+
+/** Exige a quantidade da parcela variável do custo ("gaste até", "1 a 3"). */
+export const exigirParcelaVariavel = (
+  perfil: PerfilDeHabilidade,
+  escolhas: EscolhasDaAcao,
+  detalhe: string,
+): ErroDeDominio | null => {
+  if (perfil.custo.variavel === undefined) return null;
+  return escolhas.recursoAdicional === undefined
+    ? { tipo: 'escolha-obrigatoria', carta: perfil.carta, detalhe }
+    : null;
+};
+
+/** Exige uma lista de cartas, toda ela dentro das opções legais e sem repetir. */
+export const exigirCartasEntre = (
+  escolhidas: readonly CardId[] | undefined,
+  opcoes: readonly CardId[],
+  maximo: number,
+  carta: CardId,
+  detalhe: string,
+): ErroDeDominio | null => {
+  if (escolhidas === undefined) return { tipo: 'escolha-obrigatoria', carta, detalhe };
+  if (escolhidas.length > maximo) return { tipo: 'escolha-invalida', carta, detalhe };
+  if (new Set(escolhidas).size !== escolhidas.length) {
+    return { tipo: 'escolha-invalida', carta, detalhe };
+  }
+  return escolhidas.every((item) => opcoes.includes(item))
+    ? null
+    : { tipo: 'escolha-invalida', carta, detalhe };
+};
+
+/** As escolhas que o defensor mandou junto com a Resposta desta Ação. */
+export const escolhasDaResposta = (ctx: Contexto, alvo: AlvoDoEfeito): EscolhasDaAcao =>
+  slotDe(jogadorDo(ctx, alvo.atacante), alvo.indice)?.resposta.escolhas ?? {};
+
+/** As escolhas que o atacante mandou junto com a declaração desta Ação. */
+export const escolhasDaAcao = (ctx: Contexto, alvo: AlvoDoEfeito): EscolhasDaAcao =>
+  slotDe(jogadorDo(ctx, alvo.atacante), alvo.indice)?.escolhas ?? {};

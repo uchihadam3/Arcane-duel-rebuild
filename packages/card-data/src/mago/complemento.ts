@@ -10,17 +10,6 @@ import type { DefinicaoDeCarta } from '../card-definition.js';
  * identidade da carta, não a posição dela nesta lista.
  */
 
-/** A carta de Personagem da classe (FULL_GAME_SPEC.md §3). */
-export const PERSONAGEM_DO_MAGO: DefinicaoDeCarta = {
-  id: cardId('M00'),
-  classe: 'mago',
-  nome: 'Mago',
-  tipo: 'personagem',
-  tags: [],
-  texto:
-    'Mana vai de 0 a 6 e começa em 4. Defesa Inata — Barreira Arcana: uma vez por turno inimigo, gaste 1 Mana para reduzir 1 D e 1 I.',
-};
-
 export const PASSIVAS_DO_MAGO: readonly DefinicaoDeCarta[] = [
   {
     id: cardId('MP01'),

@@ -5,6 +5,7 @@ export * from './zones.js';
 export * from './conditions.js';
 export * from './escolhas.js';
 export * from './anotacoes.js';
+export * from './escolha-pendente.js';
 export * from './card-state.js';
 export * from './recursos-de-classe.js';
 export * from './estado-de-partida.js';

@@ -67,10 +67,21 @@ export type ErroDeDominio =
   | { readonly tipo: 'carta-fora-da-build'; readonly carta: CardId }
   /** A carta existe, mas não é da classe do jogador. */
   | { readonly tipo: 'carta-de-outra-classe'; readonly carta: CardId; readonly classe: ClassId }
+  /** O Personagem da build não é o da classe escolhida. */
+  | {
+      readonly tipo: 'personagem-invalido';
+      readonly esperado: CardId;
+      readonly recebido: CardId;
+      readonly classe: ClassId;
+    }
   /** A escolha informada não é uma das opções impressas na carta. */
   | { readonly tipo: 'escolha-invalida'; readonly carta: CardId; readonly detalhe: string }
   /** A carta exige uma escolha que não veio. */
   | { readonly tipo: 'escolha-obrigatoria'; readonly carta: CardId; readonly detalhe: string }
+  /** O jogador tem escolha pendente e precisa resolvê-la antes de agir. */
+  | { readonly tipo: 'escolha-pendente'; readonly origem: CardId; readonly jogador: PlayerId }
+  /** Não há escolha pendente para resolver. */
+  | { readonly tipo: 'sem-escolha-pendente'; readonly jogador: PlayerId }
   /** A condição impressa para jogar a carta não está satisfeita. */
   | {
       readonly tipo: 'condicao-de-uso-nao-satisfeita';

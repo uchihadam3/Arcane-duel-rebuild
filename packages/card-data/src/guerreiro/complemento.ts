@@ -12,17 +12,6 @@ import type { DefinicaoDeCarta } from '../card-definition.js';
  * exato para que a troca silenciosa seja impossível.
  */
 
-/** A carta de Personagem da classe (FULL_GAME_SPEC.md §3). */
-export const PERSONAGEM_DO_GUERREIRO: DefinicaoDeCarta = {
-  id: cardId('W00'),
-  classe: 'guerreiro',
-  nome: 'Guerreiro',
-  tipo: 'personagem',
-  tags: [],
-  texto:
-    'Momentum possui no máximo 3 fichas. Defesa Inata — Guarda Marcial: uma vez por turno inimigo, reduza 1 D ou 1 I.',
-};
-
 export const PASSIVAS_DO_GUERREIRO: readonly DefinicaoDeCarta[] = [
   {
     id: cardId('WP01'),

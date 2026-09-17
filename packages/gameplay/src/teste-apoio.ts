@@ -7,6 +7,7 @@ import type {
 } from '@arcane-duel/shared-types';
 import { cardId, matchId, playerId } from '@arcane-duel/shared-types';
 import type { BuildEquipada, ErroDeDominio, EventoUniversal } from '@arcane-duel/rules-engine';
+import { PERSONAGEM_DA_CLASSE } from '@arcane-duel/card-data';
 
 import type { PedidoDeAcao, PedidoDeResposta, Resposta } from './partida.js';
 import {
@@ -49,13 +50,11 @@ const PADROES = {
     passivas: ['WP02', 'WP05', 'WP09', 'WP10'],
     cartasDeClasse: ['WC01', 'WC02'],
     ultimate: 'WU01',
-    personagem: 'W00',
   },
   mago: {
     passivas: ['MP01', 'MP02', 'MP04', 'MP09'],
     cartasDeClasse: ['MC01', 'MC02'],
     ultimate: 'MU01',
-    personagem: 'M00',
   },
 } as const;
 
@@ -85,7 +84,7 @@ export const build = (classe: 'guerreiro' | 'mago', opcoes: OpcoesDeBuild = {}):
 
   return {
     classe,
-    personagem: cardId(padrao.personagem),
+    personagem: PERSONAGEM_DA_CLASSE[classe],
     habilidades: habilidades.map((codigo) => cardId(codigo)),
     passivas: passivas.map((codigo) => cardId(codigo)),
     cartasDeClasse: cartasDeClasse.map((codigo) => cardId(codigo)),

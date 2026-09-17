@@ -281,7 +281,11 @@ describe('Mago — habilidades', () => {
 
     const { partida: depois, eventos } = jogar(noTurnoDoGuerreiro, B, {
       pedido: { carta: 'W02' as never },
-      resposta: { tipo: 'carta-de-reacao', carta: 'M20' as never },
+      resposta: {
+        tipo: 'carta-de-reacao',
+        carta: 'M20' as never,
+        escolhas: { cartaDeClasse: 'MC01' as never },
+      },
     });
 
     const impacto = eventos.find((evento) => evento.tipo === 'impacto-aplicado');

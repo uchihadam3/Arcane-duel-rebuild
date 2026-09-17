@@ -1,4 +1,5 @@
-import type { ClassId } from '@arcane-duel/shared-types';
+import type { CardId, ClassId } from '@arcane-duel/shared-types';
+import { cardId } from '@arcane-duel/shared-types';
 
 /**
  * Forma do componente próprio de cada classe. Nenhuma classe recebe uma barra
@@ -18,12 +19,26 @@ export interface DescritorDeClasse {
   readonly id: ClassId;
   readonly nome: string;
   readonly componente: ComponenteDeClasse;
+  /**
+   * Identidade técnica da carta de Personagem da classe.
+   *
+   * O estado da partida exige um Personagem (§3, §4), mas o CARD_CATALOG.md não
+   * fornece dados de Personagem para classe nenhuma: não há custo, valores,
+   * cooldown nem texto impresso para transcrever. Inventar esses dados seria
+   * criar carta, então o Personagem vive **fora** do catálogo jogável — aqui,
+   * como um identificador estável e mais nada.
+   *
+   * Quando o documento trouxer as cartas de Personagem, elas entram no catálogo
+   * com os dados reais e este campo passa a apontar para elas.
+   */
+  readonly personagem: CardId;
 }
 
 /** As doze classes do lançamento inicial (FULL_GAME_SPEC.md §2 e §16). */
 export const CLASSES: readonly DescritorDeClasse[] = [
   {
     id: 'guerreiro',
+    personagem: cardId('personagem:guerreiro'),
     nome: 'Guerreiro',
     componente: {
       nome: 'Momentum',
@@ -33,6 +48,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'mago',
+    personagem: cardId('personagem:mago'),
     nome: 'Mago',
     componente: {
       nome: 'Mana',
@@ -42,6 +58,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'clerigo',
+    personagem: cardId('personagem:clerigo'),
     nome: 'Clérigo',
     componente: {
       nome: 'Devoção',
@@ -51,6 +68,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'necromante',
+    personagem: cardId('personagem:necromante'),
     nome: 'Necromante',
     componente: {
       nome: 'Almas',
@@ -60,6 +78,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'paladino',
+    personagem: cardId('personagem:paladino'),
     nome: 'Paladino',
     componente: {
       nome: 'Juramento',
@@ -69,6 +88,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'ladino',
+    personagem: cardId('personagem:ladino'),
     nome: 'Ladino',
     componente: {
       nome: 'Brechas',
@@ -79,6 +99,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'bardo',
+    personagem: cardId('personagem:bardo'),
     nome: 'Bardo',
     componente: {
       nome: 'Cadência',
@@ -89,6 +110,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'monge',
+    personagem: cardId('personagem:monge'),
     nome: 'Monge',
     componente: {
       nome: 'Chi',
@@ -98,6 +120,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'patrulheiro',
+    personagem: cardId('personagem:patrulheiro'),
     nome: 'Patrulheiro',
     componente: {
       nome: 'Marca da Presa',
@@ -107,6 +130,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'barbaro',
+    personagem: cardId('personagem:barbaro'),
     nome: 'Bárbaro',
     componente: {
       nome: 'Fúria',
@@ -117,6 +141,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'druida',
+    personagem: cardId('personagem:druida'),
     nome: 'Druida',
     componente: {
       nome: 'Forma',
@@ -126,6 +151,7 @@ export const CLASSES: readonly DescritorDeClasse[] = [
   },
   {
     id: 'bruxo',
+    personagem: cardId('personagem:bruxo'),
     nome: 'Bruxo',
     componente: {
       nome: 'Preço Proibido',
@@ -146,3 +172,18 @@ export const obterClasse = (id: ClassId): DescritorDeClasse => {
 };
 
 export const CLASS_IDS: readonly ClassId[] = CLASSES.map((classe) => classe.id);
+
+/**
+ * A carta de Personagem de cada classe, por identificador.
+ *
+ * É um registro técnico, não uma entrada do catálogo jogável: `CATALOGO` não
+ * conhece nenhum desses identificadores, e `perfilDaCarta` não devolve perfil
+ * para eles. Quem monta uma build usa este registro.
+ */
+export const PERSONAGEM_DA_CLASSE: Readonly<Record<ClassId, CardId>> = Object.fromEntries(
+  CLASSES.map((classe) => [classe.id, classe.personagem]),
+) as Readonly<Record<ClassId, CardId>>;
+
+/** O identificador informado é a carta de Personagem de alguma classe? */
+export const ehPersonagem = (carta: CardId): boolean =>
+  CLASSES.some((classe) => classe.personagem === carta);

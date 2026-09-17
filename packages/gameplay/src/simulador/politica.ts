@@ -1,13 +1,19 @@
 import type {
   CardId,
+  EscolhaPendente,
+  EscolhasDaAcao,
   IndiceDeAcao,
   PlayerId,
+  ReforcoEscolhido,
   VisaoDaPartida,
   VisaoDeJogador,
 } from '@arcane-duel/shared-types';
 import type { Aleatorio } from '@arcane-duel/rules-engine';
+import { valorDaAnotacao } from '@arcane-duel/shared-types';
 import { CATALOGO } from '@arcane-duel/card-data';
 import type { DefinicaoDeCarta } from '@arcane-duel/card-data';
+
+import { CHAVE } from '../chaves.js';
 
 import type { PedidoDeAcao, PedidoDeResposta } from '../partida.js';
 
@@ -38,6 +44,13 @@ export interface Politica {
     indice: IndiceDeAcao,
     rng: Aleatorio,
   ) => PedidoDeResposta;
+  /** Responde uma escolha que ficou pendente, entre as opções legais dela. */
+  readonly escolherPendencia: (
+    visao: VisaoDaPartida,
+    eu: PlayerId,
+    pendente: EscolhaPendente,
+    rng: Aleatorio,
+  ) => CardId | undefined;
 }
 
 const meuEstado = (visao: VisaoDaPartida, eu: PlayerId): VisaoDeJogador | undefined =>
@@ -156,7 +169,12 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
       if (!cabeNoOrcamento(definicao, jogador, jogador.condicoes.lento)) return;
       if (!respeitaOTexto(definicao, adversario)) return;
 
-      candidatas.push({ pedido: { carta }, nota: pontuarAcao(definicao, adversario) });
+      const escolhas = escolhasParaAcao(definicao, jogador);
+      if (escolhas === null) return;
+      candidatas.push({
+        pedido: Object.keys(escolhas).length === 0 ? { carta } : { carta, escolhas },
+        nota: pontuarAcao(definicao, adversario),
+      });
     };
 
     for (const carta of minhasCartas(jogador)) considerar(carta);
@@ -211,7 +229,10 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
             (ameacaDeRuptura ? Math.min(reducao.impacto, ameaca.impacto) * 3 : 0);
       if (util <= 0) continue;
 
-      candidatas.push({ pedido: { tipo: 'carta-de-reacao', carta }, nota: util });
+      candidatas.push({
+        pedido: { tipo: 'carta-de-reacao', carta, escolhas: escolhasParaResposta(jogador) },
+        nota: util,
+      });
     }
 
     if (candidatas.length > 0) {
@@ -228,12 +249,94 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
     if (ehTecnica) return { tipo: 'sem-resposta' };
 
     // Sem carta que compense, resta a Defesa Inata da classe.
+    // A Defesa Inata vale uma vez por turno inimigo, e isso está visível na
+    // própria projeção: oferecer de novo seria um comando ilegal.
+    if (valorDaAnotacao(jogador.anotacoes, CHAVE.defesaInataUsada) > 0) {
+      return { tipo: 'sem-resposta' };
+    }
     const podePagar = jogador.recurso.classe !== 'mago' || jogador.recurso.mana >= 1;
-    return podePagar
-      ? { tipo: 'defesa-inata', reforcarImpacto: ameacaDeRuptura }
-      : { tipo: 'sem-resposta' };
+    if (!podePagar) return { tipo: 'sem-resposta' };
+
+    // A Guarda Marcial reduz 1 D **ou** 1 I, e a escolha é do jogador: a
+    // política a manda explicitamente, como um cliente faria.
+    return {
+      tipo: 'defesa-inata',
+      reducao: ameacaDeRuptura ? 'impacto' : 'dano',
+      escolhas: escolhasParaResposta(jogador),
+    };
   },
+
+  escolherPendencia: (_visao, _eu, pendente, rng) => desempatar(pendente.opcoes, rng),
 });
 
 /** A linha de base oficial: PRNG só para desempate. */
 export const POLITICA_DE_BASE: Politica = criarPoliticaDeBase(0);
+
+/*
+ * As escolhas que cada carta pede.
+ *
+ * A política decide como um jogador decidiria: ela lê o que está impresso — que
+ * é informação pública — e manda a escolha junto com o comando. O motor não
+ * escolhe por ela, e uma carta cuja escolha ela não sabe tomar simplesmente não
+ * entra entre as candidatas.
+ */
+
+const RUNAS_DO_MAGO: readonly string[] = ['MC01', 'MC02', 'MC03', 'MC04', 'MC05', 'MC06'];
+
+const runasAtivadasNaVisao = (jogador: VisaoDeJogador): readonly CardId[] =>
+  jogador.cartasDeClasse
+    .filter((item) => item.estado === 'ativada' && RUNAS_DO_MAGO.includes(item.carta))
+    .map((item) => item.carta);
+
+/**
+ * Devolve as escolhas da Ação, ou `null` quando a política prefere não jogar a
+ * carta por não ter opção legal para oferecer.
+ */
+const escolhasParaAcao = (
+  definicao: DefinicaoDeCarta,
+  jogador: VisaoDeJogador,
+): EscolhasDaAcao | null => {
+  const escolhas: {
+    recursoAdicional?: number;
+    reforco?: ReforcoEscolhido;
+    cartaDeClasse?: CardId;
+    cartaEmCooldown?: CardId;
+    cartasEmCooldown?: readonly CardId[];
+  } = {};
+
+  // "gaste até N" e "1 a 3": a linha de base gasta o mínimo impresso, sempre o
+  // mesmo valor, para não embutir uma decisão de balanceamento no número.
+  const variavel = definicao.custo?.variavel;
+  if (variavel !== undefined) escolhas.recursoAdicional = variavel.minimo;
+
+  if (definicao.id === ('M13' as CardId)) {
+    const alvo = jogador.cooldown[1][0];
+    if (alvo === undefined) return null;
+    escolhas.cartaEmCooldown = alvo;
+  }
+
+  if (definicao.id === ('M14' as CardId)) {
+    const runa = runasAtivadasNaVisao(jogador)[0];
+    if (runa === undefined) return null;
+    escolhas.cartaDeClasse = runa;
+  }
+
+  if (definicao.id === ('MU03' as CardId)) {
+    escolhas.cartasEmCooldown = jogador.cooldown[1].slice(0, 2);
+  }
+
+  // O reforço é exigido por várias cartas e Passivas, e recusado por duas —
+  // Rajada Prismática sem Runa Ativada e Orbe Instável fora da segunda Ação.
+  const proibeReforco =
+    (definicao.id === ('M08' as CardId) && true) ||
+    (definicao.id === ('M09' as CardId) && jogador.acoesRealizadasNoTurno !== 1);
+  if (!proibeReforco) escolhas.reforco = 'dano';
+
+  return escolhas;
+};
+
+/** As escolhas que uma Resposta pode precisar carregar. */
+const escolhasParaResposta = (jogador: VisaoDeJogador): EscolhasDaAcao => {
+  const runa = runasAtivadasNaVisao(jogador)[0];
+  return runa === undefined ? { reforco: 'dano' } : { reforco: 'dano', cartaDeClasse: runa };
+};

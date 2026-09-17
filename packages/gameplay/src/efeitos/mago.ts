@@ -1,5 +1,10 @@
-import type { CardId, EstadoDeJogador, PlayerId } from '@arcane-duel/shared-types';
-import { cardId } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EstadoDeJogador,
+  PlayerId,
+  ReforcoEscolhido,
+} from '@arcane-duel/shared-types';
+import { cardId, valorDaAnotacao } from '@arcane-duel/shared-types';
 import {
   adiantarCartaNoCooldown,
   devolverCartaAMao,
@@ -25,8 +30,10 @@ import {
   emitir,
   gravarJogador,
   jogadorDo,
+  registrarEscolhaPendente,
   slotDe,
 } from '../contexto.js';
+import { CATALOGO } from '@arcane-duel/card-data';
 import type {
   AlvoDoEfeito,
   EfeitoDeCarta,
@@ -36,8 +43,15 @@ import type {
 import {
   chaveDaPassiva,
   emitirProntificacao,
+  escolhasDaAcao,
+  escolhasDaResposta,
+  exigirCartaEntre,
+  exigirCartasEntre,
+  exigirParcelaVariavel,
+  exigirReforco,
   lerPromessa,
   prometerAoProximoAtaque,
+  recusarReforco,
 } from './comum.js';
 
 /*
@@ -62,6 +76,16 @@ export const RUNAS: readonly CardId[] = [
 ];
 
 export const ehRuna = (carta: CardId): boolean => RUNAS.includes(carta);
+
+/** Toda habilidade do Mago é Feitiço; o traço está impresso no catálogo. */
+const ehFeitico = (carta: CardId): boolean =>
+  CATALOGO.porId(carta)?.tags.includes('feitico') === true;
+
+/** Os Feitiços do jogador que estão em alguma zona de cooldown. */
+export const feiticosEmCooldown = (jogador: EstadoDeJogador): readonly CardId[] =>
+  [...jogador.cooldown[1], ...jogador.cooldown[2], ...jogador.cooldown[3]].filter((carta) =>
+    ehFeitico(carta),
+  );
 
 export const runasAtivadas = (jogador: EstadoDeJogador): readonly CardId[] =>
   jogador.cartasDeClasse.filter((item) => item.estado === 'ativada').map((item) => item.carta);
@@ -103,10 +127,15 @@ const causariaRuptura = (
   return preverRuptura(defensor.guarda, valores, slot.modificadores, slot.reducaoDaResposta);
 };
 
-/** "Escolha +1 D ou +1 I": aplica a opção escolhida na declaração. */
-const aplicarReforco = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
-  const slot = slotDe(jogadorDo(ctx, alvo.atacante), alvo.indice);
-  const escolha = slot?.escolhas.reforco ?? 'dano';
+/**
+ * "Escolha +1 D ou +1 I": aplica a opção que o jogador escolheu.
+ *
+ * Sem escolha não há efeito. O motor não completa a frase: quando a decisão era
+ * obrigatória, a conferência de escolhas já recusou a jogada antes de chegar
+ * aqui.
+ */
+const aplicarReforco = (ctx: Contexto, alvo: AlvoDoEfeito, escolha?: ReforcoEscolhido): void => {
+  if (escolha === undefined) return;
   somarAoAtaque(ctx, alvo.atacante, alvo.indice, escolha === 'dano' ? { dano: 1 } : { impacto: 1 });
 };
 
@@ -184,10 +213,22 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       // "Você pode Ativar uma Runa Pronta ao declarar. Se fizer isso, escolha
       // +1 D ou +1 I." A Ativação em si é feita pelo comando de Carta de
       // Classe; aqui só o bônus, e só quando ela de fato aconteceu.
+      validarEscolhas: (consulta) => {
+        const ativouRuna = consulta.cartasDeClasse.some(
+          (uso) => ehRuna(uso.carta) && uso.modo === 'ativar',
+        );
+        return ativouRuna
+          ? exigirReforco(consulta.escolhas, consulta.perfil.carta, 'escolha +1 D ou +1 I')
+          : recusarReforco(
+              consulta.escolhas,
+              consulta.perfil.carta,
+              'só há reforço a escolher quando uma Runa é Ativada',
+            );
+      },
       aoDeclarar: (ctx, alvo) => {
         const slot = slotDe(jogadorDo(ctx, alvo.atacante), alvo.indice);
         const ativouRuna = (slot?.cartasDeClasseUsadas ?? []).some((uso) => ehRuna(uso.carta));
-        if (ativouRuna) aplicarReforco(ctx, alvo);
+        if (ativouRuna) aplicarReforco(ctx, alvo, slot?.escolhas.reforco);
       },
     },
   ],
@@ -195,8 +236,16 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
     id('M09'),
     {
       // "Se for sua segunda Ação, escolha +1 D ou +1 I."
+      validarEscolhas: (consulta) =>
+        consulta.ordem === 2
+          ? exigirReforco(consulta.escolhas, consulta.perfil.carta, 'escolha +1 D ou +1 I')
+          : recusarReforco(
+              consulta.escolhas,
+              consulta.perfil.carta,
+              'o reforço só existe na segunda Ação',
+            ),
       aoDeclarar: (ctx, alvo) => {
-        if (alvo.ordem === 2) aplicarReforco(ctx, alvo);
+        if (alvo.ordem === 2) aplicarReforco(ctx, alvo, escolhasDaAcao(ctx, alvo).reforco);
       },
     },
   ],
@@ -205,6 +254,12 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
     {
       // "Recebe +1 D por Mana adicional gasta nesta carta." A parcela impressa
       // de 1 Mana não conta: adicional é o que passou dela.
+      validarEscolhas: (consulta) =>
+        exigirParcelaVariavel(
+          consulta.perfil,
+          consulta.escolhas,
+          'informe quanta Mana adicional gastar, de 0 a 2',
+        ),
       aoDeclarar: (ctx, alvo) => {
         const slot = slotDe(jogadorDo(ctx, alvo.atacante), alvo.indice);
         const adicional = Math.max((slot?.recursoGasto ?? 0) - 1, 0);
@@ -237,10 +292,17 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       // "Escolha uma carta sua em CD1 e devolva-a imediatamente à mão."
       legalidade: (consulta) =>
         consulta.jogador.cooldown[1].length > 0 ? null : 'não há carta em CD1 para devolver',
+      validarEscolhas: (consulta) =>
+        exigirCartaEntre(
+          consulta.escolhas.cartaEmCooldown,
+          consulta.jogador.cooldown[1],
+          consulta.perfil.carta,
+          'escolha uma carta sua em CD1',
+        ),
       antesDeResolver: (ctx, alvo) => {
         const jogador = jogadorDo(ctx, alvo.atacante);
         const slot = slotDe(jogador, alvo.indice);
-        const escolhida = slot?.escolhas.cartaEmCooldown ?? jogador.cooldown[1][0];
+        const escolhida = slot?.escolhas.cartaEmCooldown;
         if (escolhida === undefined) return;
         if (zonaDaCarta(jogador, escolhida) !== 1) return;
         const movimento = devolverCartaAMao(jogador, escolhida);
@@ -261,10 +323,15 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       // "Deixe Pronta uma de suas Runas Ativadas."
       legalidade: (consulta) =>
         runasAtivadas(consulta.jogador).length > 0 ? null : 'não há Runa Ativada',
+      validarEscolhas: (consulta) =>
+        exigirCartaEntre(
+          consulta.escolhas.cartaDeClasse,
+          runasAtivadas(consulta.jogador),
+          consulta.perfil.carta,
+          'escolha qual das suas Runas Ativadas fica Pronta',
+        ),
       antesDeResolver: (ctx, alvo) => {
-        const jogador = jogadorDo(ctx, alvo.atacante);
-        const slot = slotDe(jogador, alvo.indice);
-        const escolhida = slot?.escolhas.cartaDeClasse ?? runasAtivadas(jogador)[0];
+        const escolhida = escolhasDaAcao(ctx, alvo).cartaDeClasse;
         if (escolhida !== undefined) prontificarRuna(ctx, alvo.atacante, escolhida, alvo.origem);
       },
     },
@@ -329,9 +396,20 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       aoResponder: (ctx, alvo) => {
         reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { dano: 2, impacto: 2 });
       },
+      // "Depois, deixe Pronta uma Runa Ativada." Havendo Runa Ativada, qual
+      // delas é escolha de quem respondeu.
+      validarEscolhas: (consulta) => {
+        const ativadas = runasAtivadas(consulta.jogador);
+        if (ativadas.length === 0) return null;
+        return exigirCartaEntre(
+          consulta.escolhas.cartaDeClasse,
+          ativadas,
+          consulta.perfil.carta,
+          'escolha qual das suas Runas Ativadas fica Pronta',
+        );
+      },
       aposResolver: (ctx, alvo) => {
-        const jogador = jogadorDo(ctx, alvo.defensor);
-        const escolhida = runasAtivadas(jogador)[0];
+        const escolhida = escolhasDaResposta(ctx, alvo).cartaDeClasse;
         if (escolhida !== undefined) prontificarRuna(ctx, alvo.defensor, escolhida, alvo.origem);
       },
     },
@@ -386,15 +464,18 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         if (revelacao.alvo === null) return;
         reduzirNaResposta(ctx, revelacao.alvo.atacante, revelacao.alvo.indice, { impacto: 2 });
       },
-      antesDeResolver: (ctx, alvo) => {
-        if (alvo.defensor !== alvo.dono) return;
-        if ((valorDoRecurso(jogadorDo(ctx, alvo.dono), 'mana') ?? 0) < 1) return;
-        if (!causariaRuptura(ctx, alvo)) return;
-        if (!consumirLimitePorTurno(ctx, alvo.dono, chaveDaPassiva(alvo.origem), alvo.origem)) {
-          return;
-        }
-        ganharRecurso(ctx, alvo.dono, 'mana', -1);
-        reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { impacto: 1 });
+      // "uma vez por turno inimigo, **Ative** e gaste 1 Mana": Ativar é escolha
+      // do jogador, feita pelo comando próprio de Ativação. O motor nunca gasta
+      // a Mana dele por conta própria.
+      ativacao: {
+        podeAtivar: (ctx, alvo) =>
+          alvo.defensor === alvo.dono &&
+          (valorDoRecurso(jogadorDo(ctx, alvo.dono), 'mana') ?? 0) >= 1 &&
+          causariaRuptura(ctx, alvo),
+        aplicar: (ctx, alvo) => {
+          ganharRecurso(ctx, alvo.dono, 'mana', -1);
+          reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { impacto: 1 });
+        },
       },
     },
   ],
@@ -430,18 +511,18 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         revelacao.alvo !== null &&
         revelacao.alvo.defensor === revelacao.dono &&
         revelacao.resumo.dano >= 4,
+      // Qual carta devolver e qual adiantar é escolha do dono, mas as duas
+      // acontecem no meio da Ação do adversário — não existe comando dele
+      // naquele instante. Em vez de escolher por ele, a escolha fica pendente e
+      // ele a resolve antes de voltar a agir.
       aoRevelar: (ctx, revelacao) => {
-        const jogador = jogadorDo(ctx, revelacao.dono);
-        const carta = jogador.cooldown[1][0];
-        if (carta === undefined) return;
-        const movimento = devolverCartaAMao(jogador, carta);
-        if (!movimento.ok) return;
-        gravarJogador(ctx, movimento.valor.jogador);
-        emitir(ctx, {
-          tipo: 'carta-devolvida-a-mao',
+        const opcoes = jogadorDo(ctx, revelacao.dono).cooldown[1];
+        if (opcoes.length === 0) return;
+        registrarEscolhaPendente(ctx, {
           jogador: revelacao.dono,
-          carta,
-          de: movimento.valor.de,
+          origem: id('MP05'),
+          efeito: 'devolver-a-mao',
+          opcoes: [...opcoes],
         });
       },
       aposResolver: (ctx, alvo, resumo) => {
@@ -449,8 +530,14 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         if (!consumirLimitePorTurno(ctx, alvo.dono, chaveDaPassiva(alvo.origem), alvo.origem)) {
           return;
         }
-        const carta = jogadorDo(ctx, alvo.dono).cooldown[2][0];
-        if (carta !== undefined) adiantar(ctx, alvo.dono, carta);
+        const opcoes = jogadorDo(ctx, alvo.dono).cooldown[2];
+        if (opcoes.length === 0) return;
+        registrarEscolhaPendente(ctx, {
+          jogador: alvo.dono,
+          origem: alvo.origem,
+          efeito: 'adiantar-uma-zona',
+          opcoes: [...opcoes],
+        });
       },
     },
   ],
@@ -507,6 +594,13 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         revelacao.alvo.atacante === revelacao.dono &&
         revelacao.alvo.perfil.tags.includes('feitico') &&
         ativouRunaNesta(ctx, revelacao.alvo),
+      validarEscolhas: (consulta) =>
+        consulta.perfil.tags.includes('feitico') &&
+        consulta.cartasDeClasse.some((uso) => ehRuna(uso.carta) && uso.modo === 'ativar') &&
+        valorDaAnotacao(consulta.jogador.anotacoes, CHAVE.runasAtivadasNoTurno) === 0 &&
+        valorDaAnotacao(consulta.jogador.anotacoes, chaveDaPassiva(id('MP08'))) === 0
+          ? exigirReforco(consulta.escolhas, id('MP08'), 'escolha +1 D ou +1 I')
+          : null,
       aoDeclarar: (ctx, alvo) => {
         if (alvo.atacante !== alvo.dono || !alvo.perfil.tags.includes('feitico')) return;
         if (!ativouRunaNesta(ctx, alvo)) return;
@@ -514,7 +608,7 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         if (!consumirLimitePorTurno(ctx, alvo.dono, chaveDaPassiva(alvo.origem), alvo.origem)) {
           return;
         }
-        aplicarReforco(ctx, alvo);
+        aplicarReforco(ctx, alvo, escolhasDaAcao(ctx, alvo).reforco);
       },
     },
   ],
@@ -543,6 +637,13 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         revelacao.alvo !== null &&
         revelacao.alvo.atacante === revelacao.dono &&
         (slotDe(jogadorDo(ctx, revelacao.dono), revelacao.alvo.indice)?.recursoGasto ?? 0) >= 2,
+      validarEscolhas: (consulta) =>
+        consulta.perfil.valores !== null &&
+        consulta.perfil.tags.includes('feitico') &&
+        consulta.recursoPrevisto >= 2 &&
+        valorDaAnotacao(consulta.jogador.anotacoes, chaveDaPassiva(id('MP10'))) === 0
+          ? exigirReforco(consulta.escolhas, id('MP10'), 'escolha +1 D ou +1 I')
+          : null,
       aoDeclarar: (ctx, alvo) => {
         if (alvo.atacante !== alvo.dono || alvo.perfil.valores === null) return;
         if (!alvo.perfil.tags.includes('feitico')) return;
@@ -551,7 +652,7 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         if (!consumirLimitePorTurno(ctx, alvo.dono, chaveDaPassiva(alvo.origem), alvo.origem)) {
           return;
         }
-        aplicarReforco(ctx, alvo);
+        aplicarReforco(ctx, alvo, escolhasDaAcao(ctx, alvo).reforco);
       },
     },
   ],
@@ -622,14 +723,16 @@ export const CARTAS_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = new 
       exaurir: {
         // "Escolha um Feitiço seu em qualquer zona de cooldown e devolva-o à
         // mão. Se for utilizado novamente neste turno, custa +1 AP."
+        validarEscolhas: (consulta) =>
+          exigirCartaEntre(
+            consulta.escolhas.cartaEmCooldown,
+            feiticosEmCooldown(consulta.jogador),
+            id('MC03'),
+            'escolha um Feitiço seu em alguma zona de cooldown',
+          ),
         aposResolver: (ctx, alvo) => {
           const jogador = jogadorDo(ctx, alvo.dono);
-          const slot = slotDe(jogador, alvo.indice);
-          const escolhida =
-            slot?.escolhas.cartaEmCooldown ??
-            jogador.cooldown[1][0] ??
-            jogador.cooldown[2][0] ??
-            jogador.cooldown[3][0];
+          const escolhida = slotDe(jogador, alvo.indice)?.escolhas.cartaEmCooldown;
           if (escolhida === undefined) return;
           const movimento = devolverCartaAMao(jogador, escolhida);
           if (!movimento.ok) return;
@@ -656,10 +759,19 @@ export const CARTAS_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = new 
     {
       ativar: {
         // "Quando usar uma Resposta, reduza mais 1 D ou 1 I daquela ação."
+        // O "ou" é do jogador: sem a escolha, a Resposta é recusada.
+        validarEscolhas: (consulta) =>
+          exigirReforco(consulta.escolhas, id('MC04'), 'escolha reduzir 1 D ou 1 I'),
         aoResponder: (ctx, alvo) => {
           if (alvo.defensor !== alvo.dono) return;
-          const contra = causariaRuptura(ctx, alvo);
-          reduzirNaResposta(ctx, alvo.atacante, alvo.indice, contra ? { impacto: 1 } : { dano: 1 });
+          const escolha = escolhasDaResposta(ctx, alvo).reforco;
+          if (escolha === undefined) return;
+          reduzirNaResposta(
+            ctx,
+            alvo.atacante,
+            alvo.indice,
+            escolha === 'impacto' ? { impacto: 1 } : { dano: 1 },
+          );
         },
       },
       exaurir: {
@@ -749,16 +861,24 @@ export const ULTIMATES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, Efe
     {
       // "Sobrecarga Temporal. Deixe suas duas Runas Prontas, devolva até duas
       // cartas de CD1 à mão e recupere 1 AP."
+      // "devolva **até** duas cartas de CD1": quantas e quais é decisão de quem
+      // joga, e devolver nenhuma é uma decisão legítima.
+      validarEscolhas: (consulta) =>
+        exigirCartasEntre(
+          consulta.escolhas.cartasEmCooldown,
+          consulta.jogador.cooldown[1],
+          2,
+          consulta.perfil.carta,
+          'escolha até duas cartas suas de CD1, ou mande uma lista vazia',
+        ),
       antesDeResolver: (ctx, alvo) => {
         for (const runa of runasAtivadas(jogadorDo(ctx, alvo.atacante))) {
           prontificarRuna(ctx, alvo.atacante, runa, alvo.origem);
         }
-        for (let vez = 0; vez < 2; vez += 1) {
+        for (const carta of escolhasDaAcao(ctx, alvo).cartasEmCooldown ?? []) {
           const jogador = jogadorDo(ctx, alvo.atacante);
-          const carta = jogador.cooldown[1][0];
-          if (carta === undefined) break;
           const movimento = devolverCartaAMao(jogador, carta);
-          if (!movimento.ok) break;
+          if (!movimento.ok) continue;
           gravarJogador(ctx, movimento.valor.jogador);
           emitir(ctx, {
             tipo: 'carta-devolvida-a-mao',

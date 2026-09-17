@@ -25,7 +25,6 @@ describe('cobertura de cartas', () => {
   it('cita cada carta do catálogo em algum teste de comportamento', () => {
     const texto = textoDosTestesDeCarta();
     const semTeste = CATALOGO.todas
-      .filter((carta) => carta.tipo !== 'personagem')
       .filter((carta) => !texto.includes(`'${carta.id}'`))
       .map((carta) => `${carta.id} ${carta.nome}`);
 
@@ -33,7 +32,6 @@ describe('cobertura de cartas', () => {
   });
 
   it('cobre as 78 cartas jogáveis das duas classes', () => {
-    const jogaveis = CATALOGO.todas.filter((carta) => carta.tipo !== 'personagem');
-    expect(jogaveis).toHaveLength(78);
+    expect(CATALOGO.todas).toHaveLength(78);
   });
 });

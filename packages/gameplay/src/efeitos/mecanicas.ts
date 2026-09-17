@@ -1,4 +1,9 @@
-import type { CardId, EstadoDeJogador, PlayerId } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EstadoDeJogador,
+  PlayerId,
+  ReforcoEscolhido,
+} from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
 import { valorDoRecurso } from '@arcane-duel/rules-engine';
 
@@ -141,7 +146,7 @@ export const podeUsarDefesaInata = (ctx: Contexto, jogador: PlayerId): boolean =
 export const aplicarDefesaInata = (
   ctx: Contexto,
   alvo: AlvoDoEfeito,
-  preferirImpacto: boolean,
+  reducao: ReforcoEscolhido,
 ): CardId | null => {
   const defensor = jogadorDo(ctx, alvo.defensor);
   if (!consumirLimitePorTurno(ctx, alvo.defensor, CHAVE.defesaInataUsada, ORIGEM_GUARDA_MARCIAL)) {
@@ -159,7 +164,11 @@ export const aplicarDefesaInata = (
       ctx,
       alvo.atacante,
       alvo.indice,
-      fortalezaAtivada ? { dano: 1, impacto: 1 } : preferirImpacto ? { impacto: 1 } : { dano: 1 },
+      fortalezaAtivada
+        ? { dano: 1, impacto: 1 }
+        : reducao === 'impacto'
+          ? { impacto: 1 }
+          : { dano: 1 },
     );
     return ORIGEM_GUARDA_MARCIAL;
   }

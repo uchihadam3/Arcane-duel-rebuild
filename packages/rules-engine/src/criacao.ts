@@ -130,6 +130,7 @@ export const criarPartida = (configuracao: ConfiguracaoDaPartida): EstadoDaParti
   ],
   turno: null,
   desfecho: null,
+  escolhasPendentes: [],
 });
 
 /** Localiza um jogador pelo identificador. */

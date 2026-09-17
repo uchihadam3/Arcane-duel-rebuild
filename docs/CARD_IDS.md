@@ -13,7 +13,6 @@ Trocar um nome sem trocar o código, ou vice-versa, quebra a verificação.
 | Prefixo                      | Significa                                                  |
 | ---------------------------- | ---------------------------------------------------------- |
 | `W` / `M`                    | Guerreiro / Mago                                           |
-| `W00`, `M00`                 | a carta de Personagem da classe                            |
 | `W01`–`W20`, `M01`–`M20`     | as vinte habilidades, exatamente como no `CARD_CATALOG.md` |
 | `WP01`–`WP10`, `MP01`–`MP10` | as dez Passivas                                            |
 | `WC01`–`WC06`, `MC01`–`MC06` | as seis Cartas de Classe                                   |
@@ -29,7 +28,6 @@ tabela abaixo.
 
 | Código | Carta                  | Tipo            |
 | ------ | ---------------------- | --------------- |
-| W00    | Guerreiro              | Personagem      |
 | W01    | Corte de Sondagem      | Ataque          |
 | W02    | Ombro de Guerra        | Ataque          |
 | W03    | Quebra-Escudo          | Ataque          |
@@ -72,13 +70,11 @@ tabela abaixo.
 
 ## Mago
 
-Todas as habilidades, as Ultimates e o Personagem do Mago carregam o traço
-`feitico`. "Feitiço" é traço impresso ao lado do tipo, nunca um quarto tipo
-universal.
+Todas as habilidades e as Ultimates do Mago carregam o traço `feitico`.
+"Feitiço" é traço impresso ao lado do tipo, nunca um quarto tipo universal.
 
 | Código | Carta                    | Tipo            |
 | ------ | ------------------------ | --------------- |
-| M00    | Mago                     | Personagem      |
 | M01    | Dardo Arcano             | Ataque/Feitiço  |
 | M02    | Bola de Fogo             | Ataque/Feitiço  |
 | M03    | Chama Persistente        | Ataque/Feitiço  |
@@ -118,6 +114,29 @@ universal.
 | MU01   | Meteoro                  | Ultimate        |
 | MU02   | Zero Absoluto            | Ultimate        |
 | MU03   | Sobrecarga Temporal      | Ultimate        |
+
+## Personagem: identidade técnica, não carta
+
+O `CARD_CATALOG.md` **não fornece dados de Personagem** para classe nenhuma:
+não há custo, valores, cooldown nem texto impresso para transcrever. Inventar
+esses dados seria criar carta, e isso a Etapa 3 proíbe explicitamente.
+
+O estado da partida, porém, exige um Personagem (§3, §4). As duas coisas ficam
+separadas: o **catálogo jogável** tem 39 cartas por classe e nenhuma delas é
+Personagem; a **identidade técnica** do Personagem vive no descritor da classe,
+em `packages/card-data/src/classes.ts`, como identificador e nada mais.
+
+| Classe             | Identificador do Personagem |
+| ------------------ | --------------------------- |
+| Guerreiro          | `personagem:guerreiro`      |
+| Mago               | `personagem:mago`           |
+| demais dez classes | `personagem:<classe>`       |
+
+`CATALOGO.porId('personagem:guerreiro')` devolve `undefined` de propósito, e
+`perfilDaCarta` também: o Personagem não é jogado de lugar nenhum, e a build o
+valida contra o descritor da classe em vez de contra o catálogo. Quando o
+documento trouxer as cartas de Personagem com os dados reais, elas entram no
+catálogo e o descritor passa a apontar para elas.
 
 ## Identificadores que não são carta
 

@@ -1,6 +1,7 @@
 import { cardId } from '@arcane-duel/shared-types';
 import { describe, expect, it } from 'vitest';
 
+import { CLASSES, PERSONAGEM_DA_CLASSE, ehPersonagem } from './classes.js';
 import {
   CARTAS_DE_CLASSE_DO_GUERREIRO,
   CARTAS_DE_CLASSE_DO_MAGO,
@@ -24,7 +25,6 @@ import {
  */
 
 const NOMES_DO_GUERREIRO: Readonly<Record<string, string>> = {
-  W00: 'Guerreiro',
   W01: 'Corte de Sondagem',
   W02: 'Ombro de Guerra',
   W03: 'Quebra-Escudo',
@@ -67,7 +67,6 @@ const NOMES_DO_GUERREIRO: Readonly<Record<string, string>> = {
 };
 
 const NOMES_DO_MAGO: Readonly<Record<string, string>> = {
-  M00: 'Mago',
   M01: 'Dardo Arcano',
   M02: 'Bola de Fogo',
   M03: 'Chama Persistente',
@@ -112,6 +111,31 @@ const NOMES_DO_MAGO: Readonly<Record<string, string>> = {
 describe('catálogo oficial', () => {
   it('implementa exatamente Guerreiro e Mago nesta etapa', () => {
     expect([...CLASSES_IMPLEMENTADAS]).toEqual(['guerreiro', 'mago']);
+  });
+
+  it('tem 78 cartas jogáveis, 39 por classe', () => {
+    expect(CATALOGO.todas).toHaveLength(78);
+    expect(CATALOGO.porClasse('guerreiro')).toHaveLength(39);
+    expect(CATALOGO.porClasse('mago')).toHaveLength(39);
+  });
+
+  it('não contém carta de Personagem: o documento não fornece os dados delas', () => {
+    expect(CATALOGO.todas.some((carta) => carta.tipo === 'personagem')).toBe(false);
+    for (const classe of CLASSES) {
+      expect(CATALOGO.porId(classe.personagem), classe.id).toBeUndefined();
+      expect(perfilDaCarta(classe.personagem), classe.id).toBeUndefined();
+    }
+  });
+
+  it('dá a cada uma das doze classes um Personagem técnico e único', () => {
+    const identificadores = CLASSES.map((classe) => classe.personagem);
+    expect(identificadores).toHaveLength(12);
+    expect(new Set(identificadores).size).toBe(12);
+    expect(identificadores.every((carta) => ehPersonagem(carta))).toBe(true);
+    expect(PERSONAGEM_DA_CLASSE.mago).toBe(
+      CLASSES.find((classe) => classe.id === 'mago')?.personagem,
+    );
+    expect(ehPersonagem(cardId('W01'))).toBe(false);
   });
 
   it('tem 20 habilidades, 10 Passivas, 6 Cartas de Classe e 3 Ultimates por classe', () => {

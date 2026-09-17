@@ -6,27 +6,30 @@ import { HABILIDADES_DO_GUERREIRO } from './guerreiro/habilidades.js';
 import {
   CARTAS_DE_CLASSE_DO_GUERREIRO,
   PASSIVAS_DO_GUERREIRO,
-  PERSONAGEM_DO_GUERREIRO,
   ULTIMATES_DO_GUERREIRO,
 } from './guerreiro/complemento.js';
 import { HABILIDADES_DO_MAGO } from './mago/habilidades.js';
 import {
   CARTAS_DE_CLASSE_DO_MAGO,
   PASSIVAS_DO_MAGO,
-  PERSONAGEM_DO_MAGO,
   ULTIMATES_DO_MAGO,
 } from './mago/complemento.js';
 
 /*
  * O catálogo oficial.
  *
- * Duas classes completas entram aqui: Guerreiro e Mago. As outras dez são a
- * etapa quatro do roadmap e entram cada uma com os seus testes — não há dado
- * sem comportamento verificado neste arquivo.
+ * Duas classes completas entram aqui: Guerreiro e Mago, com 39 cartas cada —
+ * 20 habilidades, 10 Passivas, 6 Cartas de Classe e 3 Ultimates. As outras dez
+ * classes são a etapa quatro do roadmap e entram cada uma com os seus testes:
+ * não há dado sem comportamento verificado neste arquivo.
+ *
+ * Cartas de Personagem **não** entram aqui. O CARD_CATALOG.md não fornece os
+ * dados delas, e inventar custo, valores ou texto para preencher a lacuna seria
+ * criar carta. A identidade técnica do Personagem vive em `classes.ts`, como
+ * identificador e nada mais.
  */
 
 export const CARTAS_DO_GUERREIRO: readonly DefinicaoDeCarta[] = [
-  PERSONAGEM_DO_GUERREIRO,
   ...HABILIDADES_DO_GUERREIRO,
   ...PASSIVAS_DO_GUERREIRO,
   ...CARTAS_DE_CLASSE_DO_GUERREIRO,
@@ -34,7 +37,6 @@ export const CARTAS_DO_GUERREIRO: readonly DefinicaoDeCarta[] = [
 ];
 
 export const CARTAS_DO_MAGO: readonly DefinicaoDeCarta[] = [
-  PERSONAGEM_DO_MAGO,
   ...HABILIDADES_DO_MAGO,
   ...PASSIVAS_DO_MAGO,
   ...CARTAS_DE_CLASSE_DO_MAGO,
@@ -62,8 +64,6 @@ export const perfilDaCarta = (id: CardId): ReturnType<typeof perfilDaDefinicao> 
 };
 
 export {
-  PERSONAGEM_DO_GUERREIRO,
-  PERSONAGEM_DO_MAGO,
   HABILIDADES_DO_GUERREIRO,
   PASSIVAS_DO_GUERREIRO,
   CARTAS_DE_CLASSE_DO_GUERREIRO,

@@ -42,6 +42,10 @@ const executar = (): void => {
       '',
     ].join('\n'),
   );
+
+  // Um lote com comando ilegal não vale como medição: o processo termina com
+  // erro para que ninguém publique esses números por engano.
+  if (resumo.comandosIlegais > 0) process.exitCode = 1;
 };
 
 executar();

@@ -84,7 +84,7 @@ describe('validação do estado do jogador', () => {
     const orfã: EstadoDeJogador = {
       ...base,
       acoes: [
-        { ...base.acoes[0], resposta: { voluntaria: { tipo: 'defesa-inata' } } },
+        { ...base.acoes[0], resposta: { voluntaria: { tipo: 'defesa-inata' }, escolhas: {} } },
         base.acoes[1],
         base.acoes[2],
         base.acoes[3],

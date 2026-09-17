@@ -1,4 +1,10 @@
-import type { EstadoDaPartida, IndiceDeAcao, PlayerId } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EscolhaPendente,
+  EstadoDaPartida,
+  IndiceDeAcao,
+  PlayerId,
+} from '@arcane-duel/shared-types';
 import { matchId, playerId } from '@arcane-duel/shared-types';
 import type { BuildEquipada, ErroDeDominio, EventoUniversal } from '@arcane-duel/rules-engine';
 import { criarAleatorio, projetarParaJogador } from '@arcane-duel/rules-engine';
@@ -11,6 +17,7 @@ import {
   iniciar,
   montarPartida,
   resolver,
+  resolverEscolhaPendente,
   responder,
 } from '../partida.js';
 import type { Politica } from './politica.js';
@@ -19,19 +26,34 @@ import { POLITICA_DE_BASE } from './politica.js';
 /*
  * Simulador headless.
  *
- * Roda uma partida inteira sem interface nenhuma, com as duas políticas
- * decidindo a partir da visão de cada uma. A mesma semente produz a mesma
- * partida.
+ * Roda uma partida inteira sem interface, com as duas políticas decidindo a
+ * partir da visão de cada uma. A mesma semente produz a mesma partida.
+ *
+ * Uma política de simulação só pode produzir comandos **legais**. Se o motor
+ * recusar um comando dela, isso é bug do simulador — nunca comportamento normal
+ * de partida — e a partida é encerrada e marcada como inválida. Duas exceções
+ * conhecidas continuam sendo exceções: a recusa por `interacao-nao-definida`,
+ * que é lacuna do documento, e o teto técnico de turnos, que é trava do
+ * simulador.
  */
 
-/** Teto técnico de turnos. Não é regra de jogo: é uma trava do simulador. */
+/** Teto técnico de turnos. Não é regra de jogo. */
 export const LIMITE_TECNICO_DE_TURNOS = 60;
+
+/** Um comando que a política produziu e o motor recusou. */
+export interface ComandoIlegal {
+  readonly comando: 'declarar' | 'responder' | 'resolver' | 'escolha-pendente';
+  readonly jogador: PlayerId;
+  readonly turno: number;
+  readonly erro: ErroDeDominio;
+}
 
 export type DesfechoSimulado =
   | { readonly tipo: 'vitoria'; readonly vencedor: PlayerId }
   | { readonly tipo: 'indefinido' }
   | { readonly tipo: 'limite-tecnico-de-turnos' }
-  | { readonly tipo: 'bloqueio-de-regra'; readonly erro: ErroDeDominio };
+  | { readonly tipo: 'bloqueio-de-regra'; readonly erro: ErroDeDominio }
+  | { readonly tipo: 'comando-ilegal'; readonly primeiro: ComandoIlegal };
 
 export interface RelatorioDaPartida {
   readonly desfecho: DesfechoSimulado;
@@ -41,8 +63,18 @@ export interface RelatorioDaPartida {
   readonly respostasComDefesaInata: number;
   readonly rupturas: number;
   readonly ultimatesUsadas: number;
+  readonly passivasReveladas: number;
+  readonly passivasAtivadas: number;
+  readonly cartasDeClassePorAtivar: number;
+  readonly cartasDeClassePorExaurir: number;
+  /** Quantas vezes cada carta foi jogada, por identificador. */
+  readonly usoPorCarta: Readonly<Record<string, number>>;
+  /** Vida que sobrou para quem venceu, ou `null` quando não houve vencedor. */
+  readonly vidaDoVencedor: number | null;
   /** Ações recusadas por Lento + Impulso Inicial, a interação ainda não definida. */
   readonly bloqueiosDeLentoComImpulso: number;
+  /** Comandos que a política produziu e o motor recusou. Precisa ser vazio. */
+  readonly comandosIlegais: readonly ComandoIlegal[];
   readonly vidaFinal: Readonly<Record<string, number>>;
   readonly primeiroJogador: PlayerId;
   readonly partida: EstadoDaPartida;
@@ -68,25 +100,44 @@ interface Acumulador {
   respostasComDefesaInata: number;
   rupturas: number;
   ultimatesUsadas: number;
+  passivasReveladas: number;
+  passivasAtivadas: number;
+  cartasDeClassePorAtivar: number;
+  cartasDeClassePorExaurir: number;
   bloqueios: number;
+  readonly usoPorCarta: Map<string, number>;
 }
+
+const somarUso = (usoPorCarta: Map<string, number>, carta: CardId): void => {
+  usoPorCarta.set(carta, (usoPorCarta.get(carta) ?? 0) + 1);
+};
 
 const contar = (acumulador: Acumulador, eventos: readonly EventoUniversal[]): void => {
   for (const evento of eventos) {
     if (evento.tipo === 'ruptura') acumulador.rupturas += 1;
-    else if (evento.tipo === 'ultimate-consumida') acumulador.ultimatesUsadas += 1;
-    else if (evento.tipo === 'defesa-inata-usada') acumulador.respostasComDefesaInata += 1;
-    else if (evento.tipo === 'resposta-registrada' && evento.resposta.tipo === 'carta-de-reacao') {
-      acumulador.respostasComCarta += 1;
+    else if (evento.tipo === 'ultimate-consumida') {
+      acumulador.ultimatesUsadas += 1;
+      somarUso(acumulador.usoPorCarta, evento.carta);
+    } else if (evento.tipo === 'defesa-inata-usada') acumulador.respostasComDefesaInata += 1;
+    else if (evento.tipo === 'passiva-revelada') {
+      acumulador.passivasReveladas += 1;
+      somarUso(acumulador.usoPorCarta, evento.carta);
+    } else if (evento.tipo === 'passiva-ativada') acumulador.passivasAtivadas += 1;
+    else if (evento.tipo === 'carta-de-classe-ativada') {
+      acumulador.cartasDeClassePorAtivar += 1;
+      somarUso(acumulador.usoPorCarta, evento.carta);
+    } else if (evento.tipo === 'carta-de-classe-exaurida') {
+      acumulador.cartasDeClassePorExaurir += 1;
+      somarUso(acumulador.usoPorCarta, evento.carta);
+    } else if (evento.tipo === 'acao-declarada') {
+      somarUso(acumulador.usoPorCarta, evento.carta);
+    } else if (evento.tipo === 'resposta-registrada') {
+      if (evento.resposta.tipo === 'carta-de-reacao') {
+        acumulador.respostasComCarta += 1;
+        somarUso(acumulador.usoPorCarta, evento.resposta.perfil.carta);
+      }
     }
   }
-};
-
-const exigir = (
-  resposta: Resposta,
-): { partida: EstadoDaPartida; eventos: readonly EventoUniversal[] } => {
-  if (!resposta.ok) throw new ErroDeSimulacao(resposta.erro);
-  return { partida: resposta.valor.partida, eventos: resposta.valor.eventos };
 };
 
 /** Falha de comando que a simulação não sabe contornar. */
@@ -100,13 +151,13 @@ export class ErroDeSimulacao extends Error {
   }
 }
 
-/**
- * Roda uma partida do começo ao fim.
- *
- * Uma recusa de `interacao-nao-definida` **não** vira vitória, derrota nem
- * empate: ela encerra a partida como bloqueio de regra e é contada à parte, do
- * jeito que uma lacuna do documento merece ser tratada.
- */
+const exigir = (
+  resposta: Resposta,
+): { partida: EstadoDaPartida; eventos: readonly EventoUniversal[] } => {
+  if (!resposta.ok) throw new ErroDeSimulacao(resposta.erro);
+  return { partida: resposta.valor.partida, eventos: resposta.valor.eventos };
+};
+
 export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): RelatorioDaPartida => {
   const rng = criarAleatorio(configuracao.semente);
   const politicas: Readonly<Record<string, Politica>> = {
@@ -131,10 +182,16 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
     respostasComDefesaInata: 0,
     rupturas: 0,
     ultimatesUsadas: 0,
+    passivasReveladas: 0,
+    passivasAtivadas: 0,
+    cartasDeClassePorAtivar: 0,
+    cartasDeClassePorExaurir: 0,
     bloqueios: 0,
+    usoPorCarta: new Map<string, number>(),
   };
 
   const eventos: EventoUniversal[] = [];
+  const ilegais: ComandoIlegal[] = [];
   const registrar = (resultado: {
     partida: EstadoDaPartida;
     eventos: readonly EventoUniversal[];
@@ -149,6 +206,59 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
   let desfecho: DesfechoSimulado | null = null;
   let turnos = 0;
 
+  /** Registra um comando ilegal e encerra a partida como inválida. */
+  const acusarIlegal = (
+    comando: ComandoIlegal['comando'],
+    jogador: PlayerId,
+    erro: ErroDeDominio,
+  ): void => {
+    const ocorrencia: ComandoIlegal = {
+      comando,
+      jogador,
+      turno: partida.turno?.numero ?? 0,
+      erro,
+    };
+    ilegais.push(ocorrencia);
+    desfecho ??= { tipo: 'comando-ilegal', primeiro: ocorrencia };
+  };
+
+  /**
+   * Responde as escolhas pendentes de um jogador.
+   *
+   * Uma pendência trava quem a deve, então ela é resolvida assim que aparece —
+   * é o que um cliente faria ao mostrar a pergunta na tela.
+   */
+  const resolverPendencias = (jogador: PlayerId): boolean => {
+    let restantes = partida.escolhasPendentes.filter((escolha) => escolha.jogador === jogador);
+    while (restantes.length > 0) {
+      const pendente: EscolhaPendente | undefined = restantes[0];
+      if (pendente === undefined) break;
+
+      const escolhida = politicas[jogador]?.escolherPendencia(
+        projetarParaJogador(partida, jogador),
+        jogador,
+        pendente,
+        rng,
+      );
+      if (escolhida === undefined) {
+        acusarIlegal('escolha-pendente', jogador, { tipo: 'sem-escolha-pendente', jogador });
+        return false;
+      }
+
+      const resultado = resolverEscolhaPendente(partida, jogador, escolhida);
+      if (!resultado.ok) {
+        acusarIlegal('escolha-pendente', jogador, resultado.erro);
+        return false;
+      }
+      partida = registrar({
+        partida: resultado.valor.partida,
+        eventos: resultado.valor.eventos,
+      });
+      restantes = partida.escolhasPendentes.filter((escolha) => escolha.jogador === jogador);
+    }
+    return true;
+  };
+
   while (partida.situacao === 'em-andamento' && desfecho === null) {
     const turno = partida.turno;
     if (turno === null) break;
@@ -162,8 +272,10 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
     partida = registrar(exigir(abrirTurno(partida, ativo)));
     turnos = turno.numero;
 
+    if (!resolverPendencias(ativo) || !resolverPendencias(passivo)) break;
+
     let seguir = true;
-    while (seguir && partida.situacao === 'em-andamento') {
+    while (seguir && partida.situacao === 'em-andamento' && desfecho === null) {
       const eu = partida.jogadores.find((jogador) => jogador.id === ativo);
       if (eu === undefined || eu.acoesRealizadasNoTurno >= eu.acoesPermitidasNoTurno) break;
 
@@ -178,18 +290,23 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
       const declarada = declarar(partida, ativo, pedido);
       if (!declarada.ok) {
         if (declarada.erro.tipo === 'interacao-nao-definida') {
+          // Lacuna conhecida do documento, contada à parte: não é bug e não é
+          // vitória, derrota nem empate.
           acumulador.bloqueios += 1;
           desfecho = { tipo: 'bloqueio-de-regra', erro: declarada.erro };
-          seguir = false;
-          break;
+        } else {
+          acusarIlegal('declarar', ativo, declarada.erro);
         }
-        // Qualquer outra recusa significa que a política ofereceu uma jogada
-        // ilegal: ela para de agir neste turno em vez de insistir.
         seguir = false;
         break;
       }
       partida = registrar({ partida: declarada.valor.partida, eventos: declarada.valor.eventos });
       acumulador.acoes += 1;
+
+      if (!resolverPendencias(passivo)) {
+        seguir = false;
+        break;
+      }
 
       const escolhaDeResposta = politicas[passivo]?.escolherResposta(
         projetarParaJogador(partida, passivo),
@@ -199,20 +316,29 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
       );
       if (escolhaDeResposta !== undefined && escolhaDeResposta.tipo !== 'sem-resposta') {
         const respondida = responder(partida, passivo, indice, escolhaDeResposta);
-        if (respondida.ok) {
-          partida = registrar({
-            partida: respondida.valor.partida,
-            eventos: respondida.valor.eventos,
-          });
+        if (!respondida.ok) {
+          acusarIlegal('responder', passivo, respondida.erro);
+          seguir = false;
+          break;
         }
+        partida = registrar({
+          partida: respondida.valor.partida,
+          eventos: respondida.valor.eventos,
+        });
       }
 
       const resolvida = resolver(partida, ativo, indice);
       if (!resolvida.ok) {
+        acusarIlegal('resolver', ativo, resolvida.erro);
         seguir = false;
         break;
       }
       partida = registrar({ partida: resolvida.valor.partida, eventos: resolvida.valor.eventos });
+
+      if (!resolverPendencias(ativo) || !resolverPendencias(passivo)) {
+        seguir = false;
+        break;
+      }
     }
 
     if (desfecho !== null) break;
@@ -223,14 +349,16 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
 
   if (desfecho === null) {
     const vencedor = partida.desfecho?.vencedor ?? null;
-    if (vencedor !== null) {
-      desfecho = { tipo: 'vitoria', vencedor };
-    } else if (partida.situacao === 'encerrada') {
-      desfecho = { tipo: 'indefinido' };
-    } else {
-      desfecho = { tipo: 'limite-tecnico-de-turnos' };
-    }
+    if (vencedor !== null) desfecho = { tipo: 'vitoria', vencedor };
+    else if (partida.situacao === 'encerrada') desfecho = { tipo: 'indefinido' };
+    else desfecho = { tipo: 'limite-tecnico-de-turnos' };
   }
+
+  const vencedorFinal = desfecho.tipo === 'vitoria' ? desfecho.vencedor : null;
+  const vidaDoVencedor =
+    vencedorFinal === null
+      ? null
+      : (partida.jogadores.find((jogador) => jogador.id === vencedorFinal)?.vida ?? null);
 
   return {
     desfecho,
@@ -240,7 +368,14 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
     respostasComDefesaInata: acumulador.respostasComDefesaInata,
     rupturas: acumulador.rupturas,
     ultimatesUsadas: acumulador.ultimatesUsadas,
+    passivasReveladas: acumulador.passivasReveladas,
+    passivasAtivadas: acumulador.passivasAtivadas,
+    cartasDeClassePorAtivar: acumulador.cartasDeClassePorAtivar,
+    cartasDeClassePorExaurir: acumulador.cartasDeClassePorExaurir,
+    usoPorCarta: Object.fromEntries(acumulador.usoPorCarta),
+    vidaDoVencedor,
     bloqueiosDeLentoComImpulso: acumulador.bloqueios,
+    comandosIlegais: ilegais,
     vidaFinal: {
       [partida.jogadores[0].id]: partida.jogadores[0].vida,
       [partida.jogadores[1].id]: partida.jogadores[1].vida,

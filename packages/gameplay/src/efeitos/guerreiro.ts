@@ -1,5 +1,5 @@
 import type { CardId } from '@arcane-duel/shared-types';
-import { cardId } from '@arcane-duel/shared-types';
+import { cardId, valorDaAnotacao } from '@arcane-duel/shared-types';
 import { preverRuptura } from '@arcane-duel/rules-engine';
 
 import {
@@ -20,6 +20,9 @@ import {
   chaveDaPassiva,
   consumirPromessa,
   definirPromessa,
+  escolhasDaResposta,
+  exigirParcelaVariavel,
+  exigirReforco,
   lerPromessa,
   prometerAoProximoAtaque,
 } from './comum.js';
@@ -95,7 +98,13 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
     id('W05'),
     {
       // "Ao declarar, gaste até 2 Momentum. Recebe +1 D por Momentum gasto."
-      // O quanto foi gasto veio da parcela variável do custo, já paga.
+      // Quanto gastar é decisão de quem joga, inclusive gastar zero.
+      validarEscolhas: (consulta) =>
+        exigirParcelaVariavel(
+          consulta.perfil,
+          consulta.escolhas,
+          'informe quanto Momentum gastar, de 0 a 2',
+        ),
       aoDeclarar: (ctx, alvo) => {
         const slot = slotDe(jogadorDo(ctx, alvo.atacante), alvo.indice);
         const gasto = slot?.recursoGasto ?? 0;
@@ -317,16 +326,20 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
         if (revelacao.alvo === null) return;
         reduzirNaResposta(ctx, revelacao.alvo.atacante, revelacao.alvo.indice, { impacto: 2 });
       },
-      antesDeResolver: (ctx, alvo) => {
-        if (alvo.defensor !== alvo.dono) return;
-        const dono = jogadorDo(ctx, alvo.dono);
-        if (dono.recurso.classe !== 'guerreiro' || dono.recurso.momentum < 1) return;
-        if (!causariaRuptura(ctx, alvo)) return;
-        if (!consumirLimitePorTurno(ctx, alvo.dono, chaveDaPassiva(alvo.origem), alvo.origem)) {
-          return;
-        }
-        ganharRecurso(ctx, alvo.dono, 'momentum', -1);
-        reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { impacto: 1 });
+      // "uma vez por turno inimigo, **Ative** e gaste 1 Momentum": Ativar é
+      // escolha do jogador, feita pelo comando próprio de Ativação. O motor
+      // nunca gasta o Momentum dele por conta própria.
+      ativacao: {
+        podeAtivar: (ctx, alvo) => {
+          if (alvo.defensor !== alvo.dono) return false;
+          const dono = jogadorDo(ctx, alvo.dono);
+          if (dono.recurso.classe !== 'guerreiro' || dono.recurso.momentum < 1) return false;
+          return causariaRuptura(ctx, alvo);
+        },
+        aplicar: (ctx, alvo) => {
+          ganharRecurso(ctx, alvo.dono, 'momentum', -1);
+          reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { impacto: 1 });
+        },
       },
     },
   ],
@@ -495,15 +508,26 @@ export const PASSIVAS: ReadonlyMap<CardId, EfeitoDePassiva> = new Map<CardId, Ef
       // primeira carta de Reação de cada turno inimigo reduz +1 D ou +1 I."
       revelaEm: (ctx, revelacao) =>
         revelacao.gatilho === 'fim-do-turno' && jogadorDo(ctx, revelacao.dono).reserva === 2,
+      // "reduz +1 D ou +1 I": o "ou" é do jogador, e só vale para carta de
+      // Reação — a Defesa Inata não é carta.
+      validarEscolhas: (consulta) =>
+        consulta.perfil.tipo === 'reacao' &&
+        valorDaAnotacao(consulta.jogador.anotacoes, chaveDaPassiva(id('WP10'))) === 0
+          ? exigirReforco(consulta.escolhas, id('WP10'), 'escolha reduzir +1 D ou +1 I')
+          : null,
       aoResponder: (ctx, alvo) => {
         if (alvo.defensor !== alvo.dono || alvo.reacao === null) return;
+        const escolha = escolhasDaResposta(ctx, alvo).reforco;
+        if (escolha === undefined) return;
         if (!consumirLimitePorTurno(ctx, alvo.dono, chaveDaPassiva(alvo.origem), alvo.origem)) {
           return;
         }
-        // Sem escolha informada, a redução vai para o Impacto quando o Ataque
-        // ainda ameaça romper a Guarda, e para o Dano nos demais casos.
-        const contra = causariaRuptura(ctx, alvo);
-        reduzirNaResposta(ctx, alvo.atacante, alvo.indice, contra ? { impacto: 1 } : { dano: 1 });
+        reduzirNaResposta(
+          ctx,
+          alvo.atacante,
+          alvo.indice,
+          escolha === 'impacto' ? { impacto: 1 } : { dano: 1 },
+        );
       },
     },
   ],

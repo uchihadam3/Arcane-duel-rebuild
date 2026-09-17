@@ -1,6 +1,7 @@
 import type {
   AnotacaoDeEfeito,
   CardId,
+  EscolhaPendente,
   EscopoDaAnotacao,
   EstadoDaPartida,
   EstadoDeJogador,
@@ -107,6 +108,26 @@ export const consumirLimitePorTurno = (
   if (valorDaAnotacao(atual.anotacoes, chave) > 0) return false;
   registrarAnotacao(ctx, jogador, { chave, origem, escopo: 'turno', valor: 1 });
   return true;
+};
+
+/**
+ * Registra uma escolha que o dono precisa fazer antes de voltar a agir.
+ *
+ * Só existe para efeitos que disparam fora da janela de comando de quem
+ * escolhe. Escolher por ele seria inventar a decisão.
+ */
+export const registrarEscolhaPendente = (ctx: Contexto, escolha: EscolhaPendente): void => {
+  ctx.partida = {
+    ...ctx.partida,
+    escolhasPendentes: [...ctx.partida.escolhasPendentes, escolha],
+  };
+  emitir(ctx, {
+    tipo: 'escolha-pendente-registrada',
+    jogador: escolha.jogador,
+    origem: escolha.origem,
+    efeito: escolha.efeito,
+    opcoes: escolha.opcoes,
+  });
 };
 
 export const contador = (ctx: Contexto, jogador: PlayerId, chave: string): number =>

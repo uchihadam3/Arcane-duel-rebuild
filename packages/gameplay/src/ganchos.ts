@@ -1,13 +1,15 @@
 import type {
   CardId,
+  EscolhasDaAcao,
   EstadoDaPartida,
   EstadoDeJogador,
   IndiceDeAcao,
   PerfilDeHabilidade,
   PlayerId,
+  UsoDeCartaDeClasseNaAcao,
   ZonaDeCooldown,
 } from '@arcane-duel/shared-types';
-import type { DescontosDeCusto } from '@arcane-duel/rules-engine';
+import type { DescontosDeCusto, ErroDeDominio } from '@arcane-duel/rules-engine';
 
 import type { Contexto } from './contexto.js';
 
@@ -78,13 +80,26 @@ export interface ResumoDaResolucao {
   readonly teriaRompidoSemResposta: boolean;
 }
 
-/** Tudo que um efeito de custo pode consultar sem alterar nada. */
+/**
+ * Tudo que um efeito pode consultar antes de a jogada acontecer, sem alterar
+ * nada.
+ *
+ * As escolhas informadas entram aqui porque é **antes** de pagar o custo que se
+ * decide se uma escolha obrigatória veio ou não. Depois de pagar já é tarde: o
+ * comando teria alterado o estado para então descobrir que falta uma decisão.
+ */
 export interface ConsultaDeCusto {
   readonly partida: EstadoDaPartida;
   readonly jogador: EstadoDeJogador;
   readonly adversario: EstadoDeJogador;
   readonly perfil: PerfilDeHabilidade;
   readonly ordem: number;
+  /** As escolhas que o jogador mandou junto com o comando. */
+  readonly escolhas: EscolhasDaAcao;
+  /** As Cartas de Classe que ele pediu para usar nesta jogada. */
+  readonly cartasDeClasse: readonly UsoDeCartaDeClasseNaAcao[];
+  /** Quanto de recurso de classe esta jogada vai gastar, com a parcela variável. */
+  readonly recursoPrevisto: number;
 }
 
 /** Tudo que uma checagem de legalidade pode consultar. */
@@ -106,6 +121,14 @@ export type GanchoDeResolucao = (
 export interface EfeitoDeCarta {
   /** Devolve o motivo da recusa, ou `null` quando a carta pode ser jogada. */
   readonly legalidade?: (consulta: ConsultaDeLegalidade) => string | null;
+  /**
+   * Confere as escolhas que o texto da carta exige.
+   *
+   * Devolve um erro tipado quando falta uma escolha obrigatória ou quando a
+   * escolha informada não é uma das opções impressas. O motor **nunca** escolhe
+   * no lugar do jogador: sem a escolha, a jogada é recusada.
+   */
+  readonly validarEscolhas?: (consulta: ConsultaDeCusto) => ErroDeDominio | null;
   readonly descontos?: (consulta: ConsultaDeCusto) => DescontosDeCusto;
   readonly aoDeclarar?: Gancho;
   readonly aoResponder?: Gancho;
@@ -138,11 +161,26 @@ export interface ContextoDeRevelacao {
   readonly resumo: ResumoDaResolucao | null;
 }
 
+/**
+ * O efeito renovável de uma Passiva cujo texto diz "Ative e gaste...".
+ *
+ * Ativar é escolha do jogador, e ele a faz com um comando próprio durante a
+ * Ação inimiga. O motor nunca Ativa sozinho nem gasta recurso por ele.
+ */
+export interface AtivacaoDePassiva {
+  /** As condições impressas para a Ativação valerem alguma coisa agora. */
+  readonly podeAtivar: (ctx: Contexto, alvo: AlvoDoEfeito) => boolean;
+  /** O que a Ativação faz, já com o custo dela. */
+  readonly aplicar: (ctx: Contexto, alvo: AlvoDoEfeito) => void;
+}
+
 export interface EfeitoDePassiva extends EfeitoDeCarta {
   /** A condição impressa de revelação aconteceu agora? */
   readonly revelaEm: (ctx: Contexto, revelacao: ContextoDeRevelacao) => boolean;
   /** O que a revelação em si faz, além de virar a carta. */
   readonly aoRevelar?: (ctx: Contexto, revelacao: ContextoDeRevelacao) => void;
+  /** Presente só nas Passivas que o jogador Ativa explicitamente. */
+  readonly ativacao?: AtivacaoDePassiva;
 }
 
 export const SEM_DESCONTO: DescontosDeCusto = {};

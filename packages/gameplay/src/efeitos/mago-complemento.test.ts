@@ -282,6 +282,7 @@ describe('Mago — Runas', () => {
     const respondida = responder(base, A, 0, {
       tipo: 'carta-de-reacao',
       carta: 'M15' as never,
+      escolhas: { reforco: 'dano' },
       cartasDeClasse: [{ carta: 'MC04' as never, modo: 'ativar' }],
     });
     const comResposta = respondida.ok ? respondida.valor.partida : base;
@@ -412,7 +413,9 @@ describe('Mago — Ultimates', () => {
     expect(estadoDaRuna(comRunas, A, 'MC02')).toBe('ativada');
 
     const comMana = comRecurso(comRunas, A, 3);
-    const { partida: depois } = jogar(comMana, A, { pedido: { carta: 'MU03' as never } });
+    const { partida: depois } = jogar(comMana, A, {
+      pedido: { carta: 'MU03' as never, escolhas: { cartasEmCooldown: ['M01' as never] } },
+    });
 
     expect(estadoDaRuna(depois, A, 'MC01')).toBe('pronta');
     expect(estadoDaRuna(depois, A, 'MC02')).toBe('pronta');

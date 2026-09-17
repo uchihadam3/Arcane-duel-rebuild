@@ -110,12 +110,15 @@ describe('lotes', () => {
       resumo.comA.indefinidas +
       resumo.comA.interrompidasPorLimiteTecnico +
       resumo.comA.bloqueiosDeRegra +
+      resumo.comA.partidasComComandoIlegal +
       resumo.comB.vitoriasDeQuemComecou +
       resumo.comB.vitoriasDeQuemRespondeu +
       resumo.comB.indefinidas +
       resumo.comB.interrompidasPorLimiteTecnico +
-      resumo.comB.bloqueiosDeRegra;
+      resumo.comB.bloqueiosDeRegra +
+      resumo.comB.partidasComComandoIlegal;
     expect(desfechos).toBe(20);
+    expect(resumo.comandosIlegais).toBe(0);
   });
 });
 

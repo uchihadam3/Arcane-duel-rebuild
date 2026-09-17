@@ -49,9 +49,9 @@ describe('tela de fundação', () => {
     const painel = screen.getByText('Conteúdo carregado').closest('section');
     expect(painel).not.toBeNull();
     const linhaDeCartas = within(painel!).getByText('Cartas no catálogo');
-    // Guerreiro e Mago completos: Personagem, 20 habilidades, 10 Passivas,
-    // 6 Cartas de Classe e 3 Ultimates de cada um.
+    // Guerreiro e Mago completos: 20 habilidades, 10 Passivas, 6 Cartas de
+    // Classe e 3 Ultimates de cada um.
     expect(linhaDeCartas.nextElementSibling?.textContent).toBe(String(CATALOGO.todas.length));
-    expect(CATALOGO.todas).toHaveLength(80);
+    expect(CATALOGO.todas).toHaveLength(78);
   });
 });

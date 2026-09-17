@@ -1,6 +1,7 @@
 import type {
   CardId,
   CondicaoId,
+  EfeitoDaEscolha,
   EscopoDaAnotacao,
   IndiceDeAcao,
   PlayerId,
@@ -130,6 +131,19 @@ export type EventoUniversal =
       readonly valor: number;
     }
   | { readonly tipo: 'acao-extra-liberada'; readonly jogador: PlayerId; readonly origem: CardId }
+  | {
+      readonly tipo: 'escolha-pendente-registrada';
+      readonly jogador: PlayerId;
+      readonly origem: CardId;
+      readonly efeito: EfeitoDaEscolha;
+      readonly opcoes: readonly CardId[];
+    }
+  | {
+      readonly tipo: 'escolha-pendente-resolvida';
+      readonly jogador: PlayerId;
+      readonly origem: CardId;
+      readonly carta: CardId;
+    }
   | { readonly tipo: 'defesa-inata-usada'; readonly jogador: PlayerId }
   | {
       readonly tipo: 'reducao-da-resposta';

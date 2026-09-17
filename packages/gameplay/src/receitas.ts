@@ -1,4 +1,5 @@
 import type { BuildEquipada } from '@arcane-duel/rules-engine';
+import { PERSONAGEM_DA_CLASSE } from '@arcane-duel/card-data';
 import { cardId } from '@arcane-duel/shared-types';
 
 /*
@@ -12,7 +13,7 @@ import { cardId } from '@arcane-duel/shared-types';
 /** Guerreiro, Receita 1 — Quebra-Muralhas. */
 export const QUEBRA_MURALHAS: BuildEquipada = {
   classe: 'guerreiro',
-  personagem: cardId('W00'),
+  personagem: PERSONAGEM_DA_CLASSE.guerreiro,
   habilidades: [
     cardId('W02'), // Ombro de Guerra
     cardId('W03'), // Quebra-Escudo
@@ -39,7 +40,7 @@ export const QUEBRA_MURALHAS: BuildEquipada = {
 /** Mago, Receita 1 — Piromante. */
 export const PIROMANTE: BuildEquipada = {
   classe: 'mago',
-  personagem: cardId('M00'),
+  personagem: PERSONAGEM_DA_CLASSE.mago,
   habilidades: [
     cardId('M01'), // Dardo Arcano
     cardId('M02'), // Bola de Fogo

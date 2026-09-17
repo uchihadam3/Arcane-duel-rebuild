@@ -301,7 +301,7 @@ export const registrarResposta = (
 
   const comAtacante = substituirJogador(
     partida,
-    substituirSlot(atacante, { ...slot, resposta: { voluntaria: resposta } }),
+    substituirSlot(atacante, { ...slot, resposta: { ...slot.resposta, voluntaria: resposta } }),
   );
   return sucesso({ partida: substituirJogador(comAtacante, atualizado), eventos });
 };
@@ -353,10 +353,24 @@ export const registrarModificador = (
  * usada e a carta de Reação para os cooldowns delas, conta a Ação do turno e
  * resolve o Sangramento quando é a segunda Ação.
  */
+export interface OpcoesDeResolverAcao {
+  /**
+   * Adia a verificação de fim de partida para quem chamou.
+   *
+   * Existe porque várias cartas tiram Vida **depois** da resolução — "o
+   * adversário perde 2 de Vida", "depois da resolução, o adversário perde 4 de
+   * Vida". Verificar aqui e de novo lá fora daria duas respostas para a mesma
+   * Ação e esconderia morte simultânea. Quem adia fica obrigado a chamar
+   * `encerrarSeVidaZerou` uma vez, no fim de tudo.
+   */
+  readonly adiarDesfecho?: boolean;
+}
+
 export const resolverAcao = (
   partida: EstadoDaPartida,
   atacanteId: PlayerId,
   indice: IndiceDeAcao,
+  opcoes: OpcoesDeResolverAcao = {},
 ): RespostaDeComando => {
   const ativo = exigirTurnoEmAndamento(partida, atacanteId);
   if (!ativo.ok) return ativo;
@@ -463,6 +477,8 @@ export const resolverAcao = (
   eventos.push({ tipo: 'acao-resolvida', indice });
 
   const comAmbos = substituirJogador(substituirJogador(partida, defensor), atacante);
+  if (opcoes.adiarDesfecho === true) return sucesso({ partida: comAmbos, eventos });
+
   const fim = encerrarSeVidaZerou(comAmbos);
   return sucesso({ partida: fim.partida, eventos: [...eventos, ...fim.eventos] });
 };

@@ -2,7 +2,7 @@ import type { BuildEquipada } from '@arcane-duel/rules-engine';
 
 import { PIROMANTE, QUEBRA_MURALHAS } from '../receitas.js';
 import { criarPoliticaDeBase } from './politica.js';
-import type { RelatorioDaPartida } from './motor.js';
+import type { ComandoIlegal, RelatorioDaPartida } from './motor.js';
 import { JOGADOR_A, JOGADOR_B, LIMITE_TECNICO_DE_TURNOS, simularPartida } from './motor.js';
 
 /*
@@ -21,6 +21,8 @@ export interface ResumoDeLado {
   readonly indefinidas: number;
   readonly interrompidasPorLimiteTecnico: number;
   readonly bloqueiosDeRegra: number;
+  /** Partidas invalidadas por comando ilegal da própria política. */
+  readonly partidasComComandoIlegal: number;
 }
 
 export interface ResumoDoLote {
@@ -44,9 +46,26 @@ export interface ResumoDoLote {
   readonly respostasComCartaPorPartida: number;
   readonly respostasComDefesaInataPorPartida: number;
   readonly ultimatesPorPartida: number;
+  readonly passivasReveladasPorPartida: number;
+  readonly passivasAtivadasPorPartida: number;
+  readonly cartasDeClassePorAtivarPorPartida: number;
+  readonly cartasDeClassePorExaurirPorPartida: number;
+  /** Vida média de quem venceu, contando só as partidas com vencedor. */
+  readonly vidaMediaDoVencedor: number | null;
+  /** Quantas vezes cada carta foi jogada no lote inteiro, por identificador. */
+  readonly usoPorCarta: Readonly<Record<string, number>>;
   readonly vitoriasDoGuerreiro: number;
   readonly vitoriasDoMago: number;
   readonly bloqueiosDeLentoComImpulso: number;
+  /**
+   * Comandos ilegais produzidos pelas políticas.
+   *
+   * Precisa ser zero. Qualquer valor acima disso é bug do simulador, e o lote
+   * não vale como linha de base.
+   */
+  readonly comandosIlegais: number;
+  /** Os primeiros comandos ilegais encontrados, para diagnóstico. */
+  readonly exemplosDeComandoIlegal: readonly ComandoIlegal[];
 }
 
 export interface ConfiguracaoDoLote {
@@ -66,6 +85,7 @@ const ladoVazio = (): {
   indefinidas: number;
   interrompidasPorLimiteTecnico: number;
   bloqueiosDeRegra: number;
+  partidasComComandoIlegal: number;
 } => ({
   partidas: 0,
   vitoriasDeQuemComecou: 0,
@@ -73,6 +93,7 @@ const ladoVazio = (): {
   indefinidas: 0,
   interrompidasPorLimiteTecnico: 0,
   bloqueiosDeRegra: 0,
+  partidasComComandoIlegal: 0,
 });
 
 /**
@@ -101,6 +122,14 @@ export const rodarLote = (configuracao: ConfiguracaoDoLote): ResumoDoLote => {
   let bloqueios = 0;
   let vitoriasDoGuerreiro = 0;
   let vitoriasDoMago = 0;
+  let passivasReveladas = 0;
+  let passivasAtivadas = 0;
+  let porAtivar = 0;
+  let porExaurir = 0;
+  let vidaDoVencedor = 0;
+  let partidasComVencedor = 0;
+  const usoPorCarta = new Map<string, number>();
+  const ilegais: ComandoIlegal[] = [];
 
   for (let indice = 0; indice < configuracao.partidas; indice += 1) {
     const comecaComA = indice % 2 === 0;
@@ -131,7 +160,22 @@ export const rodarLote = (configuracao: ConfiguracaoDoLote): ResumoDoLote => {
     } else if (relatorio.desfecho.tipo === 'indefinido') lado.indefinidas += 1;
     else if (relatorio.desfecho.tipo === 'limite-tecnico-de-turnos') {
       lado.interrompidasPorLimiteTecnico += 1;
+    } else if (relatorio.desfecho.tipo === 'comando-ilegal') {
+      lado.partidasComComandoIlegal += 1;
     } else lado.bloqueiosDeRegra += 1;
+
+    if (relatorio.vidaDoVencedor !== null) {
+      vidaDoVencedor += relatorio.vidaDoVencedor;
+      partidasComVencedor += 1;
+    }
+    passivasReveladas += relatorio.passivasReveladas;
+    passivasAtivadas += relatorio.passivasAtivadas;
+    porAtivar += relatorio.cartasDeClassePorAtivar;
+    porExaurir += relatorio.cartasDeClassePorExaurir;
+    ilegais.push(...relatorio.comandosIlegais);
+    for (const [carta, vezes] of Object.entries(relatorio.usoPorCarta)) {
+      usoPorCarta.set(carta, (usoPorCarta.get(carta) ?? 0) + vezes);
+    }
 
     turnos += relatorio.turnos;
     acoes += relatorio.acoes;
@@ -157,9 +201,17 @@ export const rodarLote = (configuracao: ConfiguracaoDoLote): ResumoDoLote => {
     respostasComCartaPorPartida: respostasComCarta / total,
     respostasComDefesaInataPorPartida: respostasComDefesaInata / total,
     ultimatesPorPartida: ultimates / total,
+    passivasReveladasPorPartida: passivasReveladas / total,
+    passivasAtivadasPorPartida: passivasAtivadas / total,
+    cartasDeClassePorAtivarPorPartida: porAtivar / total,
+    cartasDeClassePorExaurirPorPartida: porExaurir / total,
+    vidaMediaDoVencedor: partidasComVencedor === 0 ? null : vidaDoVencedor / partidasComVencedor,
+    usoPorCarta: Object.fromEntries([...usoPorCarta].sort(([a], [b]) => a.localeCompare(b))),
     vitoriasDoGuerreiro,
     vitoriasDoMago,
     bloqueiosDeLentoComImpulso: bloqueios,
+    comandosIlegais: ilegais.length,
+    exemplosDeComandoIlegal: ilegais.slice(0, 5),
   };
 };
 

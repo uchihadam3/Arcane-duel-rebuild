@@ -174,7 +174,6 @@ describe('custo multi-recurso é atômico', () => {
 describe('catálogo e comportamento andam juntos', () => {
   it('toda carta jogável do catálogo tem comportamento registrado', () => {
     for (const carta of CATALOGO.todas) {
-      if (carta.tipo === 'personagem') continue;
       if (carta.tipo === 'passiva') {
         expect(EFEITOS_DE_PASSIVA.has(carta.id), carta.id).toBe(true);
       } else if (carta.tipo === 'carta-de-classe') {

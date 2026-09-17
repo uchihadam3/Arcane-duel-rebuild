@@ -2,6 +2,7 @@ import type { CardId, ClassId, MatchId, PlayerId } from './ids.js';
 import type { PerfilDeHabilidade, ZonaDeCooldown } from './cards.js';
 import type { Anotacoes } from './anotacoes.js';
 import type { EscolhasDaAcao } from './escolhas.js';
+import type { EscolhaPendente } from './escolha-pendente.js';
 import type { IndiceDeAcao } from './zones.js';
 import type { CondicaoId } from './conditions.js';
 import type { EstadoDeCartaDeClasse, EstadoDePassiva, EstadoDeUltimate } from './card-state.js';
@@ -60,6 +61,14 @@ export type RespostaVoluntaria =
  */
 export interface SlotDeResposta {
   readonly voluntaria: RespostaVoluntaria | null;
+  /**
+   * As escolhas que o defensor mandou junto com a Resposta.
+   *
+   * Ficam separadas das escolhas da Ação porque são de outro jogador: "deixe
+   * Pronta uma Runa Ativada" e "reduza +1 D ou +1 I" são decisões de quem
+   * responde, não de quem atacou.
+   */
+  readonly escolhas: EscolhasDaAcao;
 }
 
 /**
@@ -267,4 +276,12 @@ export interface EstadoDaPartida {
   readonly turno: EstadoDoTurno | null;
   /** `null` enquanto a partida não terminou. */
   readonly desfecho: DesfechoDaPartida | null;
+  /**
+   * Escolhas que um jogador ainda precisa fazer.
+   *
+   * Enquanto houver uma pendente, o dono dela não pode declarar Ação nem
+   * responder: o motor não escolhe por ninguém, e seguir sem a resposta seria
+   * escolher em silêncio.
+   */
+  readonly escolhasPendentes: readonly EscolhaPendente[];
 }

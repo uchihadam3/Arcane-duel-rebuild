@@ -84,10 +84,11 @@ describe('Ultimate distingue disponível de consumida', () => {
 
 describe('espaço de Resposta', () => {
   it('representa nenhuma Resposta, a Defesa Inata ou uma carta de Reação', () => {
-    const vazio: SlotDeResposta = { voluntaria: null };
-    const inata: SlotDeResposta = { voluntaria: { tipo: 'defesa-inata' } };
+    const vazio: SlotDeResposta = { voluntaria: null, escolhas: {} };
+    const inata: SlotDeResposta = { voluntaria: { tipo: 'defesa-inata' }, escolhas: {} };
     const reacao: SlotDeResposta = {
       voluntaria: { tipo: 'carta-de-reacao', perfil: reacaoImpressa },
+      escolhas: {},
     };
     expect(vazio.voluntaria).toBeNull();
     expect(inata.voluntaria?.tipo).toBe('defesa-inata');
@@ -95,13 +96,13 @@ describe('espaço de Resposta', () => {
   });
 
   it('não guarda duas Respostas voluntárias ao mesmo tempo', () => {
-    const slot: SlotDeResposta = { voluntaria: { tipo: 'defesa-inata' } };
+    const slot: SlotDeResposta = { voluntaria: { tipo: 'defesa-inata' }, escolhas: {} };
     // O campo é único: substituir é a única forma de registrar outra Resposta.
     const substituida: SlotDeResposta = {
       ...slot,
       voluntaria: { tipo: 'carta-de-reacao', perfil: reacaoImpressa },
     };
-    expect(Object.keys(substituida)).toEqual(['voluntaria']);
+    expect(Object.keys(substituida).sort()).toEqual(['escolhas', 'voluntaria']);
     expect(substituida.voluntaria?.tipo).toBe('carta-de-reacao');
   });
 

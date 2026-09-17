@@ -405,6 +405,42 @@ a carta de Reação, as Passivas reveladas do atacante e depois as do defensor.
   próprios do espaço de Ação, porque mexem no evento e não no número.
 - **"Cancele o texto dela"** desliga os ganchos da carta declarada, e só dela.
 
+### O motor não escolhe pelo jogador
+
+Onde o texto impresso diz "escolha", "você pode", "Ative" ou "gaste até", a
+decisão chega no comando. Faltando, a jogada é recusada com erro tipado —
+`escolha-obrigatoria` ou `escolha-invalida` — em vez de o motor completar a
+frase com a primeira opção que encontrar.
+
+A conferência roda **antes** de qualquer custo ser pago, sobre a carta
+declarada, as Cartas de Classe pedidas e as Passivas reveladas. Depois de pagar
+já seria tarde: o comando teria alterado o estado para então descobrir que falta
+uma decisão.
+
+Três casos têm forma própria:
+
+- **Ativar Passiva** é um comando (`ativarPassivaNaAcao`), porque "Ative e
+  gaste 1 Momentum" é escolha, e ela acontece durante a Ação do adversário. A
+  Ativação é a transição normal: Pronta vira Ativada, com o evento
+  `passiva-ativada`, e ela só volta a Pronta no início do turno do dono. Esse
+  ciclo **é** o "uma vez por turno inimigo" — não existe contador paralelo, e
+  Passiva nunca tem estado Exaurida.
+- **Escolhas do defensor** viajam no comando de Resposta e ficam no espaço de
+  Resposta, separadas das escolhas de quem atacou.
+- **Escolhas que disparam fora da janela de quem escolhe** viram uma escolha
+  **pendente** no estado. Concentração sob Pressão manda o defensor escolher uma
+  carta de cooldown no meio da Ação do adversário, quando ele não tem comando
+  nenhum para dar. O efeito não escolhe: ele registra a pendência, que trava o
+  dono de declarar e de responder até ele resolvê-la com `resolverEscolhaPendente`.
+
+### O fim da partida é decidido depois dos efeitos posteriores
+
+Ripostar e Última Palavra tiram Vida "depois da resolução". Por isso
+`resolverAcao` aceita adiar o desfecho, e a camada de composição chama
+`encerrarSeVidaZerou` **uma vez**, no fim de tudo que pertence àquela Ação. A
+regra de vitória continua sendo uma só, a do motor; o que a composição escolhe é
+o momento de aplicá-la.
+
 ### Estado temporário: anotações
 
 Muita carta cria estado que não cabe em campo fixo: "seu próximo Ataque neste
@@ -441,6 +477,16 @@ O teto de turnos é uma trava técnica do simulador, não regra de jogo: uma
 partida interrompida por ele é contada como interrompida, nunca como vitória,
 derrota ou empate. O mesmo vale para uma recusa de `interacao-nao-definida`, que
 é contada à parte como bloqueio de regra.
+
+**Comando ilegal é bug do simulador.** Uma política só pode produzir comandos
+legais. Qualquer outra recusa do motor é registrada em `comandosIlegais`,
+encerra a partida como inválida e faz o processo terminar com código de erro —
+um lote com comando ilegal não vale como medição, e nenhum número dele deve ser
+publicado. O relatório traz, por partida e por lote: Ações, Rupturas, Reações,
+Defesas Inatas, Ultimates, Passivas reveladas, Passivas Ativadas, Cartas de
+Classe por Ativar e por Exaurir, Vida média do vencedor, frequência por carta
+(mapa por identificador, aceitando qualquer build legal), bloqueios por regra
+indefinida, limite técnico e comandos ilegais.
 
 O relatório da linha de base está em `SIMULATION_STAGE3_BASELINE.md`.
 

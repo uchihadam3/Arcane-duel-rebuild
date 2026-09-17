@@ -1,5 +1,6 @@
 import type {
   CardId,
+  EscolhaPendente,
   EscolhasDaAcao,
   EstadoDaPartida,
   EstadoDeJogador,
@@ -8,7 +9,9 @@ import type {
   ModoDeUso,
   PerfilDeHabilidade,
   PlayerId,
+  ReforcoEscolhido,
   Resultado,
+  SlotDeAcao,
   ZonaDeCooldown,
 } from '@arcane-duel/shared-types';
 import { falha, sucesso, temTag, valorDaAnotacao } from '@arcane-duel/shared-types';
@@ -20,8 +23,12 @@ import type {
   ResultadoDoComando,
 } from '@arcane-duel/rules-engine';
 import {
+  adiantarCartaNoCooldown,
   ativarCartaDeClasse,
+  ativarPassiva,
   consumirUltimate,
+  devolverCartaAMao,
+  encerrarSeVidaZerou,
   criarPartida,
   declararAcao,
   encerrarTurno,
@@ -33,7 +40,12 @@ import {
   resolverAcao,
   valorDoRecurso,
 } from '@arcane-duel/rules-engine';
-import { CARD_DATA_VERSION, CATALOGO, perfilDaCarta } from '@arcane-duel/card-data';
+import {
+  CARD_DATA_VERSION,
+  CATALOGO,
+  PERSONAGEM_DA_CLASSE,
+  perfilDaCarta,
+} from '@arcane-duel/card-data';
 
 import { ganharReservaExtra, ganharRecurso, perderVidaDireta } from './apoio.js';
 import { CHAVE } from './chaves.js';
@@ -51,10 +63,11 @@ import type { AlvoDoEfeito, ConsultaDeCusto, ResumoDaResolucao } from './ganchos
 import {
   descontosDaDeclaracao,
   despachar,
+  recusaDeEscolhas,
   recusaDeLegalidade,
   verificarRevelacoes,
 } from './pipeline.js';
-import { efeitoDeCartaDeClasse } from './registro.js';
+import { efeitoDeCartaDeClasse, efeitoDePassiva } from './registro.js';
 import {
   aplicarPromessasDoAtaque,
   definirPromessa,
@@ -98,11 +111,17 @@ export type PedidoDeResposta =
   | {
       readonly tipo: 'carta-de-reacao';
       readonly carta: CardId;
+      readonly escolhas?: EscolhasDaAcao;
       readonly cartasDeClasse?: readonly UsoDeCartaDeClasse[];
     }
   | {
       readonly tipo: 'defesa-inata';
-      readonly reforcarImpacto?: boolean;
+      /**
+       * Guarda Marcial reduz 1 D **ou** 1 I, e a escolha é do Guerreiro.
+       * A Barreira Arcana do Mago reduz os dois e não pede escolha.
+       */
+      readonly reducao?: ReforcoEscolhido;
+      readonly escolhas?: EscolhasDaAcao;
       readonly cartasDeClasse?: readonly UsoDeCartaDeClasse[];
     }
   | { readonly tipo: 'sem-resposta' };
@@ -111,6 +130,34 @@ export type Resposta = Resultado<ResultadoDoComando, ErroDeDominio>;
 
 const entregar = (ctx: Contexto): Resposta =>
   sucesso({ partida: ctx.partida, eventos: [...ctx.eventos] });
+
+/**
+ * Guarda as escolhas do defensor no espaço de Resposta da Ação.
+ *
+ * Elas ficam separadas das escolhas de quem atacou porque são de outro jogador:
+ * "deixe Pronta uma Runa Ativada" e "reduza +1 D ou +1 I" são decisões de quem
+ * responde.
+ */
+const gravarEscolhasNoSlot = (
+  ctx: Contexto,
+  atacante: PlayerId,
+  indice: IndiceDeAcao,
+  escolhas: EscolhasDaAcao,
+): void => {
+  const dono = jogadorDo(ctx, atacante);
+  const comEscolhas = (slot: SlotDeAcao): SlotDeAcao =>
+    slot.indice === indice ? { ...slot, resposta: { ...slot.resposta, escolhas } } : slot;
+
+  gravarJogador(ctx, {
+    ...dono,
+    acoes: [
+      comEscolhas(dono.acoes[0]),
+      comEscolhas(dono.acoes[1]),
+      comEscolhas(dono.acoes[2]),
+      comEscolhas(dono.acoes[3]),
+    ],
+  });
+};
 
 /* ------------------------------------------------------------------ */
 /* Montagem                                                            */
@@ -141,7 +188,18 @@ export const validarBuild = (build: BuildEquipada): readonly ErroDeDominio[] => 
     }
   };
 
-  conferir(build.personagem);
+  // O Personagem não é carta do catálogo: ele é a identidade técnica da classe,
+  // e a única coisa a conferir é se é o da classe escolhida.
+  const personagemDaClasse = PERSONAGEM_DA_CLASSE[build.classe];
+  if (build.personagem !== personagemDaClasse) {
+    problemas.push({
+      tipo: 'personagem-invalido',
+      esperado: personagemDaClasse,
+      recebido: build.personagem,
+      classe: build.classe,
+    });
+  }
+
   for (const carta of build.habilidades) conferir(carta);
   for (const carta of build.passivas) conferir(carta);
   for (const carta of build.cartasDeClasse) conferir(carta);
@@ -301,6 +359,14 @@ const conferirCartasDeClasse = (
   return null;
 };
 
+/** Quanto de recurso de classe a jogada vai gastar, com a parcela variável. */
+const recursoPrevistoDe = (perfil: PerfilDeHabilidade, escolhas: EscolhasDaAcao): number => {
+  const fixa = perfil.custo.recurso?.quantidade ?? 0;
+  const variavel = perfil.custo.variavel;
+  if (variavel === undefined) return fixa;
+  return fixa + (escolhas.recursoAdicional ?? variavel.minimo);
+};
+
 /** Descontos que vêm do estado, e não de uma carta específica em jogo. */
 const descontosDoEstado = (
   jogador: EstadoDeJogador,
@@ -351,6 +417,9 @@ export const declarar = (
   const atual = ctx.partida.jogadores.find((item) => item.id === jogador);
   if (atual === undefined) return falha({ tipo: 'jogador-desconhecido', jogador });
 
+  const travado = travadoPorEscolha(ctx.partida, jogador);
+  if (travado !== null) return falha(travado);
+
   const perfil = perfilAutoritativo(atual, pedido.carta);
   if (!perfil.ok) return perfil;
   if (perfil.valor.tipo === 'reacao') {
@@ -374,18 +443,25 @@ export const declarar = (
   }
 
   const ordem = atual.acoesRealizadasNoTurno + 1;
+  const escolhas = pedido.escolhas ?? {};
   const consulta: ConsultaDeCusto = {
     partida: ctx.partida,
     jogador: atual,
     adversario: adversarioDo(ctx, jogador),
     perfil: perfil.valor,
     ordem,
+    escolhas,
+    cartasDeClasse: usos,
+    recursoPrevisto: recursoPrevistoDe(perfil.valor, escolhas),
   };
 
   const recusa = recusaDeLegalidade(consulta, usos);
   if (recusa !== null) {
     return falha({ tipo: 'condicao-de-uso-nao-satisfeita', carta: pedido.carta, detalhe: recusa });
   }
+
+  const escolhaFaltando = recusaDeEscolhas(consulta, usos);
+  if (escolhaFaltando !== null) return falha(escolhaFaltando);
 
   const descontos = somar(
     descontosDaDeclaracao(consulta, usos),
@@ -434,6 +510,10 @@ export const declarar = (
 
   despachar(ctx, alvo, 'ao-declarar');
   verificarRevelacoes(ctx, 'ao-declarar', alvo, null);
+  // "Revele quando um Ataque causaria Ruptura" passa a valer assim que o Ataque
+  // é declarado: é dessa ameaça que o texto fala, e é antes de ela resolver que
+  // o defensor precisa poder decidir se Ativa a Passiva.
+  verificarRevelacoes(ctx, 'antes-de-resolver', alvo, null);
 
   return entregar(ctx);
 };
@@ -479,12 +559,20 @@ export const responder = (
   const doDefensor = ctx.partida.jogadores.find((item) => item.id === defensor);
   if (doDefensor === undefined) return falha({ tipo: 'jogador-desconhecido', jogador: defensor });
 
+  const travado = travadoPorEscolha(ctx.partida, defensor);
+  if (travado !== null) return falha(travado);
+
   const atacante = adversarioDo(ctx, defensor);
   const slot = slotDe(atacante, indice);
   if (slot === undefined) return falha({ tipo: 'acao-nao-declarada', indice });
   const perfilDaAcao = slot.perfil;
   if (perfilDaAcao === null || slot.situacao !== 'declarada') {
     return falha({ tipo: 'acao-nao-declarada', indice });
+  }
+  // Uma segunda Resposta voluntária é ilegal seja qual for a escolha, então a
+  // recusa vem antes de cobrar qualquer decisão do jogador (§8).
+  if (slot.resposta.voluntaria !== null) {
+    return falha({ tipo: 'segunda-resposta-voluntaria', indice });
   }
 
   if (pedido.tipo === 'defesa-inata') {
@@ -504,6 +592,30 @@ export const responder = (
     const problemaDaDefesa = conferirCartasDeClasse(doDefensor, usosDaDefesa);
     if (problemaDaDefesa !== null) return falha(problemaDaDefesa);
 
+    // "Guarda Marcial: reduza 1 D ou 1 I." O "ou" é do jogador, e o motor não
+    // decide por ele. A Barreira Arcana do Mago reduz os dois e não pergunta.
+    if (doDefensor.classe === 'guerreiro' && pedido.reducao === undefined) {
+      return falha({
+        tipo: 'escolha-obrigatoria',
+        carta: doDefensor.personagem,
+        detalhe: 'Guarda Marcial reduz 1 D ou 1 I: informe qual',
+      });
+    }
+
+    const escolhasDaDefesa = pedido.escolhas ?? {};
+    const consultaDaDefesa: ConsultaDeCusto = {
+      partida: ctx.partida,
+      jogador: doDefensor,
+      adversario: atacante,
+      perfil: perfilDaAcao,
+      ordem: indice + 1,
+      escolhas: escolhasDaDefesa,
+      cartasDeClasse: usosDaDefesa,
+      recursoPrevisto: 0,
+    };
+    const faltaNaDefesa = recusaDeEscolhas(consultaDaDefesa, usosDaDefesa);
+    if (faltaNaDefesa !== null) return falha(faltaNaDefesa);
+
     const erro = aplicar(
       ctx,
       registrarResposta(ctx.partida, defensor, indice, { tipo: 'defesa-inata' }),
@@ -522,11 +634,13 @@ export const responder = (
     }
 
     const alvo = alvoDaAcao(atacante.id, defensor, indice, perfilDaAcao, null);
-    const usada = aplicarDefesaInata(ctx, alvo, pedido.reforcarImpacto === true);
+    gravarEscolhasNoSlot(ctx, atacante.id, indice, escolhasDaDefesa);
+    const usada = aplicarDefesaInata(ctx, alvo, pedido.reducao ?? 'dano');
     if (usada !== null) ctx.eventos.push({ tipo: 'defesa-inata-usada', jogador: defensor });
 
     despachar(ctx, alvo, 'ao-responder');
     verificarRevelacoes(ctx, 'ao-responder', alvo, null);
+    verificarRevelacoes(ctx, 'antes-de-resolver', alvo, null);
     return entregar(ctx);
   }
 
@@ -550,12 +664,16 @@ export const responder = (
   const problemaDeClasse = conferirCartasDeClasse(doDefensor, usos);
   if (problemaDeClasse !== null) return falha(problemaDeClasse);
 
+  const escolhasDaResposta = pedido.escolhas ?? {};
   const consulta: ConsultaDeCusto = {
     partida: ctx.partida,
     jogador: doDefensor,
     adversario: atacante,
     perfil: perfilDaAcao,
     ordem: indice + 1,
+    escolhas: escolhasDaResposta,
+    cartasDeClasse: usos,
+    recursoPrevisto: recursoPrevistoDe(perfil.valor, escolhasDaResposta),
   };
 
   // Último Bastião só responde a um Ataque que causaria Ruptura, e isso depende
@@ -582,7 +700,11 @@ export const responder = (
     return falha({ tipo: 'condicao-de-uso-nao-satisfeita', carta: pedido.carta, detalhe: recusa });
   }
 
-  const descontos = descontosDaDeclaracao({ ...consulta, perfil: perfil.valor }, usos);
+  const consultaDaReacao: ConsultaDeCusto = { ...consulta, perfil: perfil.valor };
+  const faltaNaResposta = recusaDeEscolhas(consultaDaReacao, usos);
+  if (faltaNaResposta !== null) return falha(faltaNaResposta);
+
+  const descontos = descontosDaDeclaracao(consultaDaReacao, usos);
 
   if (ehUltimate) {
     aplicarObrigatorio(ctx, consumirUltimate(ctx.partida, defensor));
@@ -612,6 +734,7 @@ export const responder = (
   );
   if (erro !== null) return falha(erro);
 
+  gravarEscolhasNoSlot(ctx, atacante.id, indice, escolhasDaResposta);
   prometerAoProximoAtaque(ctx, defensor, pedido.carta, CHAVE.reacoesUsadas, 1);
 
   for (const uso of usos) {
@@ -629,6 +752,7 @@ export const responder = (
   const alvo = alvoDaAcao(atacante.id, defensor, indice, perfilDaAcao, perfil.valor);
   despachar(ctx, alvo, 'ao-responder');
   verificarRevelacoes(ctx, 'ao-responder', alvo, null);
+  verificarRevelacoes(ctx, 'antes-de-resolver', alvo, null);
 
   return entregar(ctx);
 };
@@ -693,6 +817,166 @@ export const usarCartaDeClasseNaAcao = (
   efeito?.aoResponder?.(ctx, { ...alvo, dono: jogador, origem: uso.carta });
 
   return entregar(ctx);
+};
+
+/**
+ * Ativa uma Passiva sobre uma Ação declarada.
+ *
+ * Existe porque duas Passivas dizem "Ative e gaste...": Ativar é escolha do
+ * jogador, e ela acontece durante a Ação do adversário. Sem este comando, o
+ * motor teria de decidir por ele — que é exatamente o que não pode fazer.
+ *
+ * A Ativação é a transição normal de Passiva: Pronta vira Ativada, com o evento
+ * `passiva-ativada`, e ela só volta a ficar Pronta no início do turno do dono.
+ * É esse estado que faz valer o "uma vez por turno inimigo" — não um contador
+ * paralelo.
+ */
+export const ativarPassivaNaAcao = (
+  partida: EstadoDaPartida,
+  jogador: PlayerId,
+  indice: IndiceDeAcao,
+  carta: CardId,
+): Resposta => {
+  const ctx = criarContexto(partida);
+  const dono = ctx.partida.jogadores.find((item) => item.id === jogador);
+  if (dono === undefined) return falha({ tipo: 'jogador-desconhecido', jogador });
+
+  const equipada = dono.passivas.find((passiva) => passiva.carta === carta);
+  if (equipada === undefined) return falha({ tipo: 'passiva-desconhecida', carta });
+
+  const efeito = efeitoDePassiva(carta);
+  const ativacao = efeito?.ativacao;
+  if (ativacao === undefined) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta,
+      detalhe: 'esta Passiva não tem efeito de Ativação',
+    });
+  }
+
+  const atacante = ctx.partida.jogadores.find((item) =>
+    item.acoes.some((slot) => slot.indice === indice && slot.situacao === 'declarada'),
+  );
+  if (atacante === undefined) return falha({ tipo: 'acao-nao-declarada', indice });
+
+  const slot = slotDe(atacante, indice);
+  const perfilDaAcao = slot?.perfil ?? null;
+  if (slot === undefined || perfilDaAcao === null) {
+    return falha({ tipo: 'acao-nao-declarada', indice });
+  }
+
+  const defensor = adversarioDo(ctx, atacante.id).id;
+  const voluntaria = slot.resposta.voluntaria;
+  const reacao = voluntaria?.tipo === 'carta-de-reacao' ? voluntaria.perfil : null;
+  const alvo: AlvoDoEfeito = {
+    ...alvoDaAcao(atacante.id, defensor, indice, perfilDaAcao, reacao),
+    dono: jogador,
+    origem: carta,
+  };
+
+  // O estado vem primeiro: "ainda oculta" e "não está Pronta" são recusas mais
+  // precisas do que "as condições do texto não valem".
+  const erro = aplicar(ctx, ativarPassiva(ctx.partida, jogador, carta));
+  if (erro !== null) return falha(erro);
+
+  if (!ativacao.podeAtivar(ctx, alvo)) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta,
+      detalhe: 'as condições impressas para Ativar não estão satisfeitas agora',
+    });
+  }
+
+  ativacao.aplicar(ctx, alvo);
+  return entregar(ctx);
+};
+
+/**
+ * Resolve uma escolha que ficou pendente.
+ *
+ * O jogador informa qual das opções legais quer, e o efeito acontece sobre ela.
+ * Enquanto a pendência existir, ele não declara Ação nem responde.
+ */
+export const resolverEscolhaPendente = (
+  partida: EstadoDaPartida,
+  jogador: PlayerId,
+  carta: CardId,
+): Resposta => {
+  const ctx = criarContexto(partida);
+  const pendente = ctx.partida.escolhasPendentes.find((escolha) => escolha.jogador === jogador);
+  if (pendente === undefined) return falha({ tipo: 'sem-escolha-pendente', jogador });
+
+  if (!pendente.opcoes.includes(carta)) {
+    return falha({
+      tipo: 'escolha-invalida',
+      carta,
+      detalhe: 'a carta escolhida não está entre as opções da escolha pendente',
+    });
+  }
+
+  const dono = jogadorDo(ctx, jogador);
+
+  // A escolha pode ser respondida depois de a carta já ter saído do cooldown
+  // sozinha — o avanço do início de turno faz isso. Nesse caso a decisão do
+  // jogador continua valendo e a pendência se encerra; o que não existe mais é
+  // o movimento. Registrado em docs/AMBIGUIDADES.md.
+  if (pendente.efeito === 'devolver-a-mao') {
+    const movimento = devolverCartaAMao(dono, carta);
+    if (movimento.ok) {
+      gravarJogador(ctx, movimento.valor.jogador);
+      ctx.eventos.push({ tipo: 'carta-devolvida-a-mao', jogador, carta, de: movimento.valor.de });
+    } else if (movimento.erro.tipo !== 'carta-fora-do-cooldown') {
+      return falha(movimento.erro);
+    }
+  } else {
+    const movimento = adiantarCartaNoCooldown(dono, carta);
+    if (!movimento.ok) {
+      if (movimento.erro.tipo !== 'carta-fora-do-cooldown') return falha(movimento.erro);
+      return encerrarPendencia(ctx, pendente, jogador, carta);
+    }
+    gravarJogador(ctx, movimento.valor.jogador);
+    ctx.eventos.push(
+      movimento.valor.voltouParaAMao
+        ? { tipo: 'carta-devolvida-a-mao', jogador, carta, de: movimento.valor.de }
+        : {
+            tipo: 'carta-adiantada-no-cooldown',
+            jogador,
+            carta,
+            de: movimento.valor.de,
+            para: movimento.valor.para,
+          },
+    );
+  }
+
+  return encerrarPendencia(ctx, pendente, jogador, carta);
+};
+
+/** Tira a pendência da mesa e registra que ela foi respondida. */
+const encerrarPendencia = (
+  ctx: Contexto,
+  pendente: EscolhaPendente,
+  jogador: PlayerId,
+  carta: CardId,
+): Resposta => {
+  ctx.partida = {
+    ...ctx.partida,
+    escolhasPendentes: ctx.partida.escolhasPendentes.filter((escolha) => escolha !== pendente),
+  };
+  ctx.eventos.push({
+    tipo: 'escolha-pendente-resolvida',
+    jogador,
+    origem: pendente.origem,
+    carta,
+  });
+  return entregar(ctx);
+};
+
+/** Recusa a jogada enquanto o jogador tiver escolha pendente. */
+const travadoPorEscolha = (partida: EstadoDaPartida, jogador: PlayerId): ErroDeDominio | null => {
+  const pendente = partida.escolhasPendentes.find((escolha) => escolha.jogador === jogador);
+  return pendente === undefined
+    ? null
+    : { tipo: 'escolha-pendente', origem: pendente.origem, jogador };
 };
 
 /* ------------------------------------------------------------------ */
@@ -786,8 +1070,10 @@ export const resolver = (
       },
     );
 
+  // O desfecho fica adiado: várias cartas tiram Vida depois da resolução, e o
+  // fim da partida precisa ser decidido com a Ação inteira já resolvida.
   const antesDaResolucao = ctx.eventos.length;
-  const erro = aplicar(ctx, resolverAcao(ctx.partida, atacante, indice));
+  const erro = aplicar(ctx, resolverAcao(ctx.partida, atacante, indice, { adiarDesfecho: true }));
   if (erro !== null) return falha(erro);
 
   const resumo = resumirEventos(
@@ -809,6 +1095,14 @@ export const resolver = (
   atualizarTrilhaDoTurno(ctx, alvo, resumo);
 
   verificarRevelacoes(ctx, 'apos-resolver', alvo, resumo);
+
+  // Agora, e só agora, a regra de vitória é aplicada — uma vez, pela mesma
+  // função do motor que a define. Morte simultânea continua encerrando com
+  // vencedor `null` e motivo `indefinido`, sem regra inventada.
+  const fim = encerrarSeVidaZerou(ctx.partida);
+  ctx.partida = fim.partida;
+  ctx.eventos.push(...fim.eventos);
+
   return entregar(ctx);
 };
 

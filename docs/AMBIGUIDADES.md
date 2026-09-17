@@ -172,13 +172,11 @@ inventado.
     Runa, Barreira Prismática e Sobrecarga Temporal compram. Não há contradição,
     mas a leitura depende do item 23 continuar valendo: se o playtest decidir
     outro momento, essas três cartas mudam de valor.
-30. **Ativações opcionais de Passiva são automáticas no motor.** Instinto de
-    Ferro e Véu Prismático dizem "Ative e gaste 1 Momentum/Mana para reduzir
-    1 I de um Ataque que causaria Ruptura". Isso é uma escolha do jogador, e o
-    motor hoje a toma sozinho: ele ativa **somente** quando a redução de fato
-    impede a Ruptura, e nunca em outra situação. É uma decisão de implementação,
-    não uma regra do documento — quando a interface existir, a escolha precisa
-    voltar para o jogador.
+30. ~~**Ativações opcionais de Passiva são automáticas no motor.**~~
+    **RESOLVIDO na revisão corretiva da Etapa 3.** O motor não Ativa mais
+    Passiva nenhuma sozinho. Instinto de Ferro e Véu Prismático só agem pelo
+    comando explícito de Ativação, que faz a carta passar de Pronta para Ativada
+    e cobra o recurso. Ver os itens 41 e 42.
 31. **Ordem entre "o Dano final se torna 0" e o bônus de Ruptura.** Imagem
     Espelhada, Runa da Égide Exaurida e Última Palavra fixam o Dano final em
     zero; a Ruptura soma Dano ao mesmo Ataque (§9). O motor aplica o valor
@@ -191,11 +189,11 @@ inventado.
     espaço que nasce `indisponivel` e um limite de Ações por turno que a carta
     levanta de três para quatro. O documento não diz o que acontece se duas
     cartas futuras abrirem Ações extras no mesmo turno.
-33. **"Reduza 1 D ou 1 I" sem interface para escolher.** Guarda Marcial, Guarda
-    de Veterano e Runa da Égide Ativada deixam a escolha com o jogador. Sem
-    cliente, o motor escolhe por uma regra fixa e documentada: Impacto quando o
-    Ataque ainda ameaça romper a Guarda, Dano nos demais casos. A escolha real
-    precisa voltar para o jogador quando a interface existir.
+33. ~~**"Reduza 1 D ou 1 I" sem interface para escolher.**~~
+    **RESOLVIDO na revisão corretiva da Etapa 3.** Guarda Marcial, Guarda de
+    Veterano e Runa da Égide Ativada passaram a exigir a escolha no comando, com
+    erro tipado quando ela falta. O motor não tem mais regra de desempate
+    própria para esses casos.
 34. **Contrafeitiço e o que é "o texto" de uma Técnica.** A carta cancela "o
     texto" da Técnica e mantém custo e espaço de Ação. O motor cancela os
     ganchos da **carta declarada**, e só dela: Passivas reveladas e Cartas de
@@ -211,3 +209,48 @@ inventado.
     de uso, carta de Reação, Passivas do atacante e depois do defensor. A ordem
     é fixa para que o replay reproduza, mas o documento não define prioridade de
     gatilhos simultâneos (item 20 continua aberto).
+
+## Levantados na revisão corretiva da Etapa 3
+
+37. **Cartas de Personagem não existem no documento.** O `CARD_CATALOG.md` não
+    traz custo, valores, cooldown nem texto de Personagem para classe nenhuma,
+    mas o estado da partida exige um (§3, §4). O catálogo jogável ficou com 39
+    cartas por classe e nenhuma de Personagem; a identidade técnica do
+    Personagem vive no descritor da classe, como identificador e nada mais. Se o
+    documento trouxer essas cartas depois, elas entram no catálogo e o descritor
+    passa a apontar para elas — nenhum dado foi inventado no lugar delas.
+38. **Escolhas que disparam fora da janela de quem escolhe.** Concentração sob
+    Pressão manda o **defensor** escolher uma carta de cooldown no meio da Ação
+    do adversário, quando ele não tem comando nenhum para dar. O motor não
+    escolhe por ele: a escolha fica pendente no estado, trava o dono de declarar
+    e de responder, e ele a resolve com um comando próprio. O documento não
+    descreve esse protocolo — ele é consequência da regra de que o motor não
+    decide pelo jogador.
+39. **Escolha pendente respondida depois de a carta sair do cooldown.** Se o
+    dono só responde a pendência no turno seguinte, o avanço de cooldown já pode
+    ter devolvido a carta à mão sozinho. A decisão dele continua valendo e a
+    pendência se encerra; o que não existe mais é o movimento. O documento não
+    trata o caso.
+40. **"Reduza 1 D ou 1 I" da Guarda Marcial é escolha, não padrão.** O texto da
+    Defesa Inata do Guerreiro oferece um "ou", e o motor passou a exigir a
+    decisão em vez de escolher o Dano por omissão. A Barreira Arcana do Mago
+    reduz 1 D **e** 1 I, então não pergunta nada — a assimetria é do documento.
+41. **Momento em que "um Ataque causaria Ruptura" se torna verdade.** Instinto
+    de Ferro e Véu Prismático se revelam "quando um Ataque causaria Ruptura". O
+    motor passou a avaliar isso já na declaração da Ação, e não só na resolução:
+    é nesse instante que a ameaça existe, e é antes dela resolver que o defensor
+    precisa poder decidir se Ativa a Passiva. O documento não fixa o instante.
+42. **"Uma vez por turno inimigo" das Passivas Ativáveis é o próprio estado.**
+    Instinto de Ferro e Véu Prismático passam de Pronta para Ativada quando o
+    jogador as Ativa, e só voltam a Pronta no início do turno do dono (§12).
+    Esse ciclo já é o limite de uma vez por turno inimigo, então não existe
+    contador paralelo. Passiva continua sem estado Exaurida.
+43. **Desfecho avaliado depois dos efeitos posteriores.** Ripostar e Última
+    Palavra tiram Vida "depois da resolução". A verificação de fim de partida
+    saiu de dentro da resolução universal e passou a acontecer uma única vez, no
+    fim de tudo que pertence àquela Ação. A regra continua sendo uma só, a do
+    motor; o que mudou foi o momento. Morte simultânea segue encerrando com
+    vencedor `null` e motivo `indefinido` (itens 17 e 24), e com o catálogo
+    atual nenhuma Ação consegue produzi-la: as duas cartas que tiram Vida depois
+    só disparam quando o Dano final foi zero, ou seja, quando o defensor
+    sobreviveu.

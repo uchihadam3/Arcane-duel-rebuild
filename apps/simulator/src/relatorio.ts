@@ -18,7 +18,21 @@ const linhaDeLado = (titulo: string, lado: ResumoDeLado): readonly string[] => [
   `  desfecho indefinido ....... ${String(lado.indefinidas)}`,
   `  parou no limite técnico ... ${String(lado.interrompidasPorLimiteTecnico)}`,
   `  bloqueio de regra ......... ${String(lado.bloqueiosDeRegra)}`,
+  `  comando ilegal ............ ${String(lado.partidasComComandoIlegal)}`,
 ];
+
+/** Frequência de uso por carta, da mais jogada para a menos jogada. */
+const linhasDeUso = (usoPorCarta: Readonly<Record<string, number>>): readonly string[] => {
+  const entradas = Object.entries(usoPorCarta).sort(
+    ([aCarta, aVezes], [bCarta, bVezes]) => bVezes - aVezes || aCarta.localeCompare(bCarta),
+  );
+  if (entradas.length === 0) return ['frequência por carta ........ nenhuma carta jogada'];
+
+  return [
+    `frequência por carta ........ ${String(entradas.length)} cartas distintas`,
+    ...entradas.map(([carta, vezes]) => `  ${carta.padEnd(6)} ${String(vezes)}`),
+  ];
+};
 
 export const formatarResumo = (resumo: ResumoDoLote): string =>
   [
@@ -38,7 +52,27 @@ export const formatarResumo = (resumo: ResumoDoLote): string =>
     `Reações por partida ......... ${resumo.respostasComCartaPorPartida.toFixed(2)}`,
     `Defesas Inatas por partida .. ${resumo.respostasComDefesaInataPorPartida.toFixed(2)}`,
     `Ultimates por partida ....... ${resumo.ultimatesPorPartida.toFixed(2)}`,
+    `Passivas reveladas .......... ${resumo.passivasReveladasPorPartida.toFixed(2)}`,
+    `Passivas Ativadas ........... ${resumo.passivasAtivadasPorPartida.toFixed(2)}`,
+    `Cartas de Classe Ativadas ... ${resumo.cartasDeClassePorAtivarPorPartida.toFixed(2)}`,
+    `Cartas de Classe Exauridas .. ${resumo.cartasDeClassePorExaurirPorPartida.toFixed(2)}`,
+    `Vida média do vencedor ...... ${resumo.vidaMediaDoVencedor === null ? '—' : resumo.vidaMediaDoVencedor.toFixed(2)}`,
     `vitórias do Guerreiro ....... ${String(resumo.vitoriasDoGuerreiro)}`,
     `vitórias do Mago ............ ${String(resumo.vitoriasDoMago)}`,
     `bloqueios Lento + Impulso ... ${String(resumo.bloqueiosDeLentoComImpulso)}`,
+    `comandos ilegais ............ ${String(resumo.comandosIlegais)}`,
+    ...(resumo.comandosIlegais === 0
+      ? []
+      : [
+          '',
+          'ATENÇÃO: houve comando ilegal. Isso é bug do simulador, não resultado',
+          'de partida. Esta linha de base NÃO é válida — corrija a política antes',
+          'de publicar qualquer número daqui.',
+          ...resumo.exemplosDeComandoIlegal.map(
+            (item) =>
+              `  ${item.comando} por ${item.jogador} no turno ${String(item.turno)}: ${item.erro.tipo}`,
+          ),
+        ]),
+    '',
+    ...linhasDeUso(resumo.usoPorCarta),
   ].join('\n');

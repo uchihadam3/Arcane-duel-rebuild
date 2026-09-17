@@ -161,6 +161,7 @@ describe('Guerreiro — Cartas de Classe', () => {
     const base = declarada.ok ? declarada.valor.partida : partida;
     const respondida = responder(base, A, 0, {
       tipo: 'defesa-inata',
+      reducao: 'dano',
       cartasDeClasse: [{ carta: 'WC01' as never, modo: 'ativar' }],
     });
     const comResposta = respondida.ok ? respondida.valor.partida : base;
@@ -178,6 +179,7 @@ describe('Guerreiro — Cartas de Classe', () => {
     const base = declarada.ok ? declarada.valor.partida : partida;
     const respondida = responder(base, A, 0, {
       tipo: 'defesa-inata',
+      reducao: 'impacto',
       cartasDeClasse: [{ carta: 'WC01' as never, modo: 'exaurir' }],
     });
     const comResposta = respondida.ok ? respondida.valor.partida : base;

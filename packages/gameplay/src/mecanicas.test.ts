@@ -123,13 +123,13 @@ describe('Defesa Inata', () => {
 
     const primeira = jogar(partida, B, {
       pedido: { carta: 'M02' as never },
-      resposta: { tipo: 'defesa-inata' },
+      resposta: { tipo: 'defesa-inata', reducao: 'dano' },
     }).partida;
     expect(jogador(primeira, A).vida).toBe(30 - 3);
 
     const declarada = declarar(primeira, B, { carta: 'M01' as never });
     const base = declarada.ok ? declarada.valor.partida : primeira;
-    expect(erroDe(responder(base, A, 1, { tipo: 'defesa-inata' })).tipo).toBe(
+    expect(erroDe(responder(base, A, 1, { tipo: 'defesa-inata', reducao: 'dano' })).tipo).toBe(
       'defesa-inata-ja-usada',
     );
   });
@@ -142,6 +142,7 @@ describe('Defesa Inata', () => {
       resposta: { tipo: 'defesa-inata' },
     });
 
+    // A Barreira Arcana reduz 1 D e 1 I: não há "ou" para o jogador escolher.
     expect(manaDe(depois, A)).toBe(manaAntes - 1);
     expect(jogador(depois, A).vida).toBe(30 - 2);
     const impacto = eventos.find((evento) => evento.tipo === 'impacto-aplicado');
@@ -168,13 +169,13 @@ describe('Defesa Inata', () => {
     const partida = duelo(defensor, mago, B);
     const usada = jogar(partida, B, {
       pedido: { carta: 'M01' as never },
-      resposta: { tipo: 'defesa-inata' },
+      resposta: { tipo: 'defesa-inata', reducao: 'dano' },
     }).partida;
 
     const proximoTurnoInimigo = virarTurno(virarTurno(usada, B), A);
     const declarada = declarar(proximoTurnoInimigo, B, { carta: 'M02' as never });
     const base = declarada.ok ? declarada.valor.partida : proximoTurnoInimigo;
-    expect(responder(base, A, 0, { tipo: 'defesa-inata' }).ok).toBe(true);
+    expect(responder(base, A, 0, { tipo: 'defesa-inata', reducao: 'dano' }).ok).toBe(true);
   });
 });
 
@@ -187,8 +188,8 @@ describe('Resposta', () => {
 
     const primeira = responder(base, A, 0, { tipo: 'carta-de-reacao', carta: 'W15' as never });
     const comResposta = primeira.ok ? primeira.valor.partida : base;
-    expect(erroDe(responder(comResposta, A, 0, { tipo: 'defesa-inata' })).tipo).toBe(
-      'segunda-resposta-voluntaria',
-    );
+    expect(
+      erroDe(responder(comResposta, A, 0, { tipo: 'defesa-inata', reducao: 'dano' })).tipo,
+    ).toBe('segunda-resposta-voluntaria');
   });
 });

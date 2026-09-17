@@ -40,7 +40,7 @@ export const slotVazio = (
   situacao,
   perfil: null,
   escolhas: {},
-  resposta: { voluntaria: null },
+  resposta: { voluntaria: null, escolhas: {} },
   modificadores: { dano: 0, impacto: 0 },
   reducaoDaResposta: { dano: 0, impacto: 0 },
   danoFinalDefinido: null,

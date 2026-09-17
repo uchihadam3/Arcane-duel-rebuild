@@ -1,5 +1,5 @@
 import type { CardId, EstadoDeJogador, PlayerId, SlotDeAcao } from '@arcane-duel/shared-types';
-import type { DescontosDeCusto } from '@arcane-duel/rules-engine';
+import type { DescontosDeCusto, ErroDeDominio } from '@arcane-duel/rules-engine';
 import { revelarPassiva } from '@arcane-duel/rules-engine';
 
 import type { Contexto } from './contexto.js';
@@ -170,6 +170,36 @@ export const somarDescontos = (partes: readonly DescontosDeCusto[]): DescontosDe
     ...(ignorarRecurso ? { ignorarRecurso } : {}),
     ...(apMinimo === undefined ? {} : { apMinimo }),
   };
+};
+
+/**
+ * Junta a conferência de escolhas de todas as fontes da jogada.
+ *
+ * A carta declarada, as Cartas de Classe pedidas e as Passivas reveladas podem
+ * exigir escolha. A primeira que faltar recusa a jogada inteira, antes de
+ * qualquer custo ser pago.
+ */
+export const recusaDeEscolhas = (
+  consulta: ConsultaDeCusto,
+  cartasDeClasse: readonly { readonly carta: CardId; readonly modo: 'ativar' | 'exaurir' }[],
+): ErroDeDominio | null => {
+  const daCarta = efeitoJogavel(consulta.perfil.carta).validarEscolhas?.(consulta) ?? null;
+  if (daCarta !== null) return daCarta;
+
+  for (const uso of cartasDeClasse) {
+    const par = efeitoDeCartaDeClasse(uso.carta);
+    if (par === undefined) continue;
+    const efeito = uso.modo === 'ativar' ? par.ativar : par.exaurir;
+    const recusa = efeito.validarEscolhas?.(consulta) ?? null;
+    if (recusa !== null) return recusa;
+  }
+
+  for (const carta of passivasReveladas(consulta.jogador)) {
+    const recusa = efeitoDePassiva(carta)?.validarEscolhas?.(consulta) ?? null;
+    if (recusa !== null) return recusa;
+  }
+
+  return null;
 };
 
 /** Junta as recusas de legalidade das fontes que opinam sobre a jogada. */
