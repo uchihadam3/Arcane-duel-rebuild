@@ -137,6 +137,11 @@ export const declararAcao = (
  * Reação, nunca as duas como Respostas separadas (§8). Passivas automáticas e
  * ativações de Carta de Classe modificam a Resposta sem ocupar este espaço.
  *
+ * Quando é carta de Reação, o custo cobrado é o **impresso na própria carta**:
+ * a Resposta carrega o perfil dela, e não há como o chamador informar um
+ * número que contradiga a carta. O tipo precisa ser `reacao` e a moeda precisa
+ * ser Reserva, porque Reação se paga no turno inimigo (§6).
+ *
  * O efeito numérico da Resposta é texto de carta e entra pelos modificadores;
  * aqui só a Resposta em si é registrada e paga.
  */
@@ -145,7 +150,6 @@ export const registrarResposta = (
   defensor: PlayerId,
   indice: IndiceDeAcao,
   resposta: RespostaVoluntaria,
-  custoEmReserva = 0,
 ): RespostaDeComando => {
   if (partida.situacao !== 'em-andamento' || partida.turno === null) {
     return falha({ tipo: 'partida-nao-iniciada' });
@@ -169,20 +173,34 @@ export const registrarResposta = (
   const eventos: EventoUniversal[] = [];
 
   if (resposta.tipo === 'carta-de-reacao') {
-    if (!atualizado.mao.includes(resposta.carta)) {
-      return falha({ tipo: 'carta-fora-da-mao', carta: resposta.carta });
+    const { perfil } = resposta;
+
+    if (perfil.tipo !== 'reacao') {
+      return falha({
+        tipo: 'tipo-de-carta-invalido',
+        carta: perfil.carta,
+        esperado: 'reacao',
+        recebido: perfil.tipo,
+      });
     }
-    const pagamento = pagarComReserva(atualizado, custoEmReserva);
+    if (perfil.custo.moeda !== 'reserva') {
+      return falha({ tipo: 'moeda-de-custo-invalida', esperada: 'reserva' });
+    }
+    if (!atualizado.mao.includes(perfil.carta)) {
+      return falha({ tipo: 'carta-fora-da-mao', carta: perfil.carta });
+    }
+
+    const pagamento = pagarComReserva(atualizado, perfil.custo.valor);
     if (!pagamento.ok) return pagamento;
     atualizado = {
       ...pagamento.valor,
-      mao: pagamento.valor.mao.filter((carta) => carta !== resposta.carta),
+      mao: pagamento.valor.mao.filter((carta) => carta !== perfil.carta),
     };
     eventos.push({
       tipo: 'custo-pago',
       jogador: defensor,
       ap: 0,
-      reserva: custoEmReserva,
+      reserva: perfil.custo.valor,
       impulso: 0,
     });
   }
@@ -298,14 +316,16 @@ export const resolverAcao = (
 
   const respostaComCarta = slot.resposta.voluntaria;
   if (respostaComCarta?.tipo === 'carta-de-reacao') {
-    // A Reação também é uma das oito habilidades: ela vai para o cooldown
-    // dela quando a Ação a que respondeu termina.
-    defensor = enviarParaCooldown(defensor, respostaComCarta.carta, perfil.cooldown);
+    // A Reação também é uma das oito habilidades, e vai para a zona impressa
+    // **nela** — não na Ação a que respondeu. Cada carta tem o próprio
+    // cooldown (§11).
+    const perfilDaReacao = respostaComCarta.perfil;
+    defensor = enviarParaCooldown(defensor, perfilDaReacao.carta, perfilDaReacao.cooldown);
     eventos.push({
       tipo: 'carta-para-cooldown',
       jogador: defensor.id,
-      carta: respostaComCarta.carta,
-      zona: perfil.cooldown,
+      carta: perfilDaReacao.carta,
+      zona: perfilDaReacao.cooldown,
     });
   }
 

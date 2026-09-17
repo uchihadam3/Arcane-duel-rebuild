@@ -186,7 +186,7 @@ const cartasEmTransitoDe = (
     .filter((slot) => slot.situacao === 'declarada')
     .map((slot) => slot.resposta.voluntaria)
     .filter((resposta) => resposta?.tipo === 'carta-de-reacao')
-    .map((resposta) => (resposta?.tipo === 'carta-de-reacao' ? resposta.carta : ''));
+    .map((resposta) => (resposta?.tipo === 'carta-de-reacao' ? resposta.perfil.carta : ''));
 
   return [...proprias, ...reacoes].filter((carta) => carta !== '');
 };

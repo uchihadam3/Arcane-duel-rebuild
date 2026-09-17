@@ -37,9 +37,17 @@ export interface UltimateEquipada {
  *
  * É a Defesa Inata da classe ou uma carta de Reação — nunca as duas como
  * Respostas separadas contra a mesma Ação (FULL_GAME_SPEC.md §8).
+ *
+ * A carta de Reação carrega o **perfil impresso dela**, não só o
+ * identificador: o custo em Reserva e a zona de cooldown são da própria
+ * Reação, não da Ação a que ela responde. Guardar o perfil aqui é o que
+ * garante que a resolução use os valores certos.
+ *
+ * A Defesa Inata não é carta e não tem perfil: ela é a defesa da classe.
  */
 export type RespostaVoluntaria =
-  { readonly tipo: 'carta-de-reacao'; readonly carta: CardId } | { readonly tipo: 'defesa-inata' };
+  | { readonly tipo: 'carta-de-reacao'; readonly perfil: PerfilDeHabilidade }
+  | { readonly tipo: 'defesa-inata' };
 
 /**
  * Espaço de Resposta sob uma Ação.

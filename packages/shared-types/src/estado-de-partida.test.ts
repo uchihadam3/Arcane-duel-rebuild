@@ -8,7 +8,17 @@ import type {
   SlotDeResposta,
   UltimateEquipada,
 } from './index.js';
+import type { PerfilDeHabilidade } from './index.js';
 import { ZONAS_DE_COOLDOWN, cardId } from './index.js';
+
+/** Uma carta de Reação impressa, usada nas verificações de tipo abaixo. */
+const reacaoImpressa: PerfilDeHabilidade = {
+  carta: cardId('W15'),
+  tipo: 'reacao',
+  custo: { moeda: 'reserva', valor: 1 },
+  cooldown: 2,
+  valores: null,
+};
 
 /*
  * Estes testes provam garantias de tipo. `@ts-expect-error` falha a
@@ -76,7 +86,7 @@ describe('espaço de Resposta', () => {
     const vazio: SlotDeResposta = { voluntaria: null };
     const inata: SlotDeResposta = { voluntaria: { tipo: 'defesa-inata' } };
     const reacao: SlotDeResposta = {
-      voluntaria: { tipo: 'carta-de-reacao', carta: cardId('W15') },
+      voluntaria: { tipo: 'carta-de-reacao', perfil: reacaoImpressa },
     };
     expect(vazio.voluntaria).toBeNull();
     expect(inata.voluntaria?.tipo).toBe('defesa-inata');
@@ -88,16 +98,33 @@ describe('espaço de Resposta', () => {
     // O campo é único: substituir é a única forma de registrar outra Resposta.
     const substituida: SlotDeResposta = {
       ...slot,
-      voluntaria: { tipo: 'carta-de-reacao', carta: cardId('W15') },
+      voluntaria: { tipo: 'carta-de-reacao', perfil: reacaoImpressa },
     };
     expect(Object.keys(substituida)).toEqual(['voluntaria']);
     expect(substituida.voluntaria?.tipo).toBe('carta-de-reacao');
   });
 
-  it('a Defesa Inata não carrega carta, porque não é uma carta', () => {
+  it('a Defesa Inata não carrega perfil, porque não é uma carta', () => {
     const inata: RespostaVoluntaria = { tipo: 'defesa-inata' };
-    // @ts-expect-error a variante de Defesa Inata não tem o campo `carta`.
-    expect(inata.carta).toBeUndefined();
+    // @ts-expect-error a variante de Defesa Inata não tem o campo `perfil`.
+    expect(inata.perfil).toBeUndefined();
+  });
+
+  it('a carta de Reação carrega o custo e o cooldown impressos nela', () => {
+    const reacao: RespostaVoluntaria = { tipo: 'carta-de-reacao', perfil: reacaoImpressa };
+    if (reacao.tipo === 'carta-de-reacao') {
+      expect(reacao.perfil.custo).toEqual({ moeda: 'reserva', valor: 1 });
+      expect(reacao.perfil.cooldown).toBe(2);
+    }
+  });
+
+  it('não aceita uma carta de Reação sem o perfil impresso', () => {
+    const invalida: RespostaVoluntaria = {
+      tipo: 'carta-de-reacao',
+      // @ts-expect-error a Resposta por carta precisa do perfil, não só do id.
+      carta: cardId('W15'),
+    };
+    expect(invalida.tipo).toBe('carta-de-reacao');
   });
 });
 

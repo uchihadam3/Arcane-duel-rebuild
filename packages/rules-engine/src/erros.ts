@@ -1,4 +1,4 @@
-import type { CardId, PlayerId } from '@arcane-duel/shared-types';
+import type { CardId, PlayerId, TipoDeHabilidade } from '@arcane-duel/shared-types';
 
 /*
  * Erros de domínio.
@@ -25,6 +25,12 @@ export type ErroDeDominio =
     }
   | { readonly tipo: 'carta-fora-da-mao'; readonly carta: CardId }
   | { readonly tipo: 'moeda-de-custo-invalida'; readonly esperada: 'ap' | 'reserva' }
+  | {
+      readonly tipo: 'tipo-de-carta-invalido';
+      readonly carta: CardId;
+      readonly esperado: TipoDeHabilidade;
+      readonly recebido: TipoDeHabilidade;
+    }
   | { readonly tipo: 'acao-inexistente'; readonly indice: number }
   | { readonly tipo: 'acao-nao-declarada'; readonly indice: number }
   | { readonly tipo: 'acao-ja-resolvida'; readonly indice: number }

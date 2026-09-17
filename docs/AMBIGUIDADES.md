@@ -68,11 +68,12 @@ inventado.
     restante não basta (§7), e Lento aumenta o custo da ação em 1 (§15). Não
     está dito se o custo considerado pelo Impulso é o impresso ou o já
     aumentado por Lento. Precisa de decisão antes das regras universais.
-13. **Ruptura e redução voluntária.** Reduzir a própria Guarda como custo não
-    causa Ruptura (§9), e o Bárbaro vive disso. Falta dizer o que acontece
-    quando um Ataque inimigo leva a Guarda a zero no mesmo turno em que o
-    Bárbaro já a reduziu voluntariamente até 1 — a leitura direta é que há
-    Ruptura, por ser ação inimiga, mas vale confirmar.
+13. ~~**Ruptura e redução voluntária.**~~ **Resolvido.** A regra canônica é:
+    reduzir a própria Guarda como custo **não** provoca Ruptura; mas se depois
+    um Ataque inimigo levar a Guarda restante de acima de zero para zero, esse
+    Ataque provoca Ruptura normalmente. O que não provoca Ruptura é a redução
+    voluntária em si, não a Guarda baixa que ela deixa. Implementado em
+    `packages/rules-engine/src/combate.ts` e coberto por teste.
 14. **Título provisório.** "Arcane Duel" é explicitamente provisório (§1) e não
     deve ser tratado como nome comercial até a etapa de identidade da marca.
 
@@ -139,10 +140,12 @@ inventado.
     dando a vitória ao outro. Quando **os dois** chegam na mesma resolução, ele
     encerra com `vencedor: null` e motivo `indefinido`, deixando a decisão
     pendente em vez de inventada. O item 17 continua aberto.
-25. **Para onde vai a carta de Reação.** O §11 diz que habilidades usadas vão
-    para a zona de cooldown impressa nelas. O motor manda a carta de Reação
-    para o cooldown quando a Ação a que ela respondeu resolve — o momento não
-    está escrito, só a consequência.
+25. **Quando a carta de Reação entra no cooldown.** **Qual** cooldown não é
+    ambíguo: o §11 diz que a habilidade usada entra na zona impressa **nela**,
+    então a Reação usa o cooldown da própria Reação, nunca o da Ação a que
+    respondeu. O que o documento não escreve é o **instante** em que ela entra.
+    O motor a envia quando a Ação a que ela respondeu resolve, junto com a
+    carta do atacante.
 26. **Ordem entre Queimadura e conversão de Reserva.** O §15 diz que a
     Queimadura tica no final do turno e o §6 diz que os pontos sobrando viram
     Reserva no final do turno. As duas não interagem hoje, então a ordem é

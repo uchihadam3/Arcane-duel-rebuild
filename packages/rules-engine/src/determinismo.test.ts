@@ -18,6 +18,7 @@ import {
   exigirSucesso,
   partidaNova,
   perfil,
+  perfilDeReacao,
 } from './teste-partida.js';
 
 /** Uma partida inteira, descrita como uma sequência de comandos. */
@@ -33,7 +34,10 @@ const sequencia = (
     (partida) => revelarPassiva(partida, ID_A, partida.jogadores[0].passivas[0]?.carta ?? CARTA_A1),
     (partida) => declararAcao(partida, ID_A, perfil(CARTA_A1, { dano: 2, impacto: 3 })),
     (partida) =>
-      registrarResposta(partida, ID_B, 0, { tipo: 'carta-de-reacao', carta: CARTA_B1 }, 1),
+      registrarResposta(partida, ID_B, 0, {
+        tipo: 'carta-de-reacao',
+        perfil: perfilDeReacao(CARTA_B1, { cooldown: 3 }),
+      }),
     (partida) =>
       ativarCartaDeClasse(
         partida,

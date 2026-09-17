@@ -16,6 +16,7 @@ import {
   jogadorDe,
   partidaEmAndamento,
   perfil,
+  perfilDeReacao,
 } from './teste-partida.js';
 
 const declarar = (partida: EstadoDaPartida, carta = CARTA_A1, opcoes = {}): EstadoDaPartida =>
@@ -102,7 +103,10 @@ describe('Resposta voluntária', () => {
   it('aceita uma carta de Reação paga com Reserva', () => {
     const partida = declarar(partidaEmAndamento());
     const comResposta = exigirSucesso(
-      registrarResposta(partida, ID_B, 0, { tipo: 'carta-de-reacao', carta: CARTA_B1 }, 1),
+      registrarResposta(partida, ID_B, 0, {
+        tipo: 'carta-de-reacao',
+        perfil: perfilDeReacao(CARTA_B1),
+      }),
     ).partida;
     expect(jogadorDe(comResposta, ID_B).reserva).toBe(1);
     expect(jogadorDe(comResposta, ID_B).mao).not.toContain(CARTA_B1);
@@ -115,20 +119,17 @@ describe('Resposta voluntária', () => {
     ).partida;
     const segunda = registrarResposta(comInata, ID_B, 0, {
       tipo: 'carta-de-reacao',
-      carta: CARTA_B1,
+      perfil: perfilDeReacao(CARTA_B1),
     });
     expect(!segunda.ok && segunda.erro.tipo).toBe('segunda-resposta-voluntaria');
   });
 
   it('recusa Reação sem Reserva suficiente', () => {
     const partida = declarar(partidaEmAndamento());
-    const resposta = registrarResposta(
-      partida,
-      ID_B,
-      0,
-      { tipo: 'carta-de-reacao', carta: CARTA_B1 },
-      3,
-    );
+    const resposta = registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: perfilDeReacao(CARTA_B1, { custo: 3 }),
+    });
     expect(!resposta.ok && resposta.erro.tipo).toBe('reserva-insuficiente');
   });
 
@@ -146,7 +147,10 @@ describe('Resposta voluntária', () => {
   it('manda a carta de Reação para o cooldown quando a Ação resolve', () => {
     let partida = declarar(partidaEmAndamento());
     partida = exigirSucesso(
-      registrarResposta(partida, ID_B, 0, { tipo: 'carta-de-reacao', carta: CARTA_B1 }, 1),
+      registrarResposta(partida, ID_B, 0, {
+        tipo: 'carta-de-reacao',
+        perfil: perfilDeReacao(CARTA_B1),
+      }),
     ).partida;
     partida = resolver(partida);
     expect(jogadorDe(partida, ID_B).cooldown[1]).toContain(CARTA_B1);
@@ -250,5 +254,165 @@ describe('ciclo completo de turno', () => {
     expect(partida.turno?.jogadorAtivo).toBe(ID_B);
     expect(jogadorDe(partida, ID_B).pontosDeAcao).toBe(5);
     expect(validarPartida(partida).ok).toBe(true);
+  });
+});
+
+describe('carta de Reação: cooldown próprio', () => {
+  /** Declara um Ataque com o cooldown pedido, responde com uma Reação e resolve. */
+  const trocar = (cooldownDoAtaque: 1 | 2 | 3, cooldownDaReacao: 1 | 2 | 3): EstadoDaPartida => {
+    let partida = declarar(partidaEmAndamento(), CARTA_A1, { cooldown: cooldownDoAtaque });
+    partida = exigirSucesso(
+      registrarResposta(partida, ID_B, 0, {
+        tipo: 'carta-de-reacao',
+        perfil: perfilDeReacao(CARTA_B1, { cooldown: cooldownDaReacao }),
+      }),
+    ).partida;
+    return resolver(partida);
+  };
+
+  it('Ataque CD3 respondido por Reação CD1: cada carta vai para a própria zona', () => {
+    const partida = trocar(3, 1);
+    expect(jogadorDe(partida, ID_A).cooldown[3]).toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_B).cooldown[1]).toContain(CARTA_B1);
+
+    // E em nenhuma outra zona.
+    expect(jogadorDe(partida, ID_A).cooldown[1]).not.toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_B).cooldown[3]).not.toContain(CARTA_B1);
+  });
+
+  it('Ataque CD1 respondido por Reação CD3: cada carta vai para a própria zona', () => {
+    const partida = trocar(1, 3);
+    expect(jogadorDe(partida, ID_A).cooldown[1]).toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_B).cooldown[3]).toContain(CARTA_B1);
+
+    expect(jogadorDe(partida, ID_A).cooldown[3]).not.toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_B).cooldown[1]).not.toContain(CARTA_B1);
+  });
+
+  it('o Ataque continua indo para o cooldown dele mesmo sem Resposta', () => {
+    const partida = resolver(declarar(partidaEmAndamento(), CARTA_A1, { cooldown: 2 }));
+    expect(jogadorDe(partida, ID_A).cooldown[2]).toContain(CARTA_A1);
+  });
+
+  it('a composição das oito continua íntegra para os dois lados', () => {
+    const partida = trocar(3, 1);
+    for (const id of [ID_A, ID_B]) {
+      const jogador = jogadorDe(partida, id);
+      const todas = [
+        ...jogador.mao,
+        ...jogador.cooldown[1],
+        ...jogador.cooldown[2],
+        ...jogador.cooldown[3],
+      ];
+      expect(new Set(todas).size).toBe(8);
+    }
+    expect(validarPartida(partida).ok).toBe(true);
+  });
+});
+
+describe('carta de Reação: custo impresso', () => {
+  const responderCom = (custo: number, reservaInicial?: number) => {
+    let partida = declarar(partidaEmAndamento());
+    if (reservaInicial !== undefined) {
+      partida = {
+        ...partida,
+        jogadores: [partida.jogadores[0], { ...partida.jogadores[1], reserva: reservaInicial }],
+      };
+    }
+    return registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: perfilDeReacao(CARTA_B1, { custo }),
+    });
+  };
+
+  it('paga exatamente o custo impresso na própria Reação', () => {
+    const partida = exigirSucesso(responderCom(2)).partida;
+    expect(jogadorDe(partida, ID_B).reserva).toBe(0);
+  });
+
+  it('custo 1 com 2 de Reserva deixa 1', () => {
+    const partida = exigirSucesso(responderCom(1)).partida;
+    expect(jogadorDe(partida, ID_B).reserva).toBe(1);
+  });
+
+  it('custo 2 com apenas 1 de Reserva é recusado', () => {
+    const resposta = responderCom(2, 1);
+    expect(!resposta.ok && resposta.erro.tipo).toBe('reserva-insuficiente');
+  });
+
+  it('o evento de custo registra o valor impresso, não um número de fora', () => {
+    let partida = declarar(partidaEmAndamento());
+    const resultado = exigirSucesso(
+      registrarResposta(partida, ID_B, 0, {
+        tipo: 'carta-de-reacao',
+        perfil: perfilDeReacao(CARTA_B1, { custo: 2 }),
+      }),
+    );
+    const custo = resultado.eventos.find((evento) => evento.tipo === 'custo-pago');
+    expect(custo).toMatchObject({ reserva: 2, ap: 0, impulso: 0 });
+    partida = resultado.partida;
+    expect(jogadorDe(partida, ID_B).reserva).toBe(0);
+  });
+
+  it('não existe mais um custo separado que possa contradizer a carta', () => {
+    // A assinatura aceita quatro argumentos: o custo vem do perfil e não há
+    // como passar um número que discorde da carta.
+    expect(registrarResposta.length).toBe(4);
+  });
+});
+
+describe('carta de Reação: só Reação responde', () => {
+  it('recusa registrar um Ataque como Resposta', () => {
+    const partida = declarar(partidaEmAndamento());
+    const resposta = registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: { ...perfilDeReacao(CARTA_B1), tipo: 'ataque' },
+    });
+    expect(!resposta.ok && resposta.erro.tipo).toBe('tipo-de-carta-invalido');
+    expect(
+      !resposta.ok && resposta.erro.tipo === 'tipo-de-carta-invalido' && resposta.erro.recebido,
+    ).toBe('ataque');
+  });
+
+  it('recusa registrar uma Técnica como Resposta', () => {
+    const partida = declarar(partidaEmAndamento());
+    const resposta = registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: { ...perfilDeReacao(CARTA_B1), tipo: 'tecnica' },
+    });
+    expect(!resposta.ok && resposta.erro.tipo).toBe('tipo-de-carta-invalido');
+  });
+
+  it('recusa uma Reação que não se pague com Reserva', () => {
+    const partida = declarar(partidaEmAndamento());
+    const resposta = registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: { ...perfilDeReacao(CARTA_B1), custo: { moeda: 'ap', valor: 1 } },
+    });
+    expect(!resposta.ok && resposta.erro.tipo).toBe('moeda-de-custo-invalida');
+  });
+
+  it('não muta o estado de entrada quando recusa', () => {
+    const partida = declarar(partidaEmAndamento());
+    const antes = JSON.stringify(partida);
+    registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: { ...perfilDeReacao(CARTA_B1), tipo: 'ataque' },
+    });
+    registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: perfilDeReacao(CARTA_B1, { custo: 9 }),
+    });
+    expect(JSON.stringify(partida)).toBe(antes);
+  });
+
+  it('não muta o estado de entrada quando aceita', () => {
+    const partida = declarar(partidaEmAndamento());
+    const antes = JSON.stringify(partida);
+    registrarResposta(partida, ID_B, 0, {
+      tipo: 'carta-de-reacao',
+      perfil: perfilDeReacao(CARTA_B1),
+    });
+    expect(JSON.stringify(partida)).toBe(antes);
   });
 });

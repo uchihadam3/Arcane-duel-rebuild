@@ -270,9 +270,15 @@ até a resolução, para o defensor poder responder. O espaço de Resposta tem u
 único campo, então duas Respostas voluntárias contra a mesma Ação não são
 representáveis: a Defesa Inata **ou** uma carta de Reação.
 
-Na resolução, a carta usada e a carta de Reação vão para os cooldowns delas, a
-Ação conta para o limite de três do turno e o Sangramento tica se aquela foi a
+Na resolução, a carta usada e a carta de Reação vão **cada uma para o cooldown
+impresso nela** — a Reação não herda o cooldown da Ação a que respondeu. A Ação
+conta para o limite de três do turno e o Sangramento tica se aquela foi a
 segunda Ação.
+
+A Resposta por carta carrega o `PerfilDeHabilidade` da própria Reação, e não só
+o identificador. É daí que saem o custo em Reserva e a zona de cooldown, de
+modo que não existe como o chamador informar um número que contradiga a carta.
+O motor exige que o tipo seja `reacao` e que a moeda seja Reserva.
 
 O efeito numérico de uma Resposta é texto de carta, e entra pelos
 modificadores. O motor universal só registra e cobra a Resposta.

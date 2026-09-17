@@ -72,3 +72,20 @@ export const CARTA_A4 = habilidade('jogador-a', 4);
 export const CARTA_B1 = habilidade('jogador-b', 1);
 
 export { ID_A, ID_B };
+
+/**
+ * Perfil impresso de uma carta de Reação sintética.
+ *
+ * Reação se paga com Reserva e tem o próprio cooldown — os dois vêm daqui, e
+ * não da Ação a que ela responde.
+ */
+export const perfilDeReacao = (
+  carta: CardId,
+  opcoes: { readonly custo?: number; readonly cooldown?: ZonaDeCooldown } = {},
+): PerfilDeHabilidade => ({
+  carta,
+  tipo: 'reacao',
+  custo: { moeda: 'reserva', valor: opcoes.custo ?? 1 },
+  cooldown: opcoes.cooldown ?? 1,
+  valores: null,
+});
