@@ -283,8 +283,16 @@ Três, todas já aplicadas nesta revisão. Detalhe em `ARCHITECTURE.md`.
    inteiro. Os três overlays aprovados cobrem carta e slot; área é luz em
    código.
 3. **Orçamento de apresentação** (`packages/vfx/src/index.ts`) — teto de 1,2 s
-   por momento e 3,2 s por sequência, medidos no vídeo, para que nenhum efeito
-   futuro atrapalhe o ritmo competitivo.
+   por momento e 3,2 s por sequência, para que nenhum efeito futuro atrapalhe o
+   ritmo competitivo.
+
+   O teto de momento é **deliberadamente mais curto** que a maior duração
+   medida: a faixa de troca de turno do vídeo dura ~1,3 s e o teto é 1,2 s.
+   Não é arredondamento. A referência tem cinco a seis cartas na mão; o Arcane
+   Duel tem oito, mais três espaços de Ação com Resposta, quatro Passivas, duas
+   Cartas de Classe, Ultimate, cooldown e Condições. Sendo mais denso, ele
+   precisa ser mais rápido por beat. Só mude o valor com medição de playtest
+   que justifique.
 
 O que o vídeo **não** mudou: a separação entre regra e apresentação, a câmera
 fixa, a decisão de manter React + Vite com caminho aberto para Three.js, e o

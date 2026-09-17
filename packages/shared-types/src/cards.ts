@@ -11,6 +11,8 @@ export type MoedaDeCusto = 'ap' | 'reserva';
 /** Zonas de cooldown CD1, CD2 e CD3 (FULL_GAME_SPEC.md §11). */
 export type ZonaDeCooldown = 1 | 2 | 3;
 
+export const ZONAS_DE_COOLDOWN: readonly ZonaDeCooldown[] = [1, 2, 3];
+
 export interface CustoDeCarta {
   readonly moeda: MoedaDeCusto;
   readonly valor: number;

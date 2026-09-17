@@ -75,3 +75,40 @@ inventado.
     Ruptura, por ser ação inimiga, mas vale confirmar.
 14. **Título provisório.** "Arcane Duel" é explicitamente provisório (§1) e não
     deve ser tratado como nome comercial até a etapa de identidade da marca.
+
+## Levantados na Etapa 1 (tipos do estado da partida)
+
+15. **Paladino: Convicção não existe.** O briefing da etapa pedia "Paladino —
+    Convicção", mas o `FULL_GAME_SPEC.md` §16 diz literalmente "Não possui
+    moeda de Convicção" e define três estados: Vacilante, Resoluto e
+    Inabalável, começando Resoluto. Seguimos o documento, que tem precedência
+    para regras, e modelamos `juramento` em vez de uma moeda. Se a intenção era
+    mesmo criar uma moeda de Convicção, o `FULL_GAME_SPEC.md` precisa mudar
+    antes do código.
+16. **Quem começa a partida não está definido.** Não há regra de sorteio, de
+    escolha nem de alternância. `criarPartida` não decide: a ordem da tupla de
+    jogadores registra quem é primeiro e quem é segundo, e a Reserva inicial e
+    o marcador de Impulso do segundo jogador entram por configuração.
+17. **Desempate e morte simultânea.** O documento não diz o que acontece quando
+    os dois chegam a zero de Vida na mesma resolução. `DesfechoDaPartida` aceita
+    `vencedor: null` com motivo `indefinido`, então a estrutura representa o
+    caso sem inventar o resultado.
+18. **Prioridade entre gatilhos simultâneos.** Várias Passivas e Cartas de
+    Classe podem ter a condição satisfeita ao mesmo tempo, e o documento não
+    define a ordem de resolução. Nada foi decidido nesta etapa; a ordem vai
+    precisar de regra na etapa dois.
+19. **Visibilidade do cooldown.** O documento diz que a zona física representa
+    o cooldown (§11), mas não diz explicitamente se o adversário enxerga o que
+    está lá. Projetamos o cooldown como informação **pública**, porque a carta
+    foi jogada publicamente antes de chegar lá e porque a zona é física e está
+    à vista. Se a intenção for esconder, é uma linha na projeção — mas é uma
+    mudança de regra e precisa vir do documento.
+20. **Composição: dezesseis componentes, não quinze.** Já registrado no item
+    11; a Etapa 1 confirma na prática. A validação estrutural cobra 8
+    habilidades, 4 Passivas, 2 Cartas de Classe e 1 Ultimate, e trata o
+    Personagem à parte, como determinado pela classe.
+21. **Runas do Mago.** §16 diz que "Runas modificam feitiços, defesa, cooldown
+    e sequência", mas no `CARD_CATALOG.md` as Runas aparecem como Cartas de
+    Classe (Runa de Cinzas, Runa do Conduíte). Modelamos o Mago apenas com
+    Mana; as Runas ficam cobertas pelas Cartas de Classe. Se elas forem um
+    componente separado, falta descrevê-lo.

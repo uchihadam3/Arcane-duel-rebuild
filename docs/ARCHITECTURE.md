@@ -137,6 +137,77 @@ desenhar uma sequência longa demais.
   cantos; slots e cartas vivem no tabuleiro. A separação de camadas em
   `theme/tokens.ts` já previa isso.
 
+## Estado da partida
+
+`packages/shared-types` descreve o estado; `packages/rules-engine` cria,
+valida e projeta. Nenhuma das duas camadas resolve combate — isso é a etapa
+dois do roadmap.
+
+### Forma do estado
+
+`EstadoDaPartida` guarda identificador, carimbo de versão, semente do replay,
+situação, **uma tupla de exatamente dois jogadores**, turno e desfecho. A tupla
+é o que garante os dois jogadores: não existe estado representável com um ou
+com três.
+
+`EstadoDeJogador` guarda Vida, Guarda, pontos de Ação, Reserva, o marcador de
+Impulso Inicial, as Ações já realizadas no turno, a mão, as três zonas de
+cooldown, as quatro Passivas, as duas Cartas de Classe, a Ultimate, os três
+espaços de Ação com as suas Respostas, as quatro Condições, o componente da
+classe e as cartas removidas.
+
+Não há baralho, monte de compra, embaralhamento nem descarte: a build inteira
+começa na mão e o que sai dela vai para uma zona de cooldown.
+
+### Ação e Resposta
+
+Cada `SlotDeAcao` carrega um `SlotDeResposta`, e esse espaço tem **um único
+campo** `voluntaria`. Duas Respostas voluntárias contra a mesma Ação não são
+representáveis — a regra de §8 vira impossibilidade estrutural, não
+verificação. A Resposta distingue a Defesa Inata da classe de uma carta de
+Reação, e a variante de Defesa Inata nem sequer tem campo de carta.
+
+### Componentes de classe
+
+`RecursoDeClasse` é uma união discriminada por `classe`, com uma variante por
+classe. O compilador recusa Momentum em um Mago ou Mana em um Guerreiro, e
+`EstadoDeJogador<'mago'>` aceita apenas o recurso do Mago. Na forma genérica,
+a coerência é verificada em tempo de execução por `validarEstadoDeJogador`.
+Nada de `any`, nada de saco de propriedades opcionais.
+
+### Visões
+
+O cliente nunca recebe o estado canônico; ele recebe uma projeção.
+`projetarParaJogador` devolve o próprio estado por inteiro e o do adversário
+filtrado; `projetarParaEspectador` filtra os dois lados.
+
+O que fica escondido não é marcado como escondido: ele não é copiado para
+dentro da visão. `CartaProjetada` é uma união em que a variante invisível não
+possui o campo `carta`, então não existe campo de onde vazar.
+
+| Informação                   | Visão      | Por quê                                                           |
+| ---------------------------- | ---------- | ----------------------------------------------------------------- |
+| Identidade das cartas na mão | privada    | a IA não pode conhecer habilidades escondidas do adversário (§18) |
+| Passiva ainda face-down      | privada    | Passivas só se revelam quando a condição acontece (§12)           |
+| Semente do replay            | de ninguém | não pertence a jogador nenhum                                     |
+| Quantidade de cartas na mão  | pública    | contar cartas na mesa é possível                                  |
+| Cooldown                     | pública    | a carta foi jogada publicamente e a zona é física (§11)           |
+| Cartas de Classe             | pública    | começam face-up no campo (§13)                                    |
+| Ultimate                     | pública    | o adversário sabe qual foi escolhida (§14)                        |
+| Condições                    | pública    | ficam na área de Condições (§15)                                  |
+| Componente de classe         | pública    | são fichas, trilhas e marcadores físicos (§16)                    |
+| Vida, Guarda, AP, Reserva    | pública    | valores visíveis na mesa                                          |
+
+Um identificador que não pertence à partida recebe visão de espectador, e não
+visão privilegiada por engano.
+
+### O que a Etapa 1 deliberadamente não decide
+
+Quem começa, critério de desempate, morte simultânea e prioridade entre
+gatilhos simultâneos continuam sem regra no documento. A estrutura representa
+as situações — a ordem da tupla, `vencedor: null`, motivo `indefinido` — sem
+escolher por elas. Está registrado em [`AMBIGUIDADES.md`](AMBIGUIDADES.md).
+
 ## Servidor
 
 `apps/game-server` é um esqueleto: ele responde diagnóstico e declara

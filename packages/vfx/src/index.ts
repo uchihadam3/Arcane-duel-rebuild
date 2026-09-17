@@ -47,8 +47,16 @@ export const duracaoEfetiva = (duracaoBaseMs: number, velocidade: VelocidadeDeAn
  *
  * Esses números viram teto, não meta. O documento é explícito: nenhum efeito
  * pode demorar tanto que atrapalhe o ritmo competitivo. Um momento isolado
- * fica abaixo de `momentoMs`; só uma sequência inteira, e só nos momentos
- * grandes (Ruptura, Ultimate), pode chegar perto de `sequenciaMs`.
+ * fica abaixo de `momento`; só uma sequência inteira, e só nos momentos
+ * grandes (Ruptura, Ultimate), pode chegar perto de `sequencia`.
+ *
+ * O teto de momento é 1,2 s **de propósito**, abaixo da faixa de troca de
+ * turno de ~1,3 s que o vídeo mostra. A escolha não é um arredondamento: a
+ * referência tem cinco a seis cartas na mão e o Arcane Duel tem oito, mais os
+ * três espaços de Ação com Resposta, quatro Passivas, duas Cartas de Classe,
+ * Ultimate, trilha de cooldown e bandeja de Condições. Sendo mais denso, ele
+ * precisa ser mais rápido por beat, não mais generoso. Só mude este valor com
+ * medição de playtest que justifique.
  */
 export const ORCAMENTO_DE_APRESENTACAO_MS = {
   momento: 1200,
