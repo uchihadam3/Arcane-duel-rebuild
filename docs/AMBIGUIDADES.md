@@ -112,3 +112,48 @@ inventado.
     Classe (Runa de Cinzas, Runa do Conduíte). Modelamos o Mago apenas com
     Mana; as Runas ficam cobertas pelas Cartas de Classe. Se elas forem um
     componente separado, falta descrevê-lo.
+
+## Levantados na Etapa 2 (regras universais do combate)
+
+22. **Lento com Impulso Inicial: recusado de propósito.** O §7 diz que o
+    Impulso completa um ponto quando "os pontos de Ação restantes não forem
+    suficientes para pagar a habilidade desejada". O §15 diz que Lento faz a
+    Ação custar um ponto a mais. Não está dito se o custo que o Impulso
+    completa é o **impresso** ou o **já aumentado por Lento**, e as duas
+    leituras dão respostas diferentes no mesmo caso.
+
+    O motor **recusa** essa jogada com o erro `interacao-nao-definida`, detalhe
+    `lento-com-impulso-inicial`, em vez de escolher em silêncio. Quando nenhuma
+    das duas leituras permitiria o Impulso, não há ambiguidade e o erro volta a
+    ser o normal de AP insuficiente. Há teste documentando o comportamento.
+    Para resolver, o `FULL_GAME_SPEC.md` precisa dizer qual custo vale.
+
+23. **Quando a Carta de Classe Ativada volta a ficar Pronta.** O §13 diz que
+    ela "volta a ficar Pronta no momento normal", sem definir o momento. O §12
+    define esse momento para Passivas — "normalmente no início do turno do
+    dono". O motor aplica o mesmo momento às Cartas de Classe, por
+    consistência, mas isso é inferência e não texto.
+24. **Condição de vitória por Vida.** O documento nunca diz explicitamente que
+    chegar a zero de Vida derrota o jogador; isso aparece só de forma indireta.
+    O motor encerra a partida quando **um** jogador chega a zero ou menos,
+    dando a vitória ao outro. Quando **os dois** chegam na mesma resolução, ele
+    encerra com `vencedor: null` e motivo `indefinido`, deixando a decisão
+    pendente em vez de inventada. O item 17 continua aberto.
+25. **Para onde vai a carta de Reação.** O §11 diz que habilidades usadas vão
+    para a zona de cooldown impressa nelas. O motor manda a carta de Reação
+    para o cooldown quando a Ação a que ela respondeu resolve — o momento não
+    está escrito, só a consequência.
+26. **Ordem entre Queimadura e conversão de Reserva.** O §15 diz que a
+    Queimadura tica no final do turno e o §6 diz que os pontos sobrando viram
+    Reserva no final do turno. As duas não interagem hoje, então a ordem é
+    irrelevante; o motor tica a Queimadura primeiro. Se algum texto futuro
+    ligar Vida perdida a pontos de Ação, a ordem passa a importar e precisará
+    de regra.
+27. **Ordem entre etapas do início de turno.** O documento fixa que Murchar é
+    aplicado depois da recuperação da Guarda (§15) e que o cooldown avança no
+    início do turno do dono (§11). A ordem relativa entre o avanço de cooldown
+    e as demais etapas não é definida; elas não interagem hoje.
+28. **Efeito numérico da Resposta.** O motor registra a Resposta voluntária e
+    cobra o custo dela, mas a redução de Dano e de Impacto é texto de carta.
+    Ela entra pelos modificadores da Ação, e os valores chegam com as cartas
+    reais nas etapas seguintes.

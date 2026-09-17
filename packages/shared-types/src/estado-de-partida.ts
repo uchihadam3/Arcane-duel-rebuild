@@ -1,5 +1,5 @@
 import type { CardId, ClassId, MatchId, PlayerId } from './ids.js';
-import type { ZonaDeCooldown } from './cards.js';
+import type { PerfilDeHabilidade, ZonaDeCooldown } from './cards.js';
 import type { IndiceDeAcao } from './zones.js';
 import type { CondicaoId } from './conditions.js';
 import type { EstadoDeCartaDeClasse, EstadoDePassiva, EstadoDeUltimate } from './card-state.js';
@@ -52,11 +52,34 @@ export interface SlotDeResposta {
   readonly voluntaria: RespostaVoluntaria | null;
 }
 
+/** Em que ponto da resolução o espaço de Ação está. */
+export type SituacaoDaAcao = 'vazio' | 'declarada' | 'resolvida';
+
+/**
+ * Modificadores acumulados sobre uma Ação antes de ela resolver.
+ *
+ * É aqui que Passivas e Cartas de Classe futuras somam ou subtraem Dano e
+ * Impacto. O motor universal só acumula e aplica; quem decide o valor é o
+ * texto da carta, que entra nas etapas seguintes.
+ */
+export interface ModificadoresDaAcao {
+  readonly dano: number;
+  readonly impacto: number;
+}
+
 /** Um dos três espaços centrais de Ação, com a sua Resposta correspondente. */
 export interface SlotDeAcao {
   readonly indice: IndiceDeAcao;
-  readonly carta: CardId | null;
+  readonly situacao: SituacaoDaAcao;
+  /** A carta declarada, com os valores impressos dela. */
+  readonly perfil: PerfilDeHabilidade | null;
   readonly resposta: SlotDeResposta;
+  readonly modificadores: ModificadoresDaAcao;
+  /**
+   * Cartas de Classe já usadas nesta Ação. Uma Carta de Classe só pode ser
+   * usada uma vez na mesma Ação, seja por Ativação ou por Exaustão (§8).
+   */
+  readonly cartasDeClasseUsadas: readonly CardId[];
 }
 
 /** Os três espaços de Ação de um jogador, na ordem em que são ocupados. */
@@ -125,6 +148,13 @@ export interface EstadoDoTurno {
   /** Começa em 1 no primeiro turno da partida. */
   readonly numero: number;
   readonly jogadorAtivo: PlayerId;
+  /**
+   * A rotina de início de turno já rodou neste turno?
+   *
+   * Guarda contra rodar duas vezes — o que duplicaria pontos de Ação e faria
+   * o cooldown pular um estágio.
+   */
+  readonly iniciado: boolean;
 }
 
 /**
@@ -158,6 +188,11 @@ export interface EstadoDaPartida {
    */
   readonly semente: string;
   readonly situacao: SituacaoDaPartida;
+  /**
+   * Quem começou a partida. `null` antes do início: o documento não define o
+   * critério, então quem inicia a partida informa explicitamente.
+   */
+  readonly primeiroJogador: PlayerId | null;
   readonly jogadores: readonly [EstadoDeJogador, EstadoDeJogador];
   /** `null` enquanto a partida não começou. */
   readonly turno: EstadoDoTurno | null;

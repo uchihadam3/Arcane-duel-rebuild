@@ -35,7 +35,7 @@ describe('log de eventos', () => {
     const log = criarLogDeEventos(cabecalho);
     log.registrar({ tipo: 'a', carga: null });
     const copia = log.eventos() as EventoMutavel[];
-    copia.push({ sequencia: 99, tipo: 'falso', carga: null });
+    copia.push({ sequencia: 99, tipo: 'falso' });
     expect(log.tamanho()).toBe(1);
   });
 
@@ -62,8 +62,8 @@ describe('log de eventos', () => {
   it('detecta um log com sequência quebrada', () => {
     expect(
       logEstaIntegro([
-        { sequencia: 1, tipo: 'a', carga: null },
-        { sequencia: 3, tipo: 'b', carga: null },
+        { sequencia: 1, tipo: 'a' },
+        { sequencia: 3, tipo: 'b' },
       ]),
     ).toBe(false);
   });
@@ -72,7 +72,6 @@ describe('log de eventos', () => {
 interface EventoMutavel {
   sequencia: number;
   tipo: string;
-  carga: unknown;
 }
 
 interface EventoDeVida {

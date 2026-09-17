@@ -57,8 +57,11 @@ describe('estado inicial do jogador', () => {
     expect(jogador.acoes).toHaveLength(REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno);
     jogador.acoes.forEach((slot, posicao) => {
       expect(slot.indice).toBe(posicao);
-      expect(slot.carta).toBeNull();
+      expect(slot.situacao).toBe('vazio');
+      expect(slot.perfil).toBeNull();
       expect(slot.resposta.voluntaria).toBeNull();
+      expect(slot.modificadores).toEqual({ dano: 0, impacto: 0 });
+      expect(slot.cartasDeClasseUsadas).toHaveLength(0);
     });
   });
 

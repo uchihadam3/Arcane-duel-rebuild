@@ -16,6 +16,8 @@ export const REGRAS_UNIVERSAIS = {
   /** Respostas voluntárias permitidas por Ação inimiga (§8). */
   respostasVoluntariasPorAcao: 1,
   zonasDeCooldown: 3,
+  /** Sangramento tica depois que o personagem conclui a segunda Ação (§15). */
+  gatilhoDeSangramento: 2,
 } as const;
 
 /** Composição obrigatória de uma build para a batalha (FULL_GAME_SPEC.md §3). */

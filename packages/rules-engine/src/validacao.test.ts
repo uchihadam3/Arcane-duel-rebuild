@@ -149,7 +149,7 @@ describe('validação da partida', () => {
     const invalida: EstadoDaPartida = {
       ...base,
       situacao: 'em-andamento',
-      turno: { numero: 1, jogadorAtivo: playerId('ninguem') },
+      turno: { numero: 1, jogadorAtivo: playerId('ninguem'), iniciado: true },
     };
     expect(problemasDe(validarPartida(invalida))).toContain('turno.jogadorAtivo');
   });

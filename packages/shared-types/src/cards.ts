@@ -1,3 +1,5 @@
+import type { CardId } from './ids.js';
+
 /** Tipos visuais e mecânicos de carta (FULL_GAME_SPEC.md §27). */
 export type TipoDeCarta =
   'ataque' | 'tecnica' | 'reacao' | 'passiva' | 'carta-de-classe' | 'ultimate' | 'personagem';
@@ -22,4 +24,20 @@ export interface CustoDeCarta {
 export interface ValoresDeAtaque {
   readonly dano: number;
   readonly impacto: number;
+}
+
+/**
+ * O que está impresso em uma habilidade.
+ *
+ * O motor universal não conhece o catálogo: quem declara uma Ação informa o
+ * perfil impresso da carta. Assim as regras universais são testáveis antes de
+ * existir uma única carta real, e o catálogo entra depois sem tocar no motor.
+ */
+export interface PerfilDeHabilidade {
+  readonly carta: CardId;
+  readonly tipo: TipoDeHabilidade;
+  readonly custo: CustoDeCarta;
+  readonly cooldown: ZonaDeCooldown;
+  /** `null` quando a carta não imprime Dano nem Impacto — uma Técnica, por exemplo. */
+  readonly valores: ValoresDeAtaque | null;
 }

@@ -7,12 +7,11 @@ import type {
   EstadoDeJogador,
   MatchId,
   PlayerId,
-  SlotDeAcao,
   SlotsDeAcao,
 } from '@arcane-duel/shared-types';
-import { INDICES_DE_ACAO } from '@arcane-duel/shared-types';
 
 import { REGRAS_UNIVERSAIS } from './constants.js';
+import { slotsVazios } from './interno.js';
 import { recursoInicialDaClasse } from './recursos-iniciais.js';
 import { RULES_VERSION } from './version.js';
 
@@ -56,18 +55,8 @@ const semCondicoes = (): EstadoDeCondicoes => ({
   sangramento: 0,
 });
 
-const slotDeAcaoVazio = (indice: SlotDeAcao['indice']): SlotDeAcao => ({
-  indice,
-  carta: null,
-  resposta: { voluntaria: null },
-});
-
 /** Os três espaços centrais de Ação, todos vazios. */
-export const criarSlotsDeAcao = (): SlotsDeAcao => [
-  slotDeAcaoVazio(INDICES_DE_ACAO[0] ?? 0),
-  slotDeAcaoVazio(INDICES_DE_ACAO[1] ?? 1),
-  slotDeAcaoVazio(INDICES_DE_ACAO[2] ?? 2),
-];
+export const criarSlotsDeAcao = (): SlotsDeAcao => slotsVazios();
 
 /**
  * Estado inicial de um jogador.
@@ -132,6 +121,7 @@ export const criarPartida = (configuracao: ConfiguracaoDaPartida): EstadoDaParti
   versoes: { rulesVersion: RULES_VERSION, cardDataVersion: configuracao.cardDataVersion },
   semente: configuracao.semente,
   situacao: 'aguardando-inicio',
+  primeiroJogador: null,
   jogadores: [
     criarEstadoDeJogador(configuracao.jogadores[0]),
     criarEstadoDeJogador(configuracao.jogadores[1]),

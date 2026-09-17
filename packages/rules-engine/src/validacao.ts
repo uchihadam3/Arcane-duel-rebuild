@@ -42,7 +42,7 @@ const validarSlotDeAcao = (slot: SlotDeAcao, posicao: number): readonly Problema
       problema: `índice ${String(slot.indice)} fora da posição ${String(posicao)}`,
     });
   }
-  if (slot.carta === null && slot.resposta.voluntaria !== null) {
+  if (slot.perfil === null && slot.resposta.voluntaria !== null) {
     problemas.push({
       campo: `acoes[${String(posicao)}].resposta`,
       problema: 'existe Resposta sem Ação à qual responder',
@@ -51,8 +51,19 @@ const validarSlotDeAcao = (slot: SlotDeAcao, posicao: number): readonly Problema
   return problemas;
 };
 
-/** Confere a estrutura do estado de um jogador. */
-export const validarEstadoDeJogador = (jogador: EstadoDeJogador): ValidacaoDeEstrutura => {
+/**
+ * Confere a estrutura do estado de um jogador.
+ *
+ * `cartasEmTransito` são habilidades dele que, no momento, não estão nem na
+ * mão nem no cooldown: uma Ação declarada e ainda não resolvida, ou uma carta
+ * de Reação já colocada sob a Ação do adversário. Elas continuam sendo parte
+ * das oito, e sem contá-las a composição pareceria quebrada durante a
+ * resolução.
+ */
+export const validarEstadoDeJogador = (
+  jogador: EstadoDeJogador,
+  cartasEmTransito: readonly string[] = [],
+): ValidacaoDeEstrutura => {
   const problemas: ProblemaDeEstrutura[] = [];
   const anotar = (campo: string, problema: string): void => {
     problemas.push({ jogador: jogador.id, campo, problema });
@@ -61,6 +72,7 @@ export const validarEstadoDeJogador = (jogador: EstadoDeJogador): ValidacaoDeEst
   const habilidades = [
     ...jogador.mao,
     ...ZONAS_DE_COOLDOWN.flatMap((zona) => jogador.cooldown[zona]),
+    ...cartasEmTransito,
   ];
   if (habilidades.length !== COMPOSICAO_DA_BUILD.habilidades) {
     anotar(
@@ -148,9 +160,33 @@ export const validarPartida = (partida: EstadoDaPartida): ValidacaoDeEstrutura =
   }
 
   for (const jogador of partida.jogadores) {
-    const resultado = validarEstadoDeJogador(jogador);
+    const resultado = validarEstadoDeJogador(jogador, cartasEmTransitoDe(partida, jogador));
     if (!resultado.ok) problemas.push(...resultado.erro);
   }
 
   return problemas.length === 0 ? sucesso(true) : falha(problemas);
+};
+
+/**
+ * Habilidades de um jogador que estão em jogo, fora da mão e do cooldown:
+ * a Ação que ele declarou e ainda não resolveu, e a carta de Reação que ele
+ * colocou sob uma Ação do adversário.
+ */
+const cartasEmTransitoDe = (
+  partida: EstadoDaPartida,
+  jogador: EstadoDeJogador,
+): readonly string[] => {
+  const proprias = jogador.acoes
+    .filter((slot) => slot.situacao === 'declarada' && slot.perfil !== null)
+    .map((slot) => slot.perfil?.carta ?? '');
+
+  const reacoes = partida.jogadores
+    .filter((outro) => outro.id !== jogador.id)
+    .flatMap((outro) => outro.acoes)
+    .filter((slot) => slot.situacao === 'declarada')
+    .map((slot) => slot.resposta.voluntaria)
+    .filter((resposta) => resposta?.tipo === 'carta-de-reacao')
+    .map((resposta) => (resposta?.tipo === 'carta-de-reacao' ? resposta.carta : ''));
+
+  return [...proprias, ...reacoes].filter((carta) => carta !== '');
 };

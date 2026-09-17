@@ -27,7 +27,7 @@ type Transicao<T> = Resultado<T, ErroDeTransicao>;
  */
 
 /** Ativa uma Carta de Classe: efeito renovável, carta girada para a horizontal. */
-export const ativarCartaDeClasse = (
+export const transicaoAtivarCartaDeClasse = (
   estado: EstadoDeCartaDeClasse,
 ): Transicao<EstadoDeCartaDeClasse> => {
   if (estado === 'exaurida') return falha('carta-ja-exaurida');
@@ -40,7 +40,7 @@ export const ativarCartaDeClasse = (
  * Só é legal enquanto a carta está Pronta — uma carta Ativada precisa voltar a
  * ficar Pronta antes de poder ser Exaurida.
  */
-export const exaurirCartaDeClasse = (
+export const transicaoExaurirCartaDeClasse = (
   estado: EstadoDeCartaDeClasse,
 ): Transicao<EstadoDeCartaDeClasse> => {
   if (estado === 'exaurida') return falha('carta-ja-exaurida');
@@ -57,11 +57,11 @@ export const prontificarCartaDeClasse = (estado: EstadoDeCartaDeClasse): EstadoD
   estado === 'exaurida' ? 'exaurida' : 'pronta';
 
 /** Revela uma Passiva face-down. Depois de revelada, ela permanece face-up. */
-export const revelarPassiva = (estado: EstadoDePassiva): Transicao<EstadoDePassiva> =>
+export const transicaoRevelarPassiva = (estado: EstadoDePassiva): Transicao<EstadoDePassiva> =>
   estado === 'oculta' ? sucesso('pronta') : falha('passiva-ja-revelada');
 
 /** Ativa uma Passiva já revelada: efeito renovável, carta girada para a horizontal. */
-export const ativarPassiva = (estado: EstadoDePassiva): Transicao<EstadoDePassiva> => {
+export const transicaoAtivarPassiva = (estado: EstadoDePassiva): Transicao<EstadoDePassiva> => {
   if (estado === 'oculta') return falha('passiva-ainda-oculta');
   if (estado !== 'pronta') return falha('passiva-nao-esta-pronta');
   return sucesso('ativada');
@@ -72,5 +72,5 @@ export const prontificarPassiva = (estado: EstadoDePassiva): EstadoDePassiva =>
   estado === 'oculta' ? 'oculta' : 'pronta';
 
 /** Consome a Ultimate. Ela só pode ser usada uma vez por partida. */
-export const consumirUltimate = (estado: EstadoDeUltimate): Transicao<EstadoDeUltimate> =>
+export const transicaoConsumirUltimate = (estado: EstadoDeUltimate): Transicao<EstadoDeUltimate> =>
   estado === 'disponivel' ? sucesso('consumida') : falha('ultimate-ja-consumida');

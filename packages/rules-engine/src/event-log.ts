@@ -4,14 +4,17 @@ import type { CarimboDeVersao, MatchId } from '@arcane-duel/shared-types';
  * Envelope de um evento canônico de partida.
  *
  * O log é a fonte de verdade de um replay: ele registra comandos e resultados
- * canônicos, não animações (FULL_GAME_SPEC.md §23). Os tipos concretos de
- * evento de combate entram junto com as regras universais, na próxima etapa.
+ * canônicos, não animações (FULL_GAME_SPEC.md §23).
+ *
+ * O envelope exige apenas a posição e o tipo. Os dados de cada evento ficam
+ * nos campos do próprio evento — os eventos universais do combate são planos,
+ * e obrigar uma `carga` genérica só acrescentaria um nível de aninhamento sem
+ * ganhar nada.
  */
-export interface EventoDePartida<TTipo extends string = string, TCarga = unknown> {
+export interface EventoDePartida<TTipo extends string = string> {
   /** Posição do evento no log, começando em 1 e sempre contígua. */
   readonly sequencia: number;
   readonly tipo: TTipo;
-  readonly carga: TCarga;
 }
 
 export interface CabecalhoDeReplay {

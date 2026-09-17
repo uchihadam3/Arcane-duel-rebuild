@@ -182,11 +182,11 @@ describe('projeção como função pura', () => {
     const emAndamento: EstadoDaPartida = {
       ...partida,
       situacao: 'em-andamento',
-      turno: { numero: 3, jogadorAtivo: ID_B },
+      turno: { numero: 3, jogadorAtivo: ID_B, iniciado: true },
     };
     const visao = projetarParaJogador(emAndamento, ID_A);
     expect(visao.situacao).toBe('em-andamento');
-    expect(visao.turno).toEqual({ numero: 3, jogadorAtivo: ID_B });
+    expect(visao.turno).toEqual({ numero: 3, jogadorAtivo: ID_B, iniciado: true });
     expect(visao.desfecho).toBeNull();
   });
 });

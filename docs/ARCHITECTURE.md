@@ -208,6 +208,124 @@ gatilhos simultâneos continuam sem regra no documento. A estrutura representa
 as situações — a ordem da tupla, `vencedor: null`, motivo `indefinido` — sem
 escolher por elas. Está registrado em [`AMBIGUIDADES.md`](AMBIGUIDADES.md).
 
+## Regras universais do combate
+
+O motor executa o ciclo de uma partida sem conhecer carta, classe ou
+interface. Quem declara uma Ação informa o **perfil impresso** da habilidade
+(`PerfilDeHabilidade`): custo, cooldown, Dano e Impacto. Assim as regras
+universais são testáveis antes de existir uma única carta real, e o catálogo
+entra depois sem tocar no motor.
+
+### Forma dos comandos
+
+Todo comando tem a mesma assinatura conceitual:
+
+```text
+(estado, argumentos) -> Resultado<{ partida, eventos }, ErroDeDominio>
+```
+
+Puro, sem mutação, com erro tipado. Não há command bus, fila nem despachante:
+a função é o comando.
+
+| Comando                                       | O que faz                                                      |
+| --------------------------------------------- | -------------------------------------------------------------- |
+| `iniciarPartida`                              | recebe quem começa, dá 2 de Reserva ao segundo, abre o turno 1 |
+| `iniciarTurno`                                | a rotina de início, uma vez por turno                          |
+| `declararAcao`                                | paga custos, tira da mão, ocupa o próximo espaço de Ação       |
+| `registrarResposta`                           | uma Resposta voluntária por Ação inimiga                       |
+| `registrarModificador`                        | acumula Dano e Impacto sobre a Ação antes de resolver          |
+| `resolverAcao`                                | a ordem canônica de resolução                                  |
+| `encerrarTurno`                               | a rotina de fim e a troca de jogador                           |
+| `revelarPassiva`, `ativarPassiva`             | Passiva oculta → pronta → ativada                              |
+| `ativarCartaDeClasse`, `exaurirCartaDeClasse` | efeito renovável e efeito extremo                              |
+| `consumirUltimate`                            | uma vez por partida                                            |
+
+`iniciarTurno` e `encerrarTurno` são separados de propósito: encerrar prepara a
+troca, não executa o início seguinte. O campo `turno.iniciado` é a trava que
+impede rodar a rotina duas vezes — o que duplicaria pontos de Ação e faria o
+cooldown pular um estágio.
+
+### Início de turno
+
+1. a Reserva que sobrou desaparece;
+2. os cinco pontos de Ação chegam;
+3. o segundo jogador recebe o Impulso Inicial, no primeiro turno dele;
+4. a Guarda volta para seis;
+5. Murchar é aplicado **depois** da recuperação e é removido por inteiro;
+6. o cooldown avança: CD1 para a mão, CD2 para CD1, CD3 para CD2;
+7. Passivas e Cartas de Classe Ativadas voltam a ficar Prontas;
+8. o contador de Ações do turno zera e os espaços de Ação são limpos.
+
+### Fim de turno
+
+1. a Queimadura tica: um de Vida a menos, um acúmulo a menos;
+2. até dois pontos de Ação não usados viram Reserva;
+3. o Impulso Inicial não usado desaparece — ele nunca vira Reserva;
+4. o turno passa para o adversário, ainda não iniciado.
+
+### Ação e Resposta
+
+O atacante declara, paga e ocupa um dos três espaços. A carta fica no espaço
+até a resolução, para o defensor poder responder. O espaço de Resposta tem um
+único campo, então duas Respostas voluntárias contra a mesma Ação não são
+representáveis: a Defesa Inata **ou** uma carta de Reação.
+
+Na resolução, a carta usada e a carta de Reação vão para os cooldowns delas, a
+Ação conta para o limite de três do turno e o Sangramento tica se aquela foi a
+segunda Ação.
+
+O efeito numérico de uma Resposta é texto de carta, e entra pelos
+modificadores. O motor universal só registra e cobra a Resposta.
+
+### Ruptura
+
+```text
+impacto final = impresso + modificadores
+guarda        = max(0, guarda - impacto)
+ruptura       = guarda antes > 0 e guarda depois == 0
+dano final    = impresso + modificadores + (ruptura ? 2 : 0)
+vida          = vida - dano
+```
+
+Impacto reduz só Guarda. Dano reduz só Vida. A Guarda nunca absorve Dano. Se a
+Guarda já estava em zero, não há Ruptura nova — não há de onde romper.
+
+Reduzir a própria Guarda como custo não é ação inimiga e não passa por essa
+resolução, então não provoca Ruptura. Mas a Guarda que sobrou continua
+rompível: um Ataque inimigo posterior que a leve a zero provoca Ruptura
+normalmente.
+
+### As quatro Condições
+
+| Condição    | Máximo | Quando                                    | O que faz                                             |
+| ----------- | ------ | ----------------------------------------- | ----------------------------------------------------- |
+| Queimadura  | 3      | fim do turno do afetado                   | perde 1 de Vida, diminui 1                            |
+| Lento       | 2      | ao pagar uma Ação                         | custa +1 AP; o acúmulo só cai quando o aumento é pago |
+| Murchar     | 2      | início do turno, após a Guarda voltar a 6 | reduz a Guarda pelo valor e é limpo por inteiro       |
+| Sangramento | 3      | ao concluir a **segunda** Ação do turno   | perde 1 de Vida, diminui 1                            |
+
+Dano de Condição não é Ataque: não passa pela resolução de Ação e não abre
+espaço de Resposta. O gatilho do Sangramento é concluir a segunda Ação, o que
+acontece uma vez por turno — a terceira Ação não repete, e o turno seguinte
+recomeça a contagem.
+
+### Erros de domínio
+
+`ErroDeDominio` é uma união discriminada por `tipo`, com o dado relevante
+junto: quanto faltou de AP, qual carta, qual espaço de Ação. Nenhum erro é
+distinguido por texto solto. O caso mais incomum é
+`interacao-nao-definida`, que existe para o motor **recusar** uma jogada cuja
+regra o documento não define, em vez de escolher uma interpretação — hoje só
+Lento com Impulso Inicial.
+
+### O que ainda não existe
+
+Nenhuma lógica específica de classe. Momentum, Mana, Devoção, Almas,
+Juramento, Brechas, Notas, Chi, Marca, Fúria, Forma e Preço Proibido têm
+estado desde a Etapa 1, mas nenhum deles é lido ou alterado pelo motor. As
+Defesas Inatas são registráveis como Resposta, sem efeito próprio. Nenhuma
+carta do catálogo foi implementada.
+
 ## Servidor
 
 `apps/game-server` é um esqueleto: ele responde diagnóstico e declara
