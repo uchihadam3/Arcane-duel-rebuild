@@ -10,7 +10,7 @@ import {
   reduzirNaResposta,
   somarAoAtaque,
 } from '../apoio.js';
-import { CHAVE } from '../chaves.js';
+import { CHAVE, ORIGEM_DO_TURNO } from '../chaves.js';
 import type { Contexto } from '../contexto.js';
 import { consumirLimitePorTurno, jogadorDo, slotDe } from '../contexto.js';
 import type {
@@ -964,7 +964,10 @@ export const marcasDoInicioDoTurno = (ctx: Contexto, jogador: PlayerId): void =>
   if (atual.recurso.classe !== 'paladino') return;
 
   if (atual.guarda >= REGRAS_UNIVERSAIS.guardaInicial) {
-    prometerAoProximoAtaque(ctx, jogador, id('PP02'), CHAVE.comecouTurnoComGuardaCheia, 1);
+    // A origem é o turno, e não a Passiva que lê a marca: uma Passiva ainda
+    // oculta não pode aparecer em nenhuma anotação, senão o adversário a
+    // descobre pela projeção antes de ela se revelar (§12).
+    prometerAoProximoAtaque(ctx, jogador, ORIGEM_DO_TURNO, CHAVE.comecouTurnoComGuardaCheia, 1);
   }
 };
 

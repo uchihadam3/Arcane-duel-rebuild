@@ -40,24 +40,42 @@ exatamente o que a matriz existe para mostrar.
 | Indicador                                      | Resultado |
 | ---------------------------------------------- | --------- |
 | Comandos ilegais                               | **0**     |
-| Invariantes quebradas                          | **0**     |
+| Invariantes de instantâneo quebradas           | **0**     |
+| Invariantes de transição quebradas             | **0**     |
 | Bloqueios de regra                             | 0         |
 | Partidas indefinidas                           | 0         |
 | Interrompidas pelo limite técnico de 60 turnos | 0         |
 | Turno médio                                    | 8,97      |
 
 As invariantes são conferidas em **todo** estado que o simulador produz, não só
-no final: faixas de Vida, Guarda, pontos de Ação, Reserva, Ações por turno e
-Condições; a conservação das quatro Almas do Necromante; as três pedras de Chi
-do Monge; o domínio de Brechas, Momentum e Mana; "Passiva nunca Exaure"; e a
-proibição de uma mesma carta estar em duas zonas ao mesmo tempo
+no final, e são de duas naturezas
 (`packages/gameplay/src/simulador/invariantes.ts`).
+
+**De instantâneo**, olhando um estado sozinho: Vida, Guarda e Reserva dentro das
+faixas; AP não negativo; Ações realizadas dentro das permitidas, com a quarta
+só quando o quarto espaço foi aberto por carta; Condições dentro do acúmulo
+máximo; a conservação das quatro Almas do Necromante nas três casas onde uma
+ficha pode estar — controladas, Cemitério e anexadas a um Servo; as três pedras
+de Chi do Monge, cada uma Pronta ou Gasta; Devoção, Juramento e Forma dentro das
+trilhas impressas; Marca da Presa e Preço Proibido booleanos; o domínio de
+Brechas, Momentum e Mana; "Passiva nunca Exaure"; nenhuma Passiva ainda oculta
+citada em anotação; e a proibição de uma mesma carta estar em duas zonas ao
+mesmo tempo.
+
+**De transição**, comparando dois estados consecutivos, porque são frases sobre
+o tempo e não sobre um estado: Carta de Classe Exaurida não volta ao campo nem
+sai das removidas, e Ultimate Consumida não volta a Disponível.
+
+Uma quebra de qualquer das duas invalida a matriz e faz o processo terminar com
+erro.
 
 ## Vitórias por classe
 
-Cada classe aparece em 24 partidas por adversário (12 adversários, contando o
-espelho, nas duas posições iniciais), somando 480 partidas. No espelho as duas
-vitórias são da mesma classe, então a coluna soma 40 por espelho.
+Cada par roda 20 partidas em cada uma das 2 posições iniciais, ou seja **40
+partidas por par**. Cada classe participa de 12 pares — 11 adversários mais o
+próprio espelho —, somando **480 partidas por classe**. No espelho as duas
+vitórias são da mesma classe, então aquele par sozinho já soma 40 na coluna de
+vitórias dela.
 
 | Classe      | Vitórias | Partidas |   % |
 | ----------- | -------: | -------: | --: |
@@ -208,11 +226,12 @@ Por isso o correto a concluir daqui é estreito:
    política que use Cartas de Classe, trilhas de estado e sequências — e essa
    política ainda não existe.
 
-## Um defeito real que a matriz encontrou
+## Defeitos reais que a matriz e as invariantes encontraram
 
-A matriz não é decorativa: ao rodar as doze classes juntas, ela expôs dois bugs
-que os testes de carta não pegariam, porque os dois só aparecem em combinações
-entre classes diferentes.
+A matriz não é decorativa: ao rodar as doze classes juntas, ela expôs bugs que
+os testes de carta não pegariam — uns porque só aparecem em combinações entre
+classes diferentes, outros porque um teste de carta olha o efeito, e não o
+estado inteiro que ele deixa para trás.
 
 1. **A Defesa Inata cobrava do defensor as escolhas da carta do atacante.**
    `responder` conferia as escolhas obrigatórias usando o perfil da Ação
@@ -225,3 +244,14 @@ entre classes diferentes.
    (`validacao.ts`) já considerava estado inválido. As quatro portas de perda
    de Vida — combate, Condições, perda direta e preço — passaram a parar em
    zero.
+3. **A Alma não voltava ao Cemitério quando o Servo era Exaurido.** O texto diz
+   que a Alma anexada "permanece até ser usada por aquele Servo **ou até o
+   Servo ser Exaurido**"; só a primeira metade existia, e a segunda, que não é
+   escolha e sim consequência, nunca tinha sido implementada. A reconciliação
+   agora roda no fim de cada Ação, para os dois lados.
+4. **Uma Passiva ainda oculta aparecia na projeção do adversário.** A rotina de
+   início de turno do Paladino gravava a marca "comecei com a Guarda cheia"
+   usando `PP02` como origem da anotação — e as anotações vão inteiras para a
+   projeção. O adversário descobria a Passiva antes de ela se revelar, contra
+   §12. A origem passou a ser `sistema:turno`, que é a quem o fato pertence, e
+   uma invariante nova recusa qualquer anotação que cite Passiva oculta.

@@ -94,8 +94,12 @@ export interface ConfiguracaoDaSimulacao {
    *
    * É por onde a conferência de invariantes entra sem o motor precisar saber o
    * que ela confere: o simulador observa, e quem observa decide o que fazer.
+   *
+   * Recebe também os eventos que produziram aquele estado, porque o log é o
+   * registro público da partida: quem quiser saber o que o adversário já viu
+   * pergunta a ele, e não ao estado.
    */
-  readonly observador?: (partida: EstadoDaPartida) => void;
+  readonly observador?: (partida: EstadoDaPartida, eventos: readonly EventoUniversal[]) => void;
 }
 
 const JOGADOR_A: PlayerId = playerId('jogador-a');
@@ -228,7 +232,7 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
   }): EstadoDaPartida => {
     eventos.push(...resultado.eventos);
     contar(acumulador, resultado.eventos);
-    configuracao.observador?.(resultado.partida);
+    configuracao.observador?.(resultado.partida, resultado.eventos);
     return resultado.partida;
   };
 

@@ -88,6 +88,37 @@ const conferirJogador = (quebras: string[], jogador: EstadoDeJogador): void => {
     }
   }
 
+  /*
+   * Passiva oculta não deixa rastro (§12).
+   *
+   * As anotações vão inteiras para a projeção do adversário, e cada uma carrega
+   * a carta que a criou. Se uma Passiva ainda oculta aparecer como origem, o
+   * adversário a descobre pela projeção antes de ela se revelar — e a Passiva
+   * deixa de ser uma carta virada para baixo.
+   *
+   * Marca de rotina de turno pertence ao turno: a origem dela é
+   * `sistema:turno`, não a Passiva que vai lê-la depois.
+   */
+  const ocultas = new Set<string>(
+    jogador.passivas
+      .filter((passiva) => passiva.estado === 'oculta')
+      .map((passiva) => passiva.carta),
+  );
+  for (const anotacao of jogador.anotacoes) {
+    if (ocultas.has(anotacao.origem)) {
+      quebras.push(
+        `${jogador.classe}: a anotação ${anotacao.chave} tem como origem a Passiva ainda oculta ${anotacao.origem}`,
+      );
+    }
+    for (const oculta of ocultas) {
+      if (anotacao.chave.includes(oculta)) {
+        quebras.push(
+          `${jogador.classe}: a chave ${anotacao.chave} cita a Passiva ainda oculta ${oculta}`,
+        );
+      }
+    }
+  }
+
   // Uma carta não pode estar em duas zonas ao mesmo tempo.
   const zonas = [
     ...jogador.mao,
