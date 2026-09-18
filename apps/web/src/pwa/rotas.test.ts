@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { CAMINHOS_SO_DE_REDE, comoRegex, excecoesDaNavegacao, rotaDosAssets } from './rotas.js';
+import {
+  CAMINHO_DA_SONDA,
+  CAMINHOS_SO_DE_REDE,
+  comoRegex,
+  excecoesDaNavegacao,
+  rotaDaSondaDeVersao,
+  rotaDosAssets,
+} from './rotas.js';
 
 /*
  * As rotas do service worker.
@@ -77,5 +84,49 @@ describe('exceções da navegação', () => {
     for (const caminho of CAMINHOS_SO_DE_REDE) expect(negada(`${caminho}x`)).toBe(true);
     // O documento e as rotas do próprio aplicativo continuam caindo no index.
     expect(negada(PAGES)).toBe(false);
+  });
+});
+
+describe('sonda de versão', () => {
+  /*
+   * A sonda responde "o endereço público já está nesta build?", e só serve se
+   * vier da rede. Ela mora sob `assets/` porque essa é a única exceção da
+   * navegação que existe sob o prefixo do Pages — inclusive no worker da
+   * primeira build, que é justamente o que prende um aparelho no passado.
+   */
+
+  it('fica dentro da única exceção da navegação que existe sob o prefixo', () => {
+    const [excecaoDosAssets] = excecoesDaNavegacao(PAGES);
+    expect(excecaoDosAssets?.test(`${PAGES}${CAMINHO_DA_SONDA}`)).toBe(true);
+  });
+
+  it('casa com o endereço publicado da sonda', () => {
+    expect(rotaDaSondaDeVersao(PAGES).test(`${ORIGEM}${PAGES}${CAMINHO_DA_SONDA}`)).toBe(true);
+  });
+
+  it('não casa com o documento, com os bundles nem com os PNGs aprovados', () => {
+    const rota = rotaDaSondaDeVersao(PAGES);
+    expect(rota.test(`${ORIGEM}${PAGES}`)).toBe(false);
+    expect(rota.test(`${ORIGEM}${PAGES}app/index-abc123.js`)).toBe(false);
+    expect(rota.test(`${ORIGEM}${PAGES}assets/hud/hud_health_bar_red.png`)).toBe(false);
+  });
+
+  it('é mais restrita que a rota dos assets, que também casaria com ela', () => {
+    /*
+     * É por isso que a ordem importa: as duas casam com a sonda, e o Workbox
+     * usa a primeira que casar. A de rede precisa vir antes.
+     */
+    const alvo = `${ORIGEM}${PAGES}${CAMINHO_DA_SONDA}`;
+    expect(rotaDosAssets(PAGES).test(alvo)).toBe(true);
+    expect(rotaDaSondaDeVersao(PAGES).test(alvo)).toBe(true);
+  });
+
+  it('não é ancorada, pelo mesmo motivo da rota dos assets', () => {
+    expect(rotaDaSondaDeVersao(PAGES).source.startsWith('^')).toBe(false);
+  });
+
+  it('escapa o ponto do nome do arquivo', () => {
+    // Sem escape, `versao.html` casaria com `versaoXhtml`.
+    expect(rotaDaSondaDeVersao(PAGES).test(`${ORIGEM}${PAGES}assets/versaoXhtml`)).toBe(false);
   });
 });

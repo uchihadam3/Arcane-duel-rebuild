@@ -25,6 +25,10 @@ const workflow = readFileSync(
   'utf8',
 );
 
+const raiz = readFileSync(fileURLToPath(new URL('../../../package.json', import.meta.url)), 'utf8');
+const scriptsDaRaiz = (JSON.parse(raiz) as { readonly scripts: Readonly<Record<string, string>> })
+  .scripts;
+
 describe('workflow de publicação', () => {
   it('publica a partir da main', () => {
     expect(workflow).toContain('branches: [main]');
@@ -89,6 +93,18 @@ describe('workflow de publicação', () => {
 
   it('confere o artefato antes de publicá-lo', () => {
     expect(workflow).toContain('node scripts/verificar-artefato-publicado.mjs');
+  });
+
+  it('gera a sonda de versão em toda build publicada', () => {
+    /*
+     * A sonda é o que permite conferir, de dentro de um aparelho com o
+     * aplicativo instalado, se o endereço público já mudou. Sem ela volta a
+     * ser impossível distinguir "o Pages está atrasado" de "o service worker
+     * deste aparelho está atrasado" — que foi exatamente a confusão que
+     * segurou o diagnóstico por dias.
+     */
+    expect(raiz).toContain('scripts/gerar-sonda-de-versao.mjs');
+    expect(scriptsDaRaiz.build).toContain('npm run sonda');
   });
 
   it('não depende de nenhum serviço externo de publicação', () => {

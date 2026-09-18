@@ -104,6 +104,37 @@ prova:
 3. o HTML servido em https://uchihadam3.github.io/Arcane-duel-rebuild/
    referencia o bundle daquela build.
 
+### A sonda de versão
+
+https://uchihadam3.github.io/Arcane-duel-rebuild/assets/versao.html
+
+Uma página minúscula, gerada a cada build por
+`scripts/gerar-sonda-de-versao.mjs`, que mostra o commit, o número da build e o
+bundle que o **endereço público** está servindo agora.
+
+Ela existe por causa de uma pergunta que nada mais respondia: quando o aparelho
+mostra uma build antiga, o atraso é da publicação ou do service worker
+instalado ali? Workflow verde não responde — prova que a publicação foi pedida,
+não o que o navegador recebe. E de dentro do aplicativo preso não dava para ver
+nada, porque tudo vinha do cache dele.
+
+Dois detalhes fazem a sonda funcionar, e os dois são verificados:
+
+- **Ela mora em `assets/`.** Esse é o único caminho sob o prefixo do Pages que
+  **todo** worker já publicado mantém fora do fallback de navegação — inclusive
+  o da primeira build, que é justamente o que prende um aparelho no passado.
+  Abrir esse endereço, mesmo de dentro do aplicativo instalado, passa pela rede.
+- **Ela é exclusiva de rede.** A rota dos assets é `StaleWhileRevalidate` e
+  também casa com o caminho da sonda, então uma rota `NetworkOnly` é registrada
+  **antes** dela. Uma sonda que pode responder de cache responderia a pergunta
+  errada. `npm run verify:sw` executa as rotas do `sw.js` gerado e confere a
+  estratégia **e a ordem**; `scripts/verificar-artefato-publicado.mjs` recusa a
+  publicação se a sonda faltar ou carregar outro commit.
+
+Se a sonda mostra o commit esperado e o aplicativo instalado mostra outro, o
+atraso é do aparelho: a correção é abrir o site numa aba anônima, ou limpar os
+dados do site e reinstalar o aplicativo.
+
 ### Do push ao aplicativo instalado
 
 Esta é a regra do projeto, e vale para todo merge ou push em `main`:
@@ -116,7 +147,7 @@ Esta é a regra do projeto, e vale para todo merge ou push em `main`:
 5. **não é necessário reinstalar o aplicativo.**
 
 O aplicativo instalado é sempre o mesmo produto do site. Não existe "versão
-PWA separada": o que está em `gh-pages` é o que o aplicativo mostra, e o
+PWA separada": o que o `deploy-pages` publicou é o que o aplicativo mostra, e o
 commit publicado aparece na própria tela para conferir isso sem adivinhação.
 
 #### Quando o cliente pergunta por versão nova

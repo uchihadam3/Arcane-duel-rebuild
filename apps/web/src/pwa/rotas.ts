@@ -29,6 +29,36 @@ export const rotaDosAssets = (prefixo: string): RegExp =>
   new RegExp(`${comoRegex(prefixo)}assets/`);
 
 /**
+ * O caminho da sonda de versão, relativo ao prefixo de publicação.
+ *
+ * Ela mora dentro de `assets/` de propósito, e o motivo é mecânico: `assets/`
+ * é a **única** exceção da navegação que existe sob o prefixo do Pages. Um
+ * documento pedido daí não é servido do `index.html` pré-cacheado, nem pelo
+ * worker desta build nem pelo da primeira — que já trazia a mesma exceção.
+ *
+ * É o que torna a sonda útil justamente quando ela é necessária: com um
+ * aplicativo instalado preso numa build antiga, este endereço continua vindo
+ * da rede e diz que versão o site público está servindo de verdade.
+ */
+export const CAMINHO_DA_SONDA = 'assets/versao.html';
+
+/**
+ * A rota da sonda, que precisa ser exclusiva de rede.
+ *
+ * Sem ela a sonda cairia na rota dos assets, que é StaleWhileRevalidate, e
+ * poderia responder de cache. Uma sonda que pode mentir é pior do que nenhuma:
+ * ela existe para responder "o site público está atualizado?" e a resposta tem
+ * de vir do site público.
+ *
+ * Registrada **antes** da rota dos assets — o Workbox usa a primeira rota que
+ * casa, e o padrão dos assets também casa com este caminho.
+ *
+ * Sem âncora, pela mesma razão explicada em `rotaDosAssets`.
+ */
+export const rotaDaSondaDeVersao = (prefixo: string): RegExp =>
+  new RegExp(comoRegex(`${prefixo}${CAMINHO_DA_SONDA}`));
+
+/**
  * O que a navegação **não** pode servir do documento do aplicativo.
  *
  * Diferente de `urlPattern`, a lista de exceções da navegação é testada contra

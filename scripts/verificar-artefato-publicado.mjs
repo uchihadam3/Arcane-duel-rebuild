@@ -87,6 +87,21 @@ exigir(
 exigir(existsSync(join(dist, '404.html')), 'falta 404.html, o fallback de rota do Pages');
 exigir(existsSync(join(dist, 'sw.js')), 'falta sw.js no artefato');
 
+/*
+ * 5. A sonda de versão vai junto, e diz a verdade.
+ *
+ * É o único jeito de conferir, de dentro de um aparelho com o aplicativo
+ * instalado, se o endereço público já mudou. Se ela faltar ou carregar o
+ * commit errado, ela responderia a pergunta errada — e uma sonda que mente é
+ * pior do que nenhuma.
+ */
+const sonda = join(dist, 'assets', 'versao.html');
+exigir(existsSync(sonda), 'falta assets/versao.html, a sonda de versão');
+if (existsSync(sonda)) {
+  const texto = readFileSync(sonda, 'utf8');
+  exigir(texto.includes(commitAtual), 'a sonda de versão não carrega o commit em construção');
+}
+
 if (falhas.length > 0) {
   console.error('\nartefato NÃO pode ser publicado:');
   for (const falha of falhas) console.error(`  - ${falha}`);
@@ -100,3 +115,4 @@ console.log('  "Jogar local" ......... presente');
 console.log('  Etapa 5 ............... presente');
 console.log('  textos da fundação .... ausentes');
 console.log('  404.html e sw.js ...... presentes');
+console.log('  sonda de versão ....... assets/versao.html');

@@ -67,7 +67,12 @@ const rotasDe = (fonte) => {
     const achou = fonte.indexOf(marca, de);
     if (achou === -1) return rotas;
     const argumento = primeiroArgumento(fonte, achou + marca.length);
-    if (argumento !== null) rotas.push(argumento);
+    if (argumento !== null) {
+      // O trecho seguinte carrega a estratégia da rota — é lá que se lê se ela
+      // é NetworkOnly ou StaleWhileRevalidate.
+      const fim = achou + marca.length + argumento.length;
+      rotas.push({ fonte: argumento, estrategia: fonte.slice(fim, fim + 160) });
+    }
     de = achou + marca.length;
   }
 };
@@ -109,9 +114,10 @@ const origem = 'https://uchihadam3.github.io';
 const urlDeAsset = new URL(`${origem}${BASE}assets/cards/frames/card_frame_attack_red.png`);
 const urlDeApi = new URL(`${origem}/api/partida`);
 const urlDeDocumento = new URL(`${origem}${BASE}`);
+const urlDaSonda = new URL(`${origem}${BASE}assets/versao.html`);
 
 const avaliadas = [];
-for (const fonte of rotasDe(sw)) {
+for (const { fonte, estrategia } of rotasDe(sw)) {
   if (fonte.startsWith('new ')) continue; // NavigationRoute, montada acima.
   let matcher;
   try {
@@ -129,9 +135,11 @@ for (const fonte of rotasDe(sw)) {
   try {
     avaliadas.push({
       fonte,
+      estrategia,
       asset: testar(urlDeAsset),
       api: testar(urlDeApi),
       documento: testar(urlDeDocumento),
+      sonda: testar(urlDaSonda),
     });
   } catch (erro) {
     falhas.push(
@@ -164,7 +172,27 @@ exigir(
   'a rota de API também casa com asset, e não deveria',
 );
 
-// 5. API, autenticação e socket nunca viram conteúdo estático.
+/*
+ * 5. A sonda de versão vem da rede, sempre.
+ *
+ * Ela existe para responder "o endereço público já está nesta build?". Servida
+ * de cache, responderia outra coisa. O padrão dos assets também casa com o
+ * caminho dela, e o Workbox usa a primeira rota que casar — então o que se
+ * confere aqui é a **ordem**: quem atende a sonda tem de ser a rota de rede.
+ */
+const primeiraDaSonda = avaliadas.find((rota) => rota.sonda);
+exigir(primeiraDaSonda !== undefined, 'nenhuma rota do worker atende assets/versao.html');
+exigir(
+  primeiraDaSonda === undefined || primeiraDaSonda.estrategia.includes('NetworkOnly'),
+  'a sonda de versão é atendida por uma estratégia de cache, e precisa vir da rede: ' +
+    `${primeiraDaSonda?.estrategia.slice(0, 60) ?? '(nenhuma)'}`,
+);
+exigir(
+  primeiraDaSonda === undefined || !primeiraDaSonda.asset,
+  'a rota que atende a sonda também atende os assets — ela está na ordem errada',
+);
+
+// 6. API, autenticação e socket nunca viram conteúdo estático.
 exigir(sw.includes('NetworkOnly'), 'o worker gerado não registra NetworkOnly');
 for (const caminho of ['/api/', '/auth/', '/socket']) {
   exigir(
@@ -197,5 +225,6 @@ if (falhas.length > 0) {
   console.log('  clientsClaim .............. presente');
   console.log('  identificador `base` livre  nenhum');
   console.log('  navegação ................. index.html');
+  console.log('  sonda de versão ........... NetworkOnly, antes dos assets');
   console.log(`  rotas avaliadas ........... ${String(avaliadas.length)}, nenhuma lançou`);
 }

@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 import { criarManifesto, normalizarBase } from './src/pwa/manifest';
-import { excecoesDaNavegacao, rotaDosAssets } from './src/pwa/rotas';
+import { excecoesDaNavegacao, rotaDaSondaDeVersao, rotaDosAssets } from './src/pwa/rotas';
 
 /**
  * A pasta `public/assets` é um espelho gerado de `/assets` na raiz do
@@ -142,6 +142,18 @@ export default defineConfig({
               url.pathname.startsWith('/api/') ||
               url.pathname.startsWith('/auth/') ||
               url.pathname.startsWith('/socket'),
+            handler: 'NetworkOnly',
+          },
+          {
+            /*
+             * A sonda de versão vem antes da rota dos assets porque o padrão
+             * dos assets também casa com ela, e o Workbox usa a primeira rota
+             * que casar.
+             *
+             * Exclusiva de rede: a sonda existe para responder "o site público
+             * está atualizado?", e uma resposta de cache não responde isso.
+             */
+            urlPattern: rotaDaSondaDeVersao(base),
             handler: 'NetworkOnly',
           },
           {
