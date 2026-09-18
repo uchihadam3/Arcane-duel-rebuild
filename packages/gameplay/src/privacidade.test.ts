@@ -5,6 +5,7 @@ import { projetarParaEspectador, projetarParaJogador } from '@arcane-duel/rules-
 
 import { RECEITAS_INICIAIS } from './receitas.js';
 import { JOGADOR_A, JOGADOR_B, simularPartida } from './simulador/motor.js';
+import { build, carta, duelo, jogador, jogar } from './teste-apoio.js';
 
 /*
  * Privacidade da projeção, nas doze classes.
@@ -37,10 +38,16 @@ const apareceEm = (texto: string, id: CardId): boolean =>
 /**
  * Identificadores citados por um evento.
  *
- * O log é o registro público da partida: uma carta citada nele é uma carta que
- * o adversário viu. É essa a fronteira certa entre privado e público — e não
- * "está na mão agora". Uma habilidade jogada, resolvida e depois devolvida à
- * mão continua sendo uma carta que o adversário assistiu ser jogada.
+ * Uma carta citada no log é uma carta que saiu da mão para uma zona à vista —
+ * declarada, respondida, mandada ao cooldown, revelada. É essa a fronteira
+ * certa entre privado e público, e não "está na mão agora": uma habilidade
+ * jogada, resolvida e depois devolvida à mão continua sendo uma carta que o
+ * adversário assistiu ser jogada.
+ *
+ * O critério é deliberadamente generoso com o que conta como público, para que
+ * a conferência não acuse falso positivo. Ele por isso **não** é a prova de
+ * que o log inteiro poderia ser entregue ao adversário: o log canônico é o
+ * registro do replay e carrega até a semente, que projeção nenhuma mostra.
  */
 const citadosPor = (evento: EventoUniversal): readonly string[] => {
   const citados: string[] = [];
@@ -215,4 +222,50 @@ describe('privacidade da projeção nas doze classes', () => {
       });
     });
   }
+});
+
+/*
+ * Defeito conhecido, provado aqui em vez de descrito.
+ *
+ * A regra de visibilidade não foi alterada nesta tarefa — o escopo pedia
+ * justamente que ela ficasse como está. O que este bloco faz é fixar o
+ * comportamento atual para que a correção não passe despercebida: quando o
+ * vazamento for fechado, estes testes quebram e obrigam a atualização.
+ *
+ * A regressão das doze classes acima não o encontra porque ela roda as
+ * Receitas 1, e `R13` não está na Receita 1 do Patrulheiro.
+ */
+describe('vazamento conhecido: Preparar Emboscada (R13)', () => {
+  const reservar = (): { readonly partida: EstadoDaPartida; readonly reservada: CardId } => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R01'] });
+    const base = duelo(patrulheiro, build('guerreiro'), JOGADOR_A);
+    const reservada = jogador(base, JOGADOR_A).mao.find(
+      (id) => id !== carta('R13') && id !== carta('R01'),
+    );
+    if (reservada === undefined) throw new Error('a mão do Patrulheiro não tem o que reservar');
+    const { partida } = jogar(base, JOGADOR_A, {
+      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: reservada } },
+    });
+    return { partida, reservada };
+  };
+
+  it('a carta reservada continua na mão, como o motor a modela', () => {
+    const { partida, reservada } = reservar();
+    expect(jogador(partida, JOGADOR_A).mao).toContain(reservada);
+  });
+
+  it('mas o adversário a enxerga, contra o "face-down" impresso na carta', () => {
+    const { partida, reservada } = reservar();
+    const texto = JSON.stringify(projetarParaJogador(partida, JOGADOR_B));
+
+    // Duas portas, as duas reais:
+    // 1. as escolhas do espaço de Ação vão inteiras para a projeção;
+    expect(texto).toContain(`"cartaDaMao":"${reservada}"`);
+    // 2. a chave da anotação carrega o identificador da carta reservada.
+    expect(texto).toContain(`ataque-emboscado:${reservada}`);
+
+    // Enquanto isso valer, a conferência geral acusaria aqui — e é esse o
+    // ponto: o defeito está provado, não escondido.
+    expect(apareceEm(texto, reservada)).toBe(true);
+  });
 });
