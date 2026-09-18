@@ -1038,10 +1038,11 @@ export const travaDaEmboscada = (
 };
 
 /**
- * Descontos do Patrulheiro: o Ataque emboscado e a Paciência do Caçador.
+ * O desconto da Emboscada, o mais estreito do catálogo.
  *
- * O desconto da Emboscada é o mais estreito do catálogo: só a carta reservada,
- * só armada, só na terceira Ação. Fora desses três, ele não existe.
+ * São três condições ao mesmo tempo: a carta reservada, a reserva armada e a
+ * terceira Ação. Fora delas, o desconto não existe. A Paciência do Caçador
+ * (R15) é outro desconto do Patrulheiro e segue pela promessa própria.
  */
 export const descontoDoPatrulheiro = (
   jogador: EstadoDeJogador,
