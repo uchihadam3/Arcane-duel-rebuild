@@ -31,3 +31,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Build temporário da verificação do service worker.
+dist-verificacao-sw/

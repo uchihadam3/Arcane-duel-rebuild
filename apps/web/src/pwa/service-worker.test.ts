@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { CAMINHOS_SO_DE_REDE } from './rotas.js';
+
 /*
  * Guardas da configuração do service worker.
  *
@@ -43,14 +45,38 @@ describe('configuração do service worker', () => {
 
   it('mantém NetworkOnly para API, autenticação e socket', () => {
     expect(config).toContain("handler: 'NetworkOnly'");
-    expect(config).toContain("url.pathname.startsWith('/api/')");
-    expect(config).toContain("url.pathname.startsWith('/auth/')");
-    expect(config).toContain("url.pathname.startsWith('/socket')");
+    for (const caminho of CAMINHOS_SO_DE_REDE) {
+      expect(config).toContain(`url.pathname.startsWith('${caminho}')`);
+    }
   });
 
   it('mantém o cache dos assets aprovados', () => {
     expect(config).toContain("handler: 'StaleWhileRevalidate'");
     expect(config).toContain("cacheName: 'arcane-duel-assets'");
+  });
+
+  /*
+   * A guarda do defeito que foi ao ar.
+   *
+   * O Workbox serializa `urlPattern` quando ele é função, e serializa só o
+   * corpo: o fechamento léxico fica para trás. Uma função que lia `base` daqui
+   * chegou ao `sw.js` publicado com o identificador livre, lançando
+   * ReferenceError em todo pedido que chegasse à rota.
+   *
+   * Esta é a guarda barata, que roda em `npm test`. A cara — que constrói o
+   * artefato e **executa** cada rota dele — é `npm run verify:sw`.
+   */
+  it('não passa função nenhuma que dependa do prefixo de publicação', () => {
+    expect(config).not.toMatch(/urlPattern:\s*\(\{ url \}\)[^\n]*\$\{base\}/);
+    expect(config).not.toMatch(/urlPattern:[^\n]*`[^`]*\$\{base\}/);
+  });
+
+  it('constrói a rota dos assets como expressão regular, com o valor embutido', () => {
+    expect(config).toContain('urlPattern: rotaDosAssets(base)');
+  });
+
+  it('monta as exceções da navegação a partir do mesmo módulo', () => {
+    expect(config).toContain('excecoesDaNavegacao(base)');
   });
 
   it('mantém o prefixo de publicação vindo de BASE_PATH', () => {

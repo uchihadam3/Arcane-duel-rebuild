@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 import { criarManifesto, normalizarBase } from './src/pwa/manifest';
+import { excecoesDaNavegacao, rotaDosAssets } from './src/pwa/rotas';
 
 /**
  * A pasta `public/assets` é um espelho gerado de `/assets` na raiz do
@@ -49,8 +50,6 @@ const descobrirBuild = (commit: string): string => {
   if (execucao !== undefined && execucao !== '') return `actions-${execucao}`;
   return commit === 'desconhecido' ? 'local' : `local-${commit.slice(0, 7)}`;
 };
-
-const comoRegex = (valor: string): string => valor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const commit = descobrirCommit();
 
@@ -124,16 +123,21 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         // Nada que não seja navegação pode cair no index.html, e nada
         // autenticado ou de partida pode ser servido do cache de navegação.
-        navigateFallbackDenylist: [
-          new RegExp(`^${comoRegex(base)}assets/`),
-          /^\/api\//,
-          /^\/auth\//,
-          /^\/socket/,
-        ],
+        navigateFallbackDenylist: [...excecoesDaNavegacao(base)],
         runtimeCaching: [
           {
             // Rede e só rede: sessão, partida, matchmaking e dados privados
             // nunca viram conteúdo estático.
+            /*
+             * Esta função é escrita com literais, e precisa continuar assim.
+             *
+             * Chamar um ajudante daqui — mesmo um importado deste repositório —
+             * repetiria o defeito que `src/pwa/rotas.ts` descreve: o Workbox
+             * serializa o corpo da função e o nome do ajudante fica livre,
+             * inexistente no escopo do worker. A lista canônica é
+             * `CAMINHOS_SO_DE_REDE`, e o teste confere que as duas não
+             * divergem.
+             */
             urlPattern: ({ url }) =>
               url.pathname.startsWith('/api/') ||
               url.pathname.startsWith('/auth/') ||
@@ -144,7 +148,9 @@ export default defineConfig({
             // Os PNGs aprovados aparecem na hora, vindos do cache, e a versão
             // nova é buscada em segundo plano — trocar um asset não exige
             // esperar a expiração do cache.
-            urlPattern: ({ url }) => url.pathname.startsWith(`${base}assets/`),
+            //
+            // RegExp, e não função: veja `src/pwa/rotas.ts`.
+            urlPattern: rotaDosAssets(base),
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'arcane-duel-assets',
