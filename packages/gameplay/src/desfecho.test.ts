@@ -17,7 +17,7 @@ const guerreiro = build('guerreiro', { habilidades: ['W18', 'W01', 'W02'] });
 const mago = build('mago', { habilidades: ['M01', 'M02', 'M11'] });
 
 describe('desfecho depois da perda direta de Vida', () => {
-  it('Ripostar levando o atacante de 1 para -1 encerra a partida', () => {
+  it('Ripostar levando o atacante de 1 a zero encerra a partida', () => {
     const inicial = duelo(guerreiro, mago, B);
     const partida = com(inicial, B, { vida: 1 });
 
@@ -26,7 +26,9 @@ describe('desfecho depois da perda direta de Vida', () => {
       resposta: { tipo: 'carta-de-reacao', carta: 'W18' as never },
     });
 
-    expect(jogador(depois, B).vida).toBe(-1);
+    // Ripostar tira 2 de uma Vida que valia 1: o excesso não vira Vida
+    // negativa, porque o estado com Vida negativa é inválido.
+    expect(jogador(depois, B).vida).toBe(0);
     expect(depois.situacao).toBe('encerrada');
     expect(depois.desfecho).toEqual({ vencedor: A, motivo: 'vida-zerada' });
   });

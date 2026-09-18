@@ -184,8 +184,22 @@ export const recusaDeEscolhas = (
   cartasDeClasse: readonly { readonly carta: CardId; readonly modo: 'ativar' | 'exaurir' }[],
 ): ErroDeDominio | null => {
   const daCarta = efeitoJogavel(consulta.perfil.carta).validarEscolhas?.(consulta) ?? null;
-  if (daCarta !== null) return daCarta;
+  return daCarta ?? recusaDeEscolhasSemACarta(consulta, cartasDeClasse);
+};
 
+/**
+ * A mesma conferência, **sem** a carta do `perfil`.
+ *
+ * A Defesa Inata não é carta: quem responde com ela não declarou habilidade
+ * nenhuma, e o `perfil` da consulta é o Ataque do adversário. Conferir as
+ * escolhas daquela carta contra as escolhas de quem se defende cobraria do
+ * defensor uma decisão que não é dele — o Necromante colhendo Almas com o
+ * Ataque **dele**, por exemplo.
+ */
+export const recusaDeEscolhasSemACarta = (
+  consulta: ConsultaDeCusto,
+  cartasDeClasse: readonly { readonly carta: CardId; readonly modo: 'ativar' | 'exaurir' }[],
+): ErroDeDominio | null => {
   for (const uso of cartasDeClasse) {
     const par = efeitoDeCartaDeClasse(uso.carta);
     if (par === undefined) continue;

@@ -3,6 +3,7 @@ import type {
   EscolhaPendente,
   EscolhasDaAcao,
   IndiceDeAcao,
+  Nota,
   PlayerId,
   ReforcoEscolhido,
   VisaoDaPartida,
@@ -62,10 +63,46 @@ const oAdversario = (visao: VisaoDaPartida, eu: PlayerId): VisaoDeJogador | unde
 const minhasCartas = (jogador: VisaoDeJogador): readonly CardId[] =>
   jogador.mao.flatMap((carta) => (carta.visivel ? [carta.carta] : []));
 
+/**
+ * Quanto do recurso de classe este jogador tem agora.
+ *
+ * As classes sem moeda — as que têm estado, sequência ou marcador em vez de
+ * ficha — devolvem zero: nenhuma carta delas cobra recurso, e as condições que
+ * o estado delas impõe são conferidas por `CONDICOES_IMPRESSAS`.
+ */
 const recursoDisponivel = (jogador: VisaoDeJogador): number => {
-  if (jogador.recurso.classe === 'mago') return jogador.recurso.mana;
-  return jogador.recurso.classe === 'guerreiro' ? jogador.recurso.momentum : 0;
+  const recurso = jogador.recurso;
+  switch (recurso.classe) {
+    case 'guerreiro':
+      return recurso.momentum;
+    case 'mago':
+      return recurso.mana;
+    case 'necromante':
+      return recurso.almasControladas;
+    case 'ladino':
+      return recurso.brechasNoAdversario;
+    case 'monge':
+      return recurso.chi.filter((pedra) => pedra === 'pronta').length;
+    default:
+      return 0;
+  }
 };
+
+const DEVOCAO: readonly string[] = ['vigilia', 'graca', 'fervor', 'milagre'];
+
+/** O Clérigo está em Graça ou acima? */
+const emGraca = (jogador: VisaoDeJogador): boolean =>
+  jogador.recurso.classe === 'clerigo' && DEVOCAO.indexOf(jogador.recurso.devocao) >= 1;
+
+const emMilagre = (jogador: VisaoDeJogador): boolean =>
+  jogador.recurso.classe === 'clerigo' && jogador.recurso.devocao === 'milagre';
+
+/** O Paladino está Resoluto ou Inabalável? */
+const resoluto = (jogador: VisaoDeJogador): boolean =>
+  jogador.recurso.classe === 'paladino' && jogador.recurso.juramento !== 'vacilante';
+
+const marcado = (jogador: VisaoDeJogador): boolean =>
+  jogador.recurso.classe === 'patrulheiro' && jogador.recurso.marcaDaPresa;
 
 /** O jogador consegue pagar o custo impresso desta carta agora? */
 const cabeNoOrcamento = (
@@ -76,7 +113,9 @@ const cabeNoOrcamento = (
   const custo = definicao.custo;
   if (custo === undefined) return false;
 
-  const recurso = custo.recurso?.quantidade ?? 0;
+  // A parcela fixa e a parcela variável cobram do mesmo recurso, e o mínimo
+  // impresso da variável é obrigatório.
+  const recurso = (custo.recurso?.quantidade ?? 0) + (custo.variavel?.minimo ?? 0);
   if (recurso > recursoDisponivel(jogador)) return false;
 
   if (custo.moeda === 'reserva') return jogador.reserva >= custo.valor;
@@ -106,11 +145,52 @@ const pontuarAcao = (definicao: DefinicaoDeCarta, adversario: VisaoDeJogador): n
   return valores.dano * 3 + valores.impacto * pesoDeImpacto + quebraAGuarda + bonusDeUltimate;
 };
 
-/** Restrições impressas que a política consegue conferir sozinha. */
-const respeitaOTexto = (definicao: DefinicaoDeCarta, adversario: VisaoDeJogador): boolean => {
-  if (definicao.id === ('W10' as CardId)) return adversario.guarda === 0;
-  return true;
+/*
+ * Restrições impressas que a política confere sozinha.
+ *
+ * Tudo aqui é informação pública — o que está escrito na carta e o que está
+ * visível na mesa. A tabela cobre as cartas das doze Receitas 1 que impõem
+ * condição de uso: sem ela, a política proporia comandos que o motor recusaria,
+ * e um comando ilegal invalida o lote inteiro.
+ */
+const CONDICOES_IMPRESSAS: Readonly<
+  Record<string, (eu: VisaoDeJogador, adversario: VisaoDeJogador) => boolean>
+> = {
+  // "Só pode ser usado se o inimigo estiver com Guarda 0."
+  W10: (_eu, adversario) => adversario.guarda === 0,
+  L06: (_eu, adversario) => adversario.guarda === 0,
+  // "Requer Graça ou mais."
+  C03: emGraca,
+  C04: emGraca,
+  C11: emGraca,
+  C13: emGraca,
+  C14: emGraca,
+  C15: emGraca,
+  // "Requer Milagre e consome Milagre."
+  CU01: emMilagre,
+  // "Requer Resoluto ou Inabalável."
+  P16: resoluto,
+  P19: resoluto,
+  // "Só contra alvo Marcado."
+  RU01: marcado,
 };
+
+/** A carta respeita as condições impressas que a política sabe conferir? */
+const respeitaOTexto = (
+  definicao: DefinicaoDeCarta,
+  jogador: VisaoDeJogador,
+  adversario: VisaoDeJogador,
+): boolean => CONDICOES_IMPRESSAS[definicao.id]?.(jogador, adversario) ?? true;
+
+/*
+ * Cartas cuja condição impressa a política não sabe satisfazer.
+ *
+ * A Última Canção exige "a terceira Ação com as 2 anteriores de Notas
+ * diferentes", e o Último Bastião do Paladino é uma Reação-Ultimate. Em vez de
+ * arriscar um comando ilegal, a política simplesmente não as joga — e o
+ * relatório diz que elas ficaram de fora.
+ */
+const FORA_DO_ALCANCE: readonly string[] = ['BU01'];
 
 const desempatar = <T>(opcoes: readonly T[], rng: Aleatorio): T | undefined => {
   if (opcoes.length <= 1) return opcoes[0];
@@ -133,7 +213,37 @@ const REDUCAO_DE_REACAO: Readonly<
   M18: { dano: 2, impacto: 1 },
   M19: { dano: 0, impacto: 0 },
   M20: { dano: 2, impacto: 2 },
+  C14: { dano: 2, impacto: 2 },
+  C15: { dano: 0, impacto: 3 },
+  N16: { dano: 0, impacto: 3 },
+  N17: { dano: 3, impacto: 0 },
+  P15: { dano: 0, impacto: 3 },
+  P16: { dano: 2, impacto: 2 },
+  P18: { dano: 0, impacto: 4 },
+  P19: { dano: 2, impacto: 1 },
+  L15: { dano: 3, impacto: 0 },
+  L17: { dano: 2, impacto: 3 },
+  B16: { dano: 2, impacto: 1 },
+  B17: { dano: 0, impacto: 3 },
+  MO16: { dano: 2, impacto: 2 },
+  MO17: { dano: 3, impacto: 0 },
+  R16: { dano: 3, impacto: 0 },
+  R17: { dano: 1, impacto: 2 },
+  BA16: { dano: 3, impacto: 0 },
+  BA17: { dano: 0, impacto: 3 },
+  D16: { dano: 2, impacto: 2 },
+  D17: { dano: 3, impacto: 0 },
+  BR16: { dano: 3, impacto: 0 },
+  BR17: { dano: 0, impacto: 3 },
 };
+
+/*
+ * Reações que só valem contra uma ameaça específica.
+ *
+ * "Só contra um Ataque que causaria Ruptura" é condição impressa: oferecer a
+ * carta fora dela seria comando ilegal.
+ */
+const REACOES_SO_CONTRA_RUPTURA: readonly string[] = ['W20', 'P18'];
 
 /**
  * Cria a política de base.
@@ -167,7 +277,8 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
       }
       if (definicao.comportaComo === 'reacao') return;
       if (!cabeNoOrcamento(definicao, jogador, jogador.condicoes.lento)) return;
-      if (!respeitaOTexto(definicao, adversario)) return;
+      if (FORA_DO_ALCANCE.includes(definicao.id)) return;
+      if (!respeitaOTexto(definicao, jogador, adversario)) return;
 
       const escolhas = escolhasParaAcao(definicao, jogador);
       if (escolhas === null) return;
@@ -218,8 +329,9 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
       // Contrafeitiço só responde a Técnica; Último Bastião só a um Ataque que
       // causaria Ruptura. As duas restrições estão impressas e são públicas.
       if (carta === ('M19' as CardId) && !ehTecnica) continue;
-      if (carta === ('W20' as CardId) && !ameacaDeRuptura) continue;
+      if (REACOES_SO_CONTRA_RUPTURA.includes(carta) && !ameacaDeRuptura) continue;
       if (ehTecnica && carta !== ('M19' as CardId)) continue;
+      if (!respeitaOTexto(definicao, jogador, adversario)) continue;
 
       const reducao = REDUCAO_DE_REACAO[carta] ?? { dano: 0, impacto: 0 };
       const util =
@@ -254,8 +366,7 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
     if (valorDaAnotacao(jogador.anotacoes, CHAVE.defesaInataUsada) > 0) {
       return { tipo: 'sem-resposta' };
     }
-    const podePagar = jogador.recurso.classe !== 'mago' || jogador.recurso.mana >= 1;
-    if (!podePagar) return { tipo: 'sem-resposta' };
+    if (!defesaInataPagavel(jogador)) return { tipo: 'sem-resposta' };
 
     // A Guarda Marcial reduz 1 D **ou** 1 I, e a escolha é do jogador: a
     // política a manda explicitamente, como um cliente faria.
@@ -268,6 +379,32 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
 
   escolherPendencia: (_visao, _eu, pendente, rng) => desempatar(pendente.opcoes, rng),
 });
+
+/**
+ * A Defesa Inata desta classe pode ser paga agora?
+ *
+ * Cada uma cobra o que está impresso: Mana, Alma, Chi, Guarda, Vida, Devoção —
+ * ou preço nenhum. Oferecê-la sem poder pagar seria comando ilegal.
+ */
+const defesaInataPagavel = (jogador: VisaoDeJogador): boolean => {
+  const recurso = jogador.recurso;
+  switch (recurso.classe) {
+    case 'mago':
+      return recurso.mana >= 1;
+    case 'clerigo':
+      return emGraca(jogador);
+    case 'necromante':
+      return recurso.almasControladas >= 1;
+    case 'monge':
+      return recurso.chi.some((pedra) => pedra === 'pronta');
+    case 'barbaro':
+      return jogador.guarda >= 1;
+    case 'bruxo':
+      return jogador.vida > 1;
+    default:
+      return true;
+  }
+};
 
 /** A linha de base oficial: PRNG só para desempate. */
 export const POLITICA_DE_BASE: Politica = criarPoliticaDeBase(0);
@@ -282,6 +419,22 @@ export const POLITICA_DE_BASE: Politica = criarPoliticaDeBase(0);
  */
 
 const RUNAS_DO_MAGO: readonly string[] = ['MC01', 'MC02', 'MC03', 'MC04', 'MC05', 'MC06'];
+
+/** Cartas que imprimem "colha até N Almas", com o N impresso. */
+const ALMAS_COLHIDAS: Readonly<Record<string, number>> = {
+  N09: 2,
+  N10: 2,
+  NU03: 3,
+};
+
+const NOTAS: readonly Nota[] = ['pulso', 'melodia', 'harmonia'];
+
+/** A primeira Nota diferente da última tocada neste turno. */
+const notaQueMudaACadencia = (jogador: VisaoDeJogador): Nota => {
+  const sequencia = jogador.recurso.classe === 'bardo' ? jogador.recurso.sequenciaDeNotas : [];
+  const ultima = sequencia[sequencia.length - 1];
+  return NOTAS.find((nota) => nota !== ultima) ?? 'pulso';
+};
 
 const runasAtivadasNaVisao = (jogador: VisaoDeJogador): readonly CardId[] =>
   jogador.cartasDeClasse
@@ -302,6 +455,8 @@ const escolhasParaAcao = (
     cartaDeClasse?: CardId;
     cartaEmCooldown?: CardId;
     cartasEmCooldown?: readonly CardId[];
+    almasColhidas?: number;
+    nota?: Nota;
   } = {};
 
   // "gaste até N" e "1 a 3": a linha de base gasta o mínimo impresso, sempre o
@@ -323,6 +478,30 @@ const escolhasParaAcao = (
 
   if (definicao.id === ('MU03' as CardId)) {
     escolhas.cartasEmCooldown = jogador.cooldown[1].slice(0, 2);
+  }
+
+  // "Escolha uma carta sua em CD2 ou CD3": sem carta lá, a Técnica não tem o
+  // que fazer e a política não a joga.
+  if (definicao.id === ('N12' as CardId)) {
+    const alvo = jogador.cooldown[2][0] ?? jogador.cooldown[3][0];
+    if (alvo === undefined) return null;
+    escolhas.cartaEmCooldown = alvo;
+  }
+
+  // "Colha até N Almas": colher é ganho sem contrapartida, então a linha de
+  // base colhe o máximo que o Cemitério permite — o mesmo critério das
+  // Passivas que colhem na revelação.
+  const colheita = ALMAS_COLHIDAS[definicao.id];
+  if (colheita !== undefined) {
+    const cemiterio =
+      jogador.recurso.classe === 'necromante' ? jogador.recurso.almasNoCemiterio : 0;
+    escolhas.almasColhidas = Math.min(colheita, cemiterio);
+  }
+
+  // "Escolha Pulso, Melodia ou Harmonia": a Nota que rende Cadência é a que
+  // difere da última tocada, e a sequência do turno é pública.
+  if (definicao.id === ('B11' as CardId)) {
+    escolhas.nota = notaQueMudaACadencia(jogador);
   }
 
   // O reforço é exigido por várias cartas e Passivas, e recusado por duas —

@@ -70,6 +70,7 @@ import {
   descontosDaDeclaracao,
   despachar,
   recusaDeEscolhas,
+  recusaDeEscolhasSemACarta,
   recusaDeLegalidade,
   verificarRevelacoes,
 } from './pipeline.js';
@@ -781,7 +782,7 @@ export const responder = (
       recursoPrevisto: 0,
       acaoRespondida: perfilDaAcao,
     };
-    const faltaNaDefesa = recusaDeEscolhas(consultaDaDefesa, usosDaDefesa);
+    const faltaNaDefesa = recusaDeEscolhasSemACarta(consultaDaDefesa, usosDaDefesa);
     if (faltaNaDefesa !== null) return falha(faltaNaDefesa);
 
     const erro = aplicar(

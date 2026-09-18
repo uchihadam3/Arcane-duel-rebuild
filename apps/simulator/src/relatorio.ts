@@ -1,4 +1,4 @@
-import type { ResumoDeLado, ResumoDoLote } from '@arcane-duel/gameplay';
+import type { ResumoDaMatriz, ResumoDeLado, ResumoDoLote } from '@arcane-duel/gameplay';
 
 /*
  * Formatação do resumo de um lote.
@@ -76,3 +76,53 @@ export const formatarResumo = (resumo: ResumoDoLote): string =>
     '',
     ...linhasDeUso(resumo.usoPorCarta),
   ].join('\n');
+
+/*
+ * O relatório da matriz de doze por doze.
+ *
+ * Ele é descritivo: mostra o que aconteceu e não recomenda mudança nenhuma. A
+ * coluna "começou" existe porque começar é vantagem estrutural conhecida (§7) e
+ * um número só esconderia isso.
+ */
+
+const porcentagem = (parte: number, total: number): string =>
+  total === 0 ? '  0%' : `${String(Math.round((parte / total) * 100)).padStart(3, ' ')}%`;
+
+export const formatarMatriz = (resumo: ResumoDaMatriz): string => {
+  const linhas: string[] = [
+    `semente ..................... ${resumo.semente}`,
+    `classes ..................... ${String(resumo.classes.length)}`,
+    `configurações ............... ${String(resumo.configuracoes)}`,
+    `partidas .................... ${String(resumo.partidas)}`,
+    `turno médio ................. ${resumo.turnoMedio.toFixed(2)}`,
+    `indefinidas ................. ${String(resumo.indefinidas)}`,
+    `interrompidas por limite .... ${String(resumo.interrompidasPorLimiteTecnico)}`,
+    `bloqueios de regra .......... ${String(resumo.bloqueiosDeRegra)}`,
+    `comandos ilegais ............ ${String(resumo.comandosIlegais)}`,
+    `invariantes quebradas ....... ${String(resumo.invariantesQuebradas.length)}`,
+    '',
+    'vitórias por classe (os dois lados somados)',
+  ];
+
+  for (const classe of resumo.classes) {
+    const vitorias = resumo.vitoriasPorClasse[classe] ?? 0;
+    const partidas = resumo.partidasPorClasse[classe] ?? 0;
+    linhas.push(
+      `  ${classe.padEnd(13, '.')} ${String(vitorias).padStart(4, ' ')} / ${String(partidas).padStart(4, ' ')}  ${porcentagem(vitorias, partidas)}`,
+    );
+  }
+
+  linhas.push('', 'pares (A x B — vitórias de A, vitórias de B, começou venceu)');
+  for (const par of resumo.pares) {
+    linhas.push(
+      `  ${`${par.classeA} x ${par.classeB}`.padEnd(28, '.')} ${String(par.vitoriasDeA).padStart(4, ' ')} ${String(par.vitoriasDeB).padStart(4, ' ')}  ${porcentagem(par.vitoriasDeQuemComecou, par.partidas)}  turno ${par.turnoMedio.toFixed(1)}`,
+    );
+  }
+
+  for (const quebra of resumo.invariantesQuebradas) linhas.push(`  INVARIANTE: ${quebra}`);
+  for (const ilegal of resumo.exemplosDeComandoIlegal) {
+    linhas.push(`  ILEGAL: ${JSON.stringify(ilegal)}`);
+  }
+
+  return linhas.join('\n');
+};

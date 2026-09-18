@@ -1,148 +1,64 @@
 # Identificadores de carta
 
-Cada carta tem um código estável. O código é a **identidade** da carta, não a
-posição dela em uma lista: reordenar um arquivo de dados não pode trocar o
-código de nada. Um replay antigo fala desses códigos, e um código reaproveitado
-transformaria um replay em uma partida diferente.
+Todo identificador do catálogo é uma string estável, imutável e única. Ele é a
+chave que liga as três metades de uma carta: o dado (`packages/card-data`), o
+comportamento (`packages/gameplay/src/efeitos`) e o asset
+(`packages/ui/src/assets`). Renomear um identificador é quebrar replay, teste e
+arte ao mesmo tempo — então identificador não se renomeia.
 
-`packages/card-data/src/catalogo.test.ts` prende cada código ao nome impresso.
-Trocar um nome sem trocar o código, ou vice-versa, quebra a verificação.
+## Formato
 
-## Como os códigos são formados
+```
+<prefixo da classe><marcador de tipo><número de dois dígitos>
+```
 
-| Prefixo                      | Significa                                                  |
-| ---------------------------- | ---------------------------------------------------------- |
-| `W` / `M`                    | Guerreiro / Mago                                           |
-| `W01`–`W20`, `M01`–`M20`     | as vinte habilidades, exatamente como no `CARD_CATALOG.md` |
-| `WP01`–`WP10`, `MP01`–`MP10` | as dez Passivas                                            |
-| `WC01`–`WC06`, `MC01`–`MC06` | as seis Cartas de Classe                                   |
-| `WU01`–`WU03`, `MU01`–`MU03` | as três Ultimates                                          |
+O marcador de tipo é vazio para habilidade, `P` para Passiva, `C` para Carta de
+Classe e `U` para Ultimate. O número é sempre de dois dígitos, começando em
+`01`, na ordem em que a carta aparece em `docs/CARD_CATALOG.md`.
 
-Os códigos das habilidades vêm do próprio `CARD_CATALOG.md`. Os demais não
-existiam no documento — ele lista Passivas, Cartas de Classe e Ultimates por
-nome — e foram atribuídos **uma única vez**, na ordem em que o documento as
-apresenta. A partir daqui a ordem do documento é irrelevante: o que vale é a
-tabela abaixo.
+| Classe      | Prefixo | Habilidades   | Passivas        | Cartas de Classe | Ultimates       |
+| ----------- | ------- | ------------- | --------------- | ---------------- | --------------- |
+| Guerreiro   | `W`     | `W01`–`W20`   | `WP01`–`WP10`   | `WC01`–`WC06`    | `WU01`–`WU03`   |
+| Mago        | `M`     | `M01`–`M20`   | `MP01`–`MP10`   | `MC01`–`MC06`    | `MU01`–`MU03`   |
+| Clérigo     | `C`     | `C01`–`C20`   | `CP01`–`CP10`   | `CC01`–`CC06`    | `CU01`–`CU03`   |
+| Necromante  | `N`     | `N01`–`N20`   | `NP01`–`NP10`   | `NC01`–`NC06`    | `NU01`–`NU03`   |
+| Paladino    | `P`     | `P01`–`P20`   | `PP01`–`PP10`   | `PC01`–`PC06`    | `PU01`–`PU03`   |
+| Ladino      | `L`     | `L01`–`L20`   | `LP01`–`LP10`   | `LC01`–`LC06`    | `LU01`–`LU03`   |
+| Bardo       | `B`     | `B01`–`B20`   | `BP01`–`BP10`   | `BC01`–`BC06`    | `BU01`–`BU03`   |
+| Monge       | `MO`    | `MO01`–`MO20` | `MOP01`–`MOP10` | `MOC01`–`MOC06`  | `MOU01`–`MOU03` |
+| Patrulheiro | `R`     | `R01`–`R20`   | `RP01`–`RP10`   | `RC01`–`RC06`    | `RU01`–`RU03`   |
+| Bárbaro     | `BA`    | `BA01`–`BA20` | `BAP01`–`BAP10` | `BAC01`–`BAC06`  | `BAU01`–`BAU03` |
+| Druida      | `D`     | `D01`–`D20`   | `DP01`–`DP10`   | `DC01`–`DC06`    | `DU01`–`DU03`   |
+| Bruxo       | `BR`    | `BR01`–`BR20` | `BRP01`–`BRP10` | `BRC01`–`BRC06`  | `BRU01`–`BRU03` |
 
-## Guerreiro
+## Por que alguns prefixos têm duas letras
 
-| Código | Carta                  | Tipo            |
-| ------ | ---------------------- | --------------- |
-| W01    | Corte de Sondagem      | Ataque          |
-| W02    | Ombro de Guerra        | Ataque          |
-| W03    | Quebra-Escudo          | Ataque          |
-| W04    | Corte Ascendente       | Ataque          |
-| W05    | Golpe do Carrasco      | Ataque          |
-| W06    | Sequência Brutal       | Ataque          |
-| W07    | Finta Cortante         | Ataque          |
-| W08    | Golpe de Cerco         | Ataque          |
-| W09    | Corte Encadeado        | Ataque          |
-| W10    | Ataque de Oportunidade | Ataque          |
-| W11    | Pressão Implacável     | Técnica         |
-| W12    | Disciplina de Aço      | Técnica         |
-| W13    | Finta Calculada        | Técnica         |
-| W14    | Guarda Preparada       | Técnica         |
-| W15    | Aparar                 | Reação          |
-| W16    | Base Firme             | Reação          |
-| W17    | Absorver o Golpe       | Reação          |
-| W18    | Ripostar               | Reação          |
-| W19    | Interposição           | Reação          |
-| W20    | Último Bastião         | Reação          |
-| WP01   | Instinto de Ferro      | Passiva         |
-| WP02   | Sangue Aceso           | Passiva         |
-| WP03   | Leitura de Combate     | Passiva         |
-| WP04   | Predador de Ruptura    | Passiva         |
-| WP05   | Dor em Força           | Passiva         |
-| WP06   | Mestre da Defesa       | Passiva         |
-| WP07   | Pressão de Veterano    | Passiva         |
-| WP08   | Mão Pesada             | Passiva         |
-| WP09   | Olho na Abertura       | Passiva         |
-| WP10   | Guarda de Veterano     | Passiva         |
-| WC01   | Postura da Fortaleza   | Carta de Classe |
-| WC02   | Postura da Vanguarda   | Carta de Classe |
-| WC03   | Postura do Duelista    | Carta de Classe |
-| WC04   | Cerco Metódico         | Carta de Classe |
-| WC05   | Contraofensiva         | Carta de Classe |
-| WC06   | Ritmo de Batalha       | Carta de Classe |
-| WU01   | Quebra-Reinos          | Ultimate        |
-| WU02   | Última Palavra         | Ultimate        |
-| WU03   | Sequência do Campeão   | Ultimate        |
+`M` já era do Mago quando o Monge entrou, e `B` já era do Bardo quando o Bárbaro
+e o Bruxo entraram. Em vez de renomear cartas que já tinham dado, comportamento,
+teste e asset, as classes novas ganharam prefixo de duas letras: `MO`, `BA` e
+`BR`. O Patrulheiro usa `R` (de _Ranger_) porque `P` é do Paladino.
 
-## Mago
+Nenhum prefixo é prefixo de outro em uma mesma família de tipo — `B01` e `BA01`
+não colidem, e `BP01`, `BAP01` e `BRP01` são três Passivas distintas —, e um
+teste do catálogo confere que os 468 identificadores são únicos.
 
-Todas as habilidades e as Ultimates do Mago carregam o traço `feitico`.
-"Feitiço" é traço impresso ao lado do tipo, nunca um quarto tipo universal.
+## Identificadores que não são cartas
 
-| Código | Carta                    | Tipo            |
-| ------ | ------------------------ | --------------- |
-| M01    | Dardo Arcano             | Ataque/Feitiço  |
-| M02    | Bola de Fogo             | Ataque/Feitiço  |
-| M03    | Chama Persistente        | Ataque/Feitiço  |
-| M04    | Pulso Cinético           | Ataque/Feitiço  |
-| M05    | Lança Arcana             | Ataque/Feitiço  |
-| M06    | Estilhaço de Gelo        | Ataque/Feitiço  |
-| M07    | Onda Glacial             | Ataque/Feitiço  |
-| M08    | Rajada Prismática        | Ataque/Feitiço  |
-| M09    | Orbe Instável            | Ataque/Feitiço  |
-| M10    | Explosão de Mana         | Ataque/Feitiço  |
-| M11    | Canalizar                | Técnica/Feitiço |
-| M12    | Concentração Prismática  | Técnica/Feitiço |
-| M13    | Distorção Temporal       | Técnica/Feitiço |
-| M14    | Recalibrar Runa          | Técnica/Feitiço |
-| M15    | Barreira de Mana         | Reação/Feitiço  |
-| M16    | Imagem Espelhada         | Reação/Feitiço  |
-| M17    | Égide Cinética           | Reação/Feitiço  |
-| M18    | Armadura de Gelo         | Reação/Feitiço  |
-| M19    | Contrafeitiço            | Reação/Feitiço  |
-| M20    | Barreira Prismática      | Reação/Feitiço  |
-| MP01   | Reserva Arcana           | Passiva         |
-| MP02   | Mente Calculista         | Passiva         |
-| MP03   | Véu Prismático           | Passiva         |
-| MP04   | Eco Rúnico               | Passiva         |
-| MP05   | Concentração sob Pressão | Passiva         |
-| MP06   | Combustão Controlada     | Passiva         |
-| MP07   | Frio Calculado           | Passiva         |
-| MP08   | Geometria Rúnica         | Passiva         |
-| MP09   | Reserva de Contramedidas | Passiva         |
-| MP10   | Núcleo Sobrecarregado    | Passiva         |
-| MC01   | Runa de Cinzas           | Carta de Classe |
-| MC02   | Runa da Geada            | Carta de Classe |
-| MC03   | Runa do Eco              | Carta de Classe |
-| MC04   | Runa da Égide            | Carta de Classe |
-| MC05   | Runa do Conduíte         | Carta de Classe |
-| MC06   | Runa Prismática          | Carta de Classe |
-| MU01   | Meteoro                  | Ultimate        |
-| MU02   | Zero Absoluto            | Ultimate        |
-| MU03   | Sobrecarga Temporal      | Ultimate        |
+Duas famílias de identificador existem fora do catálogo jogável e **nunca**
+aparecem nele:
 
-## Personagem: identidade técnica, não carta
+- `personagem:<classe>` — a identidade técnica do Personagem, usada como origem
+  de efeito da classe. O `CARD_CATALOG.md` ainda não traz as cartas de
+  Personagem, e o catálogo jogável não as inventa (ver `AMBIGUIDADES.md`, 37).
+- `sistema:<nome>` — origem de efeito que pertence ao motor e não a uma carta:
+  `sistema:turno` para as rotinas de turno e `sistema:guarda-marcial`,
+  `sistema:veu-profano` e as outras dez para as Defesas Inatas, que são regra de
+  classe e não cartas (§8).
 
-O `CARD_CATALOG.md` **não fornece dados de Personagem** para classe nenhuma:
-não há custo, valores, cooldown nem texto impresso para transcrever. Inventar
-esses dados seria criar carta, e isso a Etapa 3 proíbe explicitamente.
+## Contagem
 
-O estado da partida, porém, exige um Personagem (§3, §4). As duas coisas ficam
-separadas: o **catálogo jogável** tem 39 cartas por classe e nenhuma delas é
-Personagem; a **identidade técnica** do Personagem vive no descritor da classe,
-em `packages/card-data/src/classes.ts`, como identificador e nada mais.
-
-| Classe             | Identificador do Personagem |
-| ------------------ | --------------------------- |
-| Guerreiro          | `personagem:guerreiro`      |
-| Mago               | `personagem:mago`           |
-| demais dez classes | `personagem:<classe>`       |
-
-`CATALOGO.porId('personagem:guerreiro')` devolve `undefined` de propósito, e
-`perfilDaCarta` também: o Personagem não é jogado de lugar nenhum, e a build o
-valida contra o descritor da classe em vez de contra o catálogo. Quando o
-documento trouxer as cartas de Personagem com os dados reais, elas entram no
-catálogo e o descritor passa a apontar para elas.
-
-## Identificadores que não são carta
-
-Algumas anotações de efeito nascem de uma mecânica de classe, e não de uma
-carta. Elas usam identificadores de sistema, fora do catálogo de propósito:
-`sistema:momentum`, `sistema:mana`, `sistema:guarda-marcial`,
-`sistema:barreira-arcana` e `sistema:turno`. Nenhum deles é procurável no
-catálogo, e é assim que se distingue "isto veio de uma carta" de "isto é a
-mecânica da classe".
+Doze classes × 39 cartas jogáveis = **468**. Por classe: 20 habilidades,
+10 Passivas, 6 Cartas de Classe e 3 Ultimates. A composição é conferida carta a
+carta em `packages/card-data/src/catalogo.test.ts`, contra uma tabela de nomes
+transcrita à mão do `CARD_CATALOG.md` — uma segunda leitura independente do
+documento, de propósito.

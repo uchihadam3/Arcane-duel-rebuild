@@ -17,6 +17,14 @@ export interface Argumentos {
    * para medir distribuição e precisa ser pedido explicitamente.
    */
   readonly exploracao: number;
+  /**
+   * Roda a matriz de doze por doze em vez de um lote de um par só.
+   *
+   * Nesse modo, `partidas` passa a ser o número de partidas **por
+   * configuração**: 78 pares não ordenados em duas posições iniciais dão 156
+   * configurações.
+   */
+  readonly matriz: boolean;
 }
 
 export const PADRAO: Argumentos = {
@@ -25,6 +33,7 @@ export const PADRAO: Argumentos = {
   limiteDeTurnos: 60,
   formato: 'texto',
   exploracao: 0,
+  matriz: false,
 };
 
 const inteiro = (valor: string | undefined, atual: number, nome: string): number => {
@@ -42,6 +51,7 @@ export const lerArgumentos = (argumentos: readonly string[]): Argumentos => {
   let limiteDeTurnos = PADRAO.limiteDeTurnos;
   let formato = PADRAO.formato;
   let exploracao = PADRAO.exploracao;
+  let matriz = PADRAO.matriz;
 
   for (let indice = 0; indice < argumentos.length; indice += 1) {
     const atual = argumentos[indice];
@@ -65,6 +75,8 @@ export const lerArgumentos = (argumentos: readonly string[]): Argumentos => {
       }
       exploracao = fracao;
       indice += 1;
+    } else if (atual === '--matrix' || atual === '--matriz') {
+      matriz = true;
     } else if (atual === '--json') {
       formato = 'json';
     } else if (atual?.startsWith('--') === true) {
@@ -72,5 +84,5 @@ export const lerArgumentos = (argumentos: readonly string[]): Argumentos => {
     }
   }
 
-  return { partidas, semente, limiteDeTurnos, formato, exploracao };
+  return { partidas, semente, limiteDeTurnos, formato, exploracao, matriz };
 };

@@ -187,7 +187,7 @@ export const restaurarGuarda = (jogador: EstadoDeJogador, quantidade: number): E
  */
 export const perderVida = (jogador: EstadoDeJogador, quantidade: number): EstadoDeJogador => ({
   ...jogador,
-  vida: jogador.vida - semNegativo(quantidade),
+  vida: semNegativo(jogador.vida - semNegativo(quantidade)),
 });
 
 /** Remove acúmulo de uma Condição, sem passar de zero. */
@@ -290,7 +290,9 @@ export const perderVidaComoCusto = (
   jogador: EstadoDeJogador,
   quantidade: number,
 ): PerdaDeVidaComoCusto => {
-  const perdido = semNegativo(quantidade);
+  // A Vida não desce abaixo de zero: o estado com Vida negativa é inválido
+  // (validacao.ts) e o desfecho já se decide em zero.
+  const perdido = Math.min(semNegativo(quantidade), jogador.vida);
   return { jogador: { ...jogador, vida: jogador.vida - perdido }, perdido };
 };
 

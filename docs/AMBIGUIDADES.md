@@ -254,3 +254,74 @@ inventado.
     atual nenhuma Ação consegue produzi-la: as duas cartas que tiram Vida depois
     só disparam quando o Dano final foi zero, ou seja, quando o defensor
     sobreviveu.
+44. **"Uma vez em cada rodada" virou uma vez em cada turno.** Sete Passivas de
+    cinco classes — Virtuose, Canção Inesquecível, Voto Cumprido, Passos
+    Invisíveis, Mestre das Armadilhas, Pacto Profundo e Maldição Persistente —
+    limitam o efeito a "a primeira vez em cada rodada". O documento não define
+    rodada em lugar nenhum: o estado tem número de turno e jogador ativo, e
+    nada que marque onde uma rodada começa ou termina. O motor lê a frase como
+    "uma vez em cada turno", que é o limite que o estado sabe representar, e o
+    faz de forma idêntica nas sete. Se o documento definir rodada depois, muda
+    uma função só (`consumirLimitePorTurno`) e as sete acompanham.
+45. **Ordem entre o texto da carta e os preços que a acompanham.** Três coisas
+    podem tirar Vida do Bruxo no mesmo instante de declaração: o Preço Proibido
+    (mecânica de classe), o texto da própria carta ("pode perder 1 Vida para
+    receber +2 D") e um Pacto ou Passiva ("perca 3 Vida e o Ataque recebe
+    +4 D"). Cartas como a Seta Sombria perguntam "já perdeu Vida por efeito
+    próprio neste turno?", e a resposta depende de qual desses saiu primeiro. O
+    documento não fixa a ordem. O motor fixa uma só, e a mesma para todas as
+    classes: o preço da **mecânica de classe** sai junto do custo, antes de
+    qualquer texto; depois o texto da carta declarada; depois as Cartas de
+    Classe; depois as Passivas. Na prática, a Seta Sombria enxerga o Preço
+    Proibido e **não** enxerga o preço do Pacto de Sangue Exaurido, e há teste
+    fixando os dois lados.
+46. **A Vida não fica negativa.** Um Ataque de 6 D contra 1 de Vida deixava o
+    estado com −5. O documento fala em "a Vida chega a zero" e a validação do
+    próprio motor já tratava Vida negativa como estado inválido, mas as quatro
+    portas de perda — resolução de combate, tique de Condição, perda direta e
+    preço pago — não paravam em zero. Agora param, nas quatro. O Dano relatado
+    continua sendo o número cheio: quem causou 6 causou 6, e é isso que os
+    gatilhos leem; o que para em zero é a Vida no estado.
+47. **A Defesa Inata não é carta e não carrega escolha de carta.** Ao responder
+    com a Defesa Inata, o motor conferia as escolhas obrigatórias contra o
+    perfil da **Ação inimiga** — e portanto cobrava do defensor uma decisão que
+    pertencia ao atacante ("colha até 2 Almas", do Necromante). A conferência da
+    Defesa Inata passou a olhar só o que é de quem se defende: as Cartas de
+    Classe que ele usou na Resposta e as Passivas reveladas dele. O documento
+    não descreve esse protocolo — ele é consequência de a Defesa Inata não ser
+    carta (§8).
+48. **"Colha até N Almas" é escolha, e a linha de base colhe o máximo.** Onde o
+    texto diz "até", quem joga escolhe quanto, e o motor exige a escolha em vez
+    de completar a frase. A política do simulador precisa escolher alguma coisa:
+    ela colhe o máximo que o Cemitério permite, porque colher Alma não tem
+    contrapartida impressa. Isso é decisão **da política**, registrada aqui para
+    não ser confundida com regra: o motor continua sem escolher no lugar de
+    ninguém.
+49. **Canção da Marcha Exaurida é inalcançável com três Ações.** O texto pede "a
+    terceira Ação depois de ter produzido 2 Cadências", e a segunda Cadência só
+    nasce da própria terceira Ação: com três Ações por turno, a condição nunca
+    se satisfaz. O motor não a relaxa nem inventa uma quarta Ação — ele recusa
+    com `condicao-de-uso-nao-satisfeita`, e há teste fixando a recusa. Se o
+    documento quis dizer "depois de 1 Cadência", é mudança de texto da carta, e
+    mudança de texto é decisão humana.
+50. **Boca do Abismo: "restaure 1 Vida **ou** deixe Pronta sua Maldição".** A
+    escolha só importa se o Ataque causar Ruptura, mas a decisão precisa chegar
+    junto do comando — depois da resolução não há janela de comando para o
+    atacante. O motor exige a escolha na declaração sempre que existir Maldição
+    Ativada para prontificar, e dispensa a exigência quando não existe, porque
+    aí a metade da Vida é a única metade jogável. Campo próprio e fechado
+    (`escolhaDoAbismo: 'vida' | 'maldicao'`), para que o motor não escolha.
+51. **"Remova 1 Condição negativa" é sempre do próprio Clérigo.** Prece de
+    Purificação e as outras cartas com essa frase não dizem de quem. Como
+    remover Condição negativa do adversário seria um presente, e o resto da
+    carta cuida de quem a joga ("se não houver nenhuma, restaure 2 Vida"), o
+    motor lê a frase como auto-alvo e exige a escolha entre as Condições
+    negativas **do próprio jogador**. Se o documento quis dizer o adversário, é
+    outra carta.
+52. **Preparar Emboscada não cria uma zona nova.** O texto manda "coloque 1
+    Ataque da mão face-down no terceiro espaço de Ação", reservado para o
+    próximo turno. O estado não tem zona de carta face-down fora da mão, e
+    inventar uma mudaria a projeção, o replay e a contagem de zonas. O motor
+    modela a reserva como marcação: a carta continua na mão, fica anotada como
+    reservada para a terceira Ação do próximo turno e sai 1 AP mais barata lá.
+    O efeito jogável é o impresso; o que não existe é a zona física.

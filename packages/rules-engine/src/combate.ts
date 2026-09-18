@@ -127,7 +127,10 @@ export const resolverAtaque = (
   const dano = fixado === null || fixado === undefined ? calculado : semNegativo(fixado);
 
   const vidaAntes = alvo.vida;
-  const vidaDepois = vidaAntes - dano;
+  // "A Vida chega a zero": ela não passa disso. Um Ataque que causaria mais
+  // Dano do que a Vida restante continua causando o Dano que a carta diz —
+  // `dano` é o número impresso na resolução —, mas o estado para em zero.
+  const vidaDepois = semNegativo(vidaAntes - dano);
 
   return {
     alvo: { ...alvo, guarda: guardaDepois, vida: vidaDepois },

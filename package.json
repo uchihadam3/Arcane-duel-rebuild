@@ -21,6 +21,8 @@
     "typecheck": "node scripts/typecheck.mjs",
     "build": "npm run typecheck && npm run build --workspace @arcane-duel/web",
     "simulate": "tsc --build tsconfig.build.json && node apps/simulator/dist/index.js",
+    "simulate:matrix": "tsc --build tsconfig.build.json && node apps/simulator/dist/index.js --matrix --games 20",
+    "simulate:matrix:smoke": "tsc --build tsconfig.build.json && node apps/simulator/dist/index.js --matrix --games 1",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

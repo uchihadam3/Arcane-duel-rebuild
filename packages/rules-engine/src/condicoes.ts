@@ -50,7 +50,7 @@ export const resolverQueimadura = (jogador: EstadoDeJogador): PerdaDeVida => {
   return {
     jogador: {
       ...jogador,
-      vida: jogador.vida - 1,
+      vida: Math.max(0, jogador.vida - 1),
       condicoes: { ...jogador.condicoes, queimadura: restante },
     },
     vidaPerdida: 1,
@@ -73,7 +73,7 @@ export const resolverSangramento = (jogador: EstadoDeJogador): PerdaDeVida => {
   return {
     jogador: {
       ...jogador,
-      vida: jogador.vida - 1,
+      vida: Math.max(0, jogador.vida - 1),
       condicoes: { ...jogador.condicoes, sangramento: restante },
     },
     vidaPerdida: 1,

@@ -89,6 +89,13 @@ export interface ConfiguracaoDaSimulacao {
   readonly politicaA?: Politica;
   readonly politicaB?: Politica;
   readonly limiteDeTurnos?: number;
+  /**
+   * Observador chamado em **todo** estado que a partida produz.
+   *
+   * É por onde a conferência de invariantes entra sem o motor precisar saber o
+   * que ela confere: o simulador observa, e quem observa decide o que fazer.
+   */
+  readonly observador?: (partida: EstadoDaPartida) => void;
 }
 
 const JOGADOR_A: PlayerId = playerId('jogador-a');
@@ -221,6 +228,7 @@ export const simularPartida = (configuracao: ConfiguracaoDaSimulacao): Relatorio
   }): EstadoDaPartida => {
     eventos.push(...resultado.eventos);
     contar(acumulador, resultado.eventos);
+    configuracao.observador?.(resultado.partida);
     return resultado.partida;
   };
 
