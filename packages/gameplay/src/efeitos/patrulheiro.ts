@@ -22,6 +22,7 @@ import {
   exigirCartaEntre,
   lerPromessa,
   prometerAoProximoAtaque,
+  prometerEmSegredo,
 } from './comum.js';
 
 /*
@@ -346,7 +347,11 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       aposResolver: (ctx, alvo) => {
         const escolhida = escolhasDaAcao(ctx, alvo).cartaDaMao;
         if (escolhida === undefined) return;
-        prometerAoProximoAtaque(
+        // A chave carrega o identificador do Ataque reservado, e o texto diz
+        // "face-down": o estado canônico precisa saber qual é, o adversário
+        // não pode. A anotação nasce privada e a projeção não a copia para
+        // quem não é o dono.
+        prometerEmSegredo(
           ctx,
           alvo.atacante,
           alvo.origem,

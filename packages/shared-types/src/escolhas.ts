@@ -135,3 +135,65 @@ export interface EscolhasDaAcao {
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};
+
+/*
+ * De onde cada escolha tira a informação que ela carrega.
+ *
+ * Uma escolha é um dado que o jogador manda junto com o comando, e o espaço de
+ * Ação a guarda. Quase todas apontam para coisas que estão à vista na mesa —
+ * uma carta em cooldown, uma Carta de Classe face-up, uma Condição, um número.
+ * Algumas apontam para zona secreta, e essas não podem atravessar a projeção.
+ *
+ * A tabela é exaustiva por construção: `Record<keyof EscolhasDaAcao, ...>`
+ * obriga quem acrescentar um campo a dizer de onde ele vem. É essa exigência,
+ * e não uma lista de exceções, que impede o próximo campo privado de vazar por
+ * esquecimento.
+ */
+
+export type OrigemDaEscolha =
+  /** Está à vista na mesa: cooldown, campo, trilha, número, opção impressa. */
+  | 'publica'
+  /** Aponta para a mão, que é zona secreta. Nunca atravessa a projeção. */
+  | 'zona-secreta'
+  /**
+   * Aponta para uma Passiva do próprio escolhedor.
+   *
+   * Privada só enquanto aquela Passiva estiver oculta: depois de revelada ela
+   * é carta virada para cima, e esconder a escolha seria esconder o que já é
+   * público.
+   */
+  | 'passiva-propria';
+
+export const ORIGEM_DAS_ESCOLHAS: Readonly<Record<keyof EscolhasDaAcao, OrigemDaEscolha>> = {
+  // Números, opções impressas e decisões que o texto manda anunciar.
+  recursoAdicional: 'publica',
+  reforco: 'publica',
+  condicao: 'publica',
+  forma: 'publica',
+  precoProibido: 'publica',
+  vidaOferecida: 'publica',
+  precoDaPassiva: 'publica',
+  escolhaDoAbismo: 'publica',
+  guardaReduzida: 'publica',
+  bonusDoMilagre: 'publica',
+  almasColhidas: 'publica',
+  usarAlmaAnexada: 'publica',
+  divisao: 'publica',
+  descontoDeRecurso: 'publica',
+  descerEstado: 'publica',
+  nota: 'publica',
+  disciplinaDoPasso: 'publica',
+  passoDeKata: 'publica',
+  explorarMarca: 'publica',
+  // Cartas de Classe e Servos começam face-up no campo (§13).
+  cartaDeClasse: 'publica',
+  servo: 'publica',
+  // O cooldown é zona física à vista, do dono e do adversário (§11).
+  cartaEmCooldown: 'publica',
+  cartasEmCooldown: 'publica',
+  cartaAdversariaEmCooldown: 'publica',
+  // "Escolha 1 Ataque da mão": a mão é a única zona secreta do jogo (§20).
+  cartaDaMao: 'zona-secreta',
+  // Uma Passiva própria, que pode estar virada para baixo (§12).
+  passiva: 'passiva-propria',
+};

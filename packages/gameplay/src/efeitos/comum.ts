@@ -34,6 +34,31 @@ export const prometerAoProximoAtaque = (
   registrarAnotacao(ctx, jogador, { chave, origem, escopo, valor });
 };
 
+/**
+ * A mesma promessa, mas guardando informação que só o dono pode conhecer.
+ *
+ * Existe para o punhado de textos que trabalham com zona secreta — "coloque
+ * face-down" — e cuja anotação, por isso, não pode ser copiada para a visão do
+ * adversário. Usar esta função é uma decisão consciente de privacidade, e é por
+ * isso que ela é uma função à parte em vez de um parâmetro fácil de esquecer.
+ */
+export const prometerEmSegredo = (
+  ctx: Contexto,
+  jogador: PlayerId,
+  origem: CardId,
+  chave: string,
+  valor: number,
+  escopo: EscopoDaAnotacao = 'turno',
+): void => {
+  registrarAnotacao(ctx, jogador, {
+    chave,
+    origem,
+    escopo,
+    valor,
+    visibilidade: 'privada-do-dono',
+  });
+};
+
 /** Lê e apaga uma promessa guardada, devolvendo quanto ela valia. */
 export const consumirPromessa = (ctx: Contexto, jogador: PlayerId, chave: string): number => {
   const atual = jogadorDo(ctx, jogador);

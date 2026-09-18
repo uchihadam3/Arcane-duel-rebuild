@@ -24,6 +24,21 @@ import type { CardId } from './ids.js';
  */
 export type EscopoDaAnotacao = 'acao' | 'turno' | 'partida';
 
+/**
+ * Quem pode conhecer a anotação.
+ *
+ * Quase toda anotação nasce de um texto que resolveu em público — "seu próximo
+ * Ataque recebe +2 I" —, e quem assistiu à Ação já sabe dela. Essas são
+ * `publica`, que é o padrão.
+ *
+ * `privada-do-dono` existe para o caso oposto: a anotação guarda informação de
+ * zona secreta, como a carta que Preparar Emboscada reservou **face-down**. O
+ * estado canônico precisa dela para funcionar; o adversário não pode recebê-la.
+ * A projeção a remove inteira em vez de mascarar o conteúdo — não há campo
+ * nenhum de onde o identificador vazar.
+ */
+export type VisibilidadeDaAnotacao = 'publica' | 'privada-do-dono';
+
 export interface AnotacaoDeEfeito {
   /** Chave documentada pelo módulo de classe que a escreve. */
   readonly chave: string;
@@ -31,6 +46,12 @@ export interface AnotacaoDeEfeito {
   readonly origem: CardId;
   readonly escopo: EscopoDaAnotacao;
   readonly valor: number;
+  /**
+   * Ausente quer dizer `publica`: a esmagadora maioria das anotações nasce de
+   * texto que resolveu à vista de todos, e obrigar cada uma das centenas de
+   * chamadas a repetir isso só esconderia as poucas que importam.
+   */
+  readonly visibilidade?: VisibilidadeDaAnotacao;
 }
 
 export type Anotacoes = readonly AnotacaoDeEfeito[];
@@ -53,6 +74,14 @@ export const comAnotacao = (anotacoes: Anotacoes, nova: AnotacaoDeEfeito): Anota
 
 export const semAnotacoesDaChave = (anotacoes: Anotacoes, chave: string): Anotacoes =>
   anotacoes.filter((anotacao) => anotacao.chave !== chave);
+
+/** A anotação guarda informação que só o dono pode conhecer? */
+export const anotacaoEhPrivada = (anotacao: AnotacaoDeEfeito): boolean =>
+  anotacao.visibilidade === 'privada-do-dono';
+
+/** Só as anotações que qualquer observador pode receber. */
+export const anotacoesPublicas = (anotacoes: Anotacoes): Anotacoes =>
+  anotacoes.filter((anotacao) => !anotacaoEhPrivada(anotacao));
 
 /** Descarta as anotações cujo escopo terminou. */
 export const expirarAnotacoes = (anotacoes: Anotacoes, escopo: EscopoDaAnotacao): Anotacoes =>

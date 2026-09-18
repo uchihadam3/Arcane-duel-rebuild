@@ -325,3 +325,26 @@ inventado.
     modela a reserva como marcação: a carta continua na mão, fica anotada como
     reservada para a terceira Ação do próximo turno e sai 1 AP mais barata lá.
     O efeito jogável é o impresso; o que não existe é a zona física.
+
+    Duas consequências que o modelo deixa em aberto, registradas aqui para não
+    passarem por implementadas: a marcação não força a carta a ser a **terceira**
+    Ação, e ela é de escopo `partida`, então a reserva não expira "até o fim
+    daquele turno" — o desconto espera pela carta. "Volta à mão" já está
+    satisfeito de graça, porque a carta nunca saiu de lá. Fechar as duas é
+    mudança de mecânica, não de privacidade.
+
+    A privacidade, essa sim, é fechada: o texto diz **face-down**, então a
+    escolha `cartaDaMao` e a anotação que carrega o identificador não
+    atravessam a projeção para o adversário nem para o espectador (item 53).
+
+53. **Escolhas e anotações têm visibilidade, porque nem toda informação do
+    estado é pública.** O estado canônico precisa saber o que Preparar Emboscada
+    reservou; o adversário não pode. Até aqui a projeção copiava os espaços de
+    Ação e as anotações praticamente inteiros, e o identificador vazava por dois
+    caminhos ao mesmo tempo — `escolhas.cartaDaMao` e a chave
+    `ataque-emboscado:<carta>`. O documento não descreve esse protocolo: ele é
+    consequência de §20 e §32 ("o cliente nunca recebe o estado canônico") e do
+    "face-down" impresso na carta. O motor passou a distinguir, por tipo, a
+    origem de cada escolha (`ORIGEM_DAS_ESCOLHAS`) e a visibilidade de cada
+    anotação (`publica` ou `privada-do-dono`), e a visão ganhou tipos próprios
+    para os espaços de Ação em vez de reaproveitar os canônicos.

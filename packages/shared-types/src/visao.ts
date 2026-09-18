@@ -1,7 +1,9 @@
 import type { CardId, ClassId, MatchId, PlayerId } from './ids.js';
-import type { ZonaDeCooldown } from './cards.js';
+import type { PerfilDeHabilidade, ZonaDeCooldown } from './cards.js';
+import type { IndiceDeAcao } from './zones.js';
 import type { Anotacoes } from './anotacoes.js';
 import type { EstadoDePassiva } from './card-state.js';
+import type { EscolhasDaAcao } from './escolhas.js';
 import type { RecursoDeClasse } from './recursos-de-classe.js';
 import type { CarimboDeVersao } from './versions.js';
 import type {
@@ -9,9 +11,12 @@ import type {
   DesfechoDaPartida,
   EstadoDeCondicoes,
   EstadoDoTurno,
+  ModificadoresDaAcao,
+  RespostaVoluntaria,
+  SituacaoDaAcao,
   SituacaoDaPartida,
-  SlotsDeAcao,
   UltimateEquipada,
+  UsoDeCartaDeClasseNaAcao,
 } from './estado-de-partida.js';
 
 /*
@@ -38,6 +43,57 @@ export interface PassivaProjetada {
   readonly carta: CartaProjetada;
 }
 
+/*
+ * Os espaços de Ação como um observador os enxerga.
+ *
+ * Eles são declarados campo a campo, de propósito, em vez de reaproveitarem o
+ * `SlotDeAcao` canônico. Reaproveitar era cômodo e foi exatamente o que deixou
+ * `escolhas.cartaDaMao` — o Ataque que Preparar Emboscada guardou face-down —
+ * atravessar para o adversário. Com a lista explícita, um campo novo no estado
+ * canônico **não** aparece na visão até alguém decidir que pode.
+ */
+
+/**
+ * As escolhas de uma Ação ou de uma Resposta, já filtradas.
+ *
+ * Tem o formato do canônico porque toda escolha é opcional, mas o conteúdo é
+ * outro: o que aponta para zona secreta simplesmente não está aqui, e não está
+ * mascarado — a chave não existe no objeto.
+ */
+export type EscolhasProjetadas = EscolhasDaAcao;
+
+export interface SlotDeRespostaProjetado {
+  readonly voluntaria: RespostaVoluntaria | null;
+  /** As escolhas de quem respondeu, filtradas para este observador. */
+  readonly escolhas: EscolhasProjetadas;
+}
+
+export interface SlotDeAcaoProjetado {
+  readonly indice: IndiceDeAcao;
+  readonly situacao: SituacaoDaAcao;
+  readonly perfil: PerfilDeHabilidade | null;
+  /** As escolhas de quem declarou, filtradas para este observador. */
+  readonly escolhas: EscolhasProjetadas;
+  readonly resposta: SlotDeRespostaProjetado;
+  readonly modificadores: ModificadoresDaAcao;
+  readonly reducaoDaResposta: ModificadoresDaAcao;
+  readonly danoFinalDefinido: number | null;
+  readonly impactoFinalDefinido: number | null;
+  readonly impedirRuptura: boolean;
+  readonly bonusDeRupturaSubstituto: number | null;
+  readonly bonusAposReducao: number;
+  readonly textoCancelado: boolean;
+  readonly recursoGasto: number;
+  readonly cartasDeClasseUsadas: readonly UsoDeCartaDeClasseNaAcao[];
+}
+
+export type SlotsDeAcaoProjetados = readonly [
+  SlotDeAcaoProjetado,
+  SlotDeAcaoProjetado,
+  SlotDeAcaoProjetado,
+  SlotDeAcaoProjetado,
+];
+
 export interface VisaoDeJogador {
   readonly id: PlayerId;
   readonly classe: ClassId;
@@ -59,10 +115,11 @@ export interface VisaoDeJogador {
   readonly cartasDeClasse: readonly CartaDeClasseEquipada[];
   readonly ultimate: UltimateEquipada;
 
-  readonly acoes: SlotsDeAcao;
+  readonly acoes: SlotsDeAcaoProjetados;
   readonly acoesPermitidasNoTurno: number;
   readonly condicoes: EstadoDeCondicoes;
   readonly recurso: RecursoDeClasse;
+  /** Só as anotações que este observador pode conhecer. */
   readonly anotacoes: Anotacoes;
   readonly removidas: readonly CardId[];
 }

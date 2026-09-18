@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { CardId, EstadoDaPartida, PlayerId, VisaoDaPartida } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EstadoDaPartida,
+  PlayerId,
+  SlotDeAcao,
+  VisaoDaPartida,
+} from '@arcane-duel/shared-types';
 import type { EventoUniversal } from '@arcane-duel/rules-engine';
+import { ORIGEM_DAS_ESCOLHAS } from '@arcane-duel/shared-types';
 import { projetarParaEspectador, projetarParaJogador } from '@arcane-duel/rules-engine';
 
 import { RECEITAS_INICIAIS } from './receitas.js';
 import { JOGADOR_A, JOGADOR_B, simularPartida } from './simulador/motor.js';
-import { build, carta, duelo, jogador, jogar } from './teste-apoio.js';
+import { build, carta, com, duelo, jogador, jogar, virarTurno } from './teste-apoio.js';
 
 /*
  * Privacidade da projeção, nas doze classes.
@@ -225,47 +232,310 @@ describe('privacidade da projeção nas doze classes', () => {
 });
 
 /*
- * Defeito conhecido, provado aqui em vez de descrito.
+ * Preparar Emboscada preserva a identidade face-down.
  *
- * A regra de visibilidade não foi alterada nesta tarefa — o escopo pedia
- * justamente que ela ficasse como está. O que este bloco faz é fixar o
- * comportamento atual para que a correção não passe despercebida: quando o
- * vazamento for fechado, estes testes quebram e obrigam a atualização.
- *
- * A regressão das doze classes acima não o encontra porque ela roda as
- * Receitas 1, e `R13` não está na Receita 1 do Patrulheiro.
+ * "Coloque face-down" não é enfeite de texto: o dono sabe qual Ataque
+ * reservou, o adversário não, o espectador não, e o estado canônico precisa
+ * saber para o desconto funcionar. Esta regressão cobre as três visões e a
+ * mecânica inteira, porque esconder a carta não pode custar o funcionamento
+ * dela.
  */
-describe('vazamento conhecido: Preparar Emboscada (R13)', () => {
-  const reservar = (): { readonly partida: EstadoDaPartida; readonly reservada: CardId } => {
-    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R01'] });
-    const base = duelo(patrulheiro, build('guerreiro'), JOGADOR_A);
-    const reservada = jogador(base, JOGADOR_A).mao.find(
-      (id) => id !== carta('R13') && id !== carta('R01'),
-    );
-    if (reservada === undefined) throw new Error('a mão do Patrulheiro não tem o que reservar');
-    const { partida } = jogar(base, JOGADOR_A, {
-      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: reservada } },
+describe('Preparar Emboscada (R13) preserva a identidade face-down', () => {
+  const RESERVADA = carta('R05');
+
+  interface Emboscada {
+    readonly partida: EstadoDaPartida;
+    readonly antes: EstadoDaPartida;
+  }
+
+  const emboscar = (): Emboscada => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R02', 'R01'] });
+    const antes = duelo(patrulheiro, build('guerreiro'), JOGADOR_A);
+    expect(jogador(antes, JOGADOR_A).mao).toContain(RESERVADA);
+    const { partida } = jogar(antes, JOGADOR_A, {
+      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: RESERVADA } },
     });
-    return { partida, reservada };
+    return { partida, antes };
   };
 
-  it('a carta reservada continua na mão, como o motor a modela', () => {
-    const { partida, reservada } = reservar();
-    expect(jogador(partida, JOGADOR_A).mao).toContain(reservada);
+  const visaoDe = (partida: EstadoDaPartida, quem: PlayerId | null): string =>
+    JSON.stringify(
+      quem === null ? projetarParaEspectador(partida) : projetarParaJogador(partida, quem),
+    );
+
+  it('1. o Patrulheiro usa R13 e reserva R05', () => {
+    const { partida } = emboscar();
+    expect(jogador(partida, JOGADOR_A).acoes[0].escolhas.cartaDaMao).toBe(RESERVADA);
   });
 
-  it('mas o adversário a enxerga, contra o "face-down" impresso na carta', () => {
-    const { partida, reservada } = reservar();
-    const texto = JSON.stringify(projetarParaJogador(partida, JOGADOR_B));
+  it('2. o estado canônico sabe que R05 foi reservado', () => {
+    const { partida } = emboscar();
+    const anotacao = jogador(partida, JOGADOR_A).anotacoes.find((atual) =>
+      atual.chave.endsWith(`:${RESERVADA}`),
+    );
+    expect(anotacao).toBeDefined();
+    expect(anotacao?.visibilidade).toBe('privada-do-dono');
+  });
 
-    // Duas portas, as duas reais:
-    // 1. as escolhas do espaço de Ação vão inteiras para a projeção;
-    expect(texto).toContain(`"cartaDaMao":"${reservada}"`);
-    // 2. a chave da anotação carrega o identificador da carta reservada.
-    expect(texto).toContain(`ataque-emboscado:${reservada}`);
+  it('3. a visão do dono contém a identidade R05, na escolha e na anotação', () => {
+    const { partida } = emboscar();
+    const visao = projetarParaJogador(partida, JOGADOR_A);
+    const dono = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
 
-    // Enquanto isso valer, a conferência geral acusaria aqui — e é esse o
-    // ponto: o defeito está provado, não escondido.
-    expect(apareceEm(texto, reservada)).toBe(true);
+    expect(dono?.acoes[0].escolhas.cartaDaMao).toBe(RESERVADA);
+    expect(dono?.anotacoes.some((atual) => atual.chave.includes(RESERVADA))).toBe(true);
+  });
+
+  it('4. a visão do adversário não contém R05 pela escolha', () => {
+    const { partida } = emboscar();
+    const visao = projetarParaJogador(partida, JOGADOR_B);
+    const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
+
+    // O campo não existe — não é uma flag com o identificador ainda dentro.
+    expect(patrulheiro?.acoes[0].escolhas.cartaDaMao).toBeUndefined();
+    expect(Object.keys(patrulheiro?.acoes[0].escolhas ?? {})).not.toContain('cartaDaMao');
+  });
+
+  it('5. a visão do adversário não contém a chave ataque-emboscado:R05', () => {
+    const { partida } = emboscar();
+    const visao = projetarParaJogador(partida, JOGADOR_B);
+    const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
+
+    expect(patrulheiro?.anotacoes.some((atual) => atual.chave.includes(RESERVADA))).toBe(false);
+    expect(visaoDe(partida, JOGADOR_B)).not.toContain('ataque-emboscado:');
+  });
+
+  it('6. o JSON inteiro da visão adversária não contém o identificador privado', () => {
+    const { partida } = emboscar();
+    expect(apareceEm(visaoDe(partida, JOGADOR_B), RESERVADA)).toBe(false);
+  });
+
+  it('7. a visão de espectador também não contém o identificador privado', () => {
+    const { partida } = emboscar();
+    expect(apareceEm(visaoDe(partida, null), RESERVADA)).toBe(false);
+  });
+
+  it('8. a quantidade da mão continua correta', () => {
+    const { partida } = emboscar();
+    const canonico = jogador(partida, JOGADOR_A);
+    const visao = projetarParaJogador(partida, JOGADOR_B);
+    const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
+
+    expect(patrulheiro?.mao).toHaveLength(canonico.mao.length);
+    for (const item of patrulheiro?.mao ?? []) expect(item.visivel).toBe(false);
+  });
+
+  it('9. o adversário continua vendo a Ação pública R13', () => {
+    const { partida } = emboscar();
+    const visao = projetarParaJogador(partida, JOGADOR_B);
+    const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
+
+    expect(patrulheiro?.acoes[0].perfil?.carta).toBe(carta('R13'));
+    expect(patrulheiro?.acoes[0].situacao).toBe('resolvida');
+  });
+
+  it('10. o adversário não aprende qual Ataque está face-down', () => {
+    const { partida, antes } = emboscar();
+    const texto = visaoDe(partida, JOGADOR_B);
+
+    // Nenhuma das cartas que estavam na mão e continuam nela pode aparecer.
+    const naMao = jogador(partida, JOGADOR_A).mao;
+    for (const escondida of naMao) {
+      expect(apareceEm(texto, escondida), `${escondida} vazou`).toBe(false);
+    }
+    expect(naMao).toContain(RESERVADA);
+    expect(jogador(antes, JOGADOR_A).mao).toContain(RESERVADA);
+  });
+
+  it('11. jogado depois, o Ataque reservado passa a ser público normalmente', () => {
+    const { partida } = emboscar();
+    const proximo = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
+    const { partida: atacou } = jogar(proximo, JOGADOR_A, { pedido: { carta: RESERVADA } });
+
+    const visao = projetarParaJogador(atacou, JOGADOR_B);
+    const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
+    // Agora ele é uma Ação declarada à vista de todos.
+    expect(patrulheiro?.acoes[0].perfil?.carta).toBe(RESERVADA);
+    expect(apareceEm(JSON.stringify(visao), RESERVADA)).toBe(true);
+  });
+
+  it('12. o desconto de 1 AP continua sendo aplicado à carta reservada', () => {
+    const { partida } = emboscar();
+    const proximo = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
+    const apAntes = jogador(proximo, JOGADOR_A).pontosDeAcao;
+    const { partida: depois } = jogar(proximo, JOGADOR_A, { pedido: { carta: RESERVADA } });
+    // R05 custa 2 AP impressos e sai por 1.
+    expect(apAntes - jogador(depois, JOGADOR_A).pontosDeAcao).toBe(1);
+  });
+
+  it('13. outra carta da mão não recebe o desconto', () => {
+    const { partida } = emboscar();
+    const proximo = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
+    const apAntes = jogador(proximo, JOGADOR_A).pontosDeAcao;
+    // R02 também custa 2 AP impressos, e não foi a reservada.
+    const { partida: depois } = jogar(proximo, JOGADOR_A, { pedido: { carta: carta('R02') } });
+    expect(apAntes - jogador(depois, JOGADOR_A).pontosDeAcao).toBe(2);
+  });
+
+  it('14. sem ser usado, o Ataque reservado continua na mão', () => {
+    const { partida } = emboscar();
+    const virada = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
+    // A reserva é marcação, e não uma zona física nova (AMBIGUIDADES, 52):
+    // a carta nunca saiu da mão, então "volta à mão" já está satisfeito.
+    expect(jogador(virada, JOGADOR_A).mao).toContain(RESERVADA);
+    expect(apareceEm(visaoDe(virada, JOGADOR_B), RESERVADA)).toBe(false);
+  });
+
+  it('15. o replay continua determinístico com a anotação privada', () => {
+    const uma = emboscar().partida;
+    const outra = emboscar().partida;
+    expect(JSON.stringify(outra)).toEqual(JSON.stringify(uma));
+    // E a visão de cada observador também é estável.
+    expect(visaoDe(outra, JOGADOR_B)).toEqual(visaoDe(uma, JOGADOR_B));
+    expect(visaoDe(outra, null)).toEqual(visaoDe(uma, null));
+  });
+});
+
+/*
+ * A guarda estrutural.
+ *
+ * A regressão das doze classes e a do R13 provam casos; esta prova a regra.
+ * Ela injeta informação privada diretamente no estado — em escolha de Ação, em
+ * escolha de Resposta e em anotação — e confere que a projeção a retém, sem
+ * depender de qual carta a teria criado nem de ela estar em alguma Receita.
+ */
+describe('guarda estrutural da projeção', () => {
+  const SEGREDO = carta('R05');
+
+  const mesa = (): EstadoDaPartida => duelo(build('patrulheiro'), build('guerreiro'), JOGADOR_A);
+
+  /** Escreve escolhas cruas em um espaço de Ação, como só o motor faria. */
+  const comEscolhas = (
+    partida: EstadoDaPartida,
+    dono: PlayerId,
+    indice: 0 | 1 | 2 | 3,
+    daAcao: Record<string, unknown>,
+    daResposta: Record<string, unknown> = {},
+  ): EstadoDaPartida => {
+    const atual = jogador(partida, dono);
+    const reescrever = (slot: SlotDeAcao, posicao: number): SlotDeAcao =>
+      posicao === indice
+        ? {
+            ...slot,
+            escolhas: { ...slot.escolhas, ...daAcao },
+            resposta: { ...slot.resposta, escolhas: { ...slot.resposta.escolhas, ...daResposta } },
+          }
+        : slot;
+    return com(partida, dono, {
+      acoes: [
+        reescrever(atual.acoes[0], 0),
+        reescrever(atual.acoes[1], 1),
+        reescrever(atual.acoes[2], 2),
+        reescrever(atual.acoes[3], 3),
+      ],
+    });
+  };
+
+  it('classifica todo campo de EscolhasDaAcao, sem deixar nenhum sem origem', () => {
+    // A exaustividade é garantida pelo tipo; este teste pega o caso em que
+    // alguém contorna o tipo e acrescenta um campo sem classificá-lo.
+    const classificados = Object.keys(ORIGEM_DAS_ESCOLHAS);
+    expect(classificados.length).toBeGreaterThan(20);
+    for (const origem of Object.values(ORIGEM_DAS_ESCOLHAS)) {
+      expect(['publica', 'zona-secreta', 'passiva-propria']).toContain(origem);
+    }
+  });
+
+  it('retém escolha de zona secreta em qualquer um dos quatro espaços', () => {
+    for (const indice of [0, 1, 2, 3] as const) {
+      const partida = comEscolhas(mesa(), JOGADOR_A, indice, { cartaDaMao: SEGREDO });
+
+      const doDono = JSON.stringify(projetarParaJogador(partida, JOGADOR_A));
+      expect(apareceEm(doDono, SEGREDO), `espaço ${String(indice)}: o dono precisa ver`).toBe(true);
+
+      for (const observador of [JOGADOR_B, null]) {
+        const texto = JSON.stringify(
+          observador === null
+            ? projetarParaEspectador(partida)
+            : projetarParaJogador(partida, observador),
+        );
+        expect(apareceEm(texto, SEGREDO), `espaço ${String(indice)} vazou`).toBe(false);
+      }
+    }
+  });
+
+  it('retém escolha de zona secreta feita na Resposta, que é de quem responde', () => {
+    const partida = comEscolhas(mesa(), JOGADOR_A, 0, {}, { cartaDaMao: SEGREDO });
+
+    // A escolha da Resposta é de B, então B pode vê-la; A e o espectador, não.
+    expect(apareceEm(JSON.stringify(projetarParaJogador(partida, JOGADOR_B)), SEGREDO)).toBe(true);
+    expect(apareceEm(JSON.stringify(projetarParaJogador(partida, JOGADOR_A)), SEGREDO)).toBe(false);
+    expect(apareceEm(JSON.stringify(projetarParaEspectador(partida)), SEGREDO)).toBe(false);
+  });
+
+  it('retém anotação privada, com o identificador na chave ou na origem', () => {
+    const partida = com(mesa(), JOGADOR_A, {
+      anotacoes: [
+        {
+          chave: `partida:qualquer-coisa:${SEGREDO}`,
+          origem: SEGREDO,
+          escopo: 'partida' as const,
+          valor: 1,
+          visibilidade: 'privada-do-dono' as const,
+        },
+      ],
+    });
+
+    expect(apareceEm(JSON.stringify(projetarParaJogador(partida, JOGADOR_A)), SEGREDO)).toBe(true);
+    expect(apareceEm(JSON.stringify(projetarParaJogador(partida, JOGADOR_B)), SEGREDO)).toBe(false);
+    expect(apareceEm(JSON.stringify(projetarParaEspectador(partida)), SEGREDO)).toBe(false);
+  });
+
+  it('deixa passar anotação pública, porque esconder o que é público não é privacidade', () => {
+    const publica = carta('R01');
+    const partida = com(mesa(), JOGADOR_A, {
+      anotacoes: [{ chave: 'turno:qualquer', origem: publica, escopo: 'turno' as const, valor: 1 }],
+    });
+    expect(apareceEm(JSON.stringify(projetarParaJogador(partida, JOGADOR_B)), publica)).toBe(true);
+  });
+
+  it('esconde a escolha que aponta para Passiva oculta, e mostra a revelada', () => {
+    const base = mesa();
+    const passivas = jogador(base, JOGADOR_A).passivas;
+    const oculta = passivas[0]?.carta;
+    const revelada = passivas[1]?.carta;
+    expect(oculta).toBeDefined();
+    expect(revelada).toBeDefined();
+
+    const comRevelada = com(base, JOGADOR_A, {
+      passivas: passivas.map((passiva) =>
+        passiva.carta === revelada ? { ...passiva, estado: 'pronta' as const } : passiva,
+      ),
+    });
+    const partida = comEscolhas(comRevelada, JOGADOR_A, 0, { passiva: oculta });
+    const comAReveladaEscolhida = comEscolhas(comRevelada, JOGADOR_A, 1, { passiva: revelada });
+
+    const doAdversario = JSON.stringify(projetarParaJogador(partida, JOGADOR_B));
+    expect(apareceEm(doAdversario, oculta!), 'Passiva oculta não pode vazar pela escolha').toBe(
+      false,
+    );
+
+    const comRev = JSON.stringify(projetarParaJogador(comAReveladaEscolhida, JOGADOR_B));
+    expect(apareceEm(comRev, revelada!), 'Passiva revelada é pública: não se esconde').toBe(true);
+  });
+
+  it('não esconde escolha pública sem motivo', () => {
+    const emCooldown = carta('R02');
+    const partida = comEscolhas(mesa(), JOGADOR_A, 0, {
+      cartaEmCooldown: emCooldown,
+      reforco: 'dano',
+      guardaReduzida: 2,
+    });
+    const visao = projetarParaJogador(partida, JOGADOR_B);
+    const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
+
+    expect(patrulheiro?.acoes[0].escolhas.cartaEmCooldown).toBe(emCooldown);
+    expect(patrulheiro?.acoes[0].escolhas.reforco).toBe('dano');
+    expect(patrulheiro?.acoes[0].escolhas.guardaReduzida).toBe(2);
   });
 });
