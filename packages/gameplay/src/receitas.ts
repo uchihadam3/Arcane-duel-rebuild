@@ -91,8 +91,36 @@ export const JULGAMENTO: BuildEquipada = {
   ultimate: cardId('CU01'), // Julgamento Celeste
 };
 
+/** Necromante, Receita 1 — Ossomante. */
+export const OSSOMANTE: BuildEquipada = {
+  classe: 'necromante',
+  personagem: PERSONAGEM_DA_CLASSE.necromante,
+  habilidades: [
+    cardId('N01'), // Flecha Óssea
+    cardId('N02'), // Lança de Ossos
+    cardId('N07'), // Mão do Túmulo
+    cardId('N09'), // Ruína Sepulcral
+    cardId('N15'), // Rito de Ossos
+    cardId('N16'), // Muralha de Ossos
+    cardId('N17'), // Véu dos Mortos
+    cardId('N12'), // Desenterrar
+  ],
+  passivas: [
+    cardId('NP02'), // Mestre do Murchar
+    cardId('NP03'), // Memória dos Mortos
+    cardId('NP06'), // Guardião do Túmulo
+    cardId('NP10'), // Eco do Cemitério
+  ],
+  cartasDeClasse: [
+    cardId('NC01'), // Guardião Esquelético
+    cardId('NC06'), // Abominação Costurada
+  ],
+  ultimate: cardId('NU01'), // Ceifador de Almas
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
   clerigo: JULGAMENTO,
+  necromante: OSSOMANTE,
 } as const;

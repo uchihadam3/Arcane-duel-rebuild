@@ -161,6 +161,19 @@ export type EventoUniversal =
       readonly impacto: number;
     }
   | {
+      readonly tipo: 'carta-atrasada-no-cooldown';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly de: ZonaDeCooldown;
+      readonly para: ZonaDeCooldown;
+    }
+  | {
+      readonly tipo: 'carta-enviada-da-mao-para-cooldown';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly zona: ZonaDeCooldown;
+    }
+  | {
       readonly tipo: 'impacto-final-definido';
       readonly indice: IndiceDeAcao;
       readonly valor: number;

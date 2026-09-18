@@ -101,6 +101,58 @@ export const adiantarCartaNoCooldown = (
   });
 };
 
+export interface AtrasoDeCarta {
+  readonly jogador: EstadoDeJogador;
+  readonly de: ZonaDeCooldown;
+  readonly para: ZonaDeCooldown;
+}
+
+/**
+ * Move uma carta uma zona de cooldown para mais longe da mão.
+ *
+ * CD3 é o fundo: uma carta que já está lá não tem para onde ir, e o movimento
+ * devolve CD3 em CD3 em vez de inventar uma quarta zona.
+ */
+export const atrasarCartaNoCooldown = (
+  jogador: EstadoDeJogador,
+  carta: CardId,
+): Resultado<AtrasoDeCarta, ErroDeDominio> => {
+  const zona = zonaDaCarta(jogador, carta);
+  if (zona === null) return falha({ tipo: 'carta-fora-do-cooldown', carta });
+
+  const destino: ZonaDeCooldown = zona === 1 ? 2 : 3;
+  if (destino === zona) return sucesso({ jogador, de: zona, para: zona });
+
+  const semEla = semACarta(jogador, zona, carta);
+  return sucesso({
+    jogador: {
+      ...semEla,
+      cooldown: { ...semEla.cooldown, [destino]: [...semEla.cooldown[destino], carta] },
+    },
+    de: zona,
+    para: destino,
+  });
+};
+
+/**
+ * Tira uma carta da mão e a coloca direto em uma zona de cooldown.
+ *
+ * "Escolha outra habilidade em sua mão e coloque-a em CD2": a carta não foi
+ * jogada, não pagou custo e não ocupou espaço de Ação — ela só saiu de cena.
+ */
+export const enviarDaMaoParaCooldown = (
+  jogador: EstadoDeJogador,
+  carta: CardId,
+  zona: ZonaDeCooldown,
+): Resultado<EstadoDeJogador, ErroDeDominio> => {
+  if (!jogador.mao.includes(carta)) return falha({ tipo: 'carta-fora-da-mao', carta });
+  return sucesso({
+    ...jogador,
+    mao: jogador.mao.filter((atual) => atual !== carta),
+    cooldown: { ...jogador.cooldown, [zona]: [...jogador.cooldown[zona], carta] },
+  });
+};
+
 /** Zona de cooldown para onde a carta iria, uma zona mais perto da mão. */
 export const zonaAdiantada = (zona: ZonaDeCooldown): ZonaDeCooldown =>
   zona === 3 ? 2 : zona === 2 ? 1 : 1;

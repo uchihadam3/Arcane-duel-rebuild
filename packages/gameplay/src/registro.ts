@@ -4,6 +4,7 @@ import type { EfeitoDeCarta, EfeitoDeCartaDeClasse, EfeitoDePassiva } from './ga
 import * as guerreiro from './efeitos/guerreiro.js';
 import * as mago from './efeitos/mago.js';
 import * as clerigo from './efeitos/clerigo.js';
+import * as necromante from './efeitos/necromante.js';
 
 /*
  * Onde mora o comportamento de cada carta.
@@ -33,18 +34,22 @@ export const EFEITOS_JOGAVEIS: ReadonlyMap<CardId, EfeitoDeCarta> = juntar(
   mago.ULTIMATES,
   clerigo.HABILIDADES,
   clerigo.ULTIMATES,
+  necromante.HABILIDADES,
+  necromante.ULTIMATES,
 );
 
 export const EFEITOS_DE_PASSIVA: ReadonlyMap<CardId, EfeitoDePassiva> = juntar(
   guerreiro.PASSIVAS,
   mago.PASSIVAS,
   clerigo.PASSIVAS,
+  necromante.PASSIVAS,
 );
 
 export const EFEITOS_DE_CARTA_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = juntar(
   guerreiro.CARTAS_DE_CLASSE,
   mago.CARTAS_DE_CLASSE,
   clerigo.CARTAS_DE_CLASSE,
+  necromante.CARTAS_DE_CLASSE,
 );
 
 export const efeitoJogavel = (carta: CardId): EfeitoDeCarta => EFEITOS_JOGAVEIS.get(carta) ?? {};

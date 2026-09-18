@@ -61,6 +61,7 @@ import {
   criarContexto,
   gravarJogador,
   jogadorDo,
+  registrarAnotacao,
   slotDe,
 } from './contexto.js';
 import type { AlvoDoEfeito, ConsultaDeCusto, ResumoDaResolucao } from './ganchos.js';
@@ -77,7 +78,7 @@ import {
   mecanicasDeClasseAoFecharTurno,
   mecanicasDeClasseAposResolver,
 } from './efeitos/mecanicas-classes.js';
-import { avancarDevocao } from './recursos-classe.js';
+import { anexarAlma, avancarDevocao } from './recursos-classe.js';
 import {
   aplicarPromessasDoAtaque,
   definirPromessa,
@@ -337,7 +338,14 @@ export const abrirTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respost
   if (erro !== null) return falha(erro);
 
   reporManaNoInicioDoTurno(ctx, jogador);
-  mecanicasDeClasseAoAbrirTurno(ctx, jogador);
+  const voltaram = ctx.eventos.reduce(
+    (total, evento) =>
+      evento.tipo === 'cooldown-avancado' && evento.jogador === jogador
+        ? total + evento.paraAMao.length
+        : total,
+    0,
+  );
+  mecanicasDeClasseAoAbrirTurno(ctx, jogador, voltaram);
   verificarRevelacoes(ctx, 'inicio-do-turno', null, null);
   return entregar(ctx);
 };
@@ -473,7 +481,8 @@ const descontosDoEstado = (
 ): DescontosDeCusto => {
   const encarecida =
     valorDaAnotacao(jogador.anotacoes, `${CHAVE.ecoEncarece}:${perfil.carta}`) > 0 ||
-    valorDaAnotacao(jogador.anotacoes, `${CHAVE.relicarioEncarece}:${perfil.carta}`) > 0;
+    valorDaAnotacao(jogador.anotacoes, `${CHAVE.relicarioEncarece}:${perfil.carta}`) > 0 ||
+    valorDaAnotacao(jogador.anotacoes, `${CHAVE.ritoEncarece}:${perfil.carta}`) > 0;
   const prismatica =
     ordem === 3 &&
     temTag(perfil, 'feitico') &&
@@ -924,6 +933,57 @@ export const usarCartaDeClasseNaAcao = (
  * É esse estado que faz valer o "uma vez por turno inimigo" — não um contador
  * paralelo.
  */
+/**
+ * Necromante: põe uma Alma controlada sobre um Servo.
+ *
+ * "No início do próprio turno, antes de receber AP, o Necromante **pode**
+ * colocar 1 Alma controlada sobre um Servo que ainda não possua Alma." É
+ * decisão dele e de mais ninguém, então existe um comando só para ela — e a
+ * janela é estreita de propósito: uma vez por turno, antes da primeira Ação.
+ */
+export const anexarAlmaNoServo = (
+  partida: EstadoDaPartida,
+  jogador: PlayerId,
+  servo: CardId,
+): Resposta => {
+  const ctx = criarContexto(partida);
+  const dono = ctx.partida.jogadores.find((item) => item.id === jogador);
+  if (dono === undefined) return falha({ tipo: 'jogador-desconhecido', jogador });
+  if (ctx.partida.turno?.jogadorAtivo !== jogador) return falha({ tipo: 'fora-do-turno', jogador });
+  if (dono.acoesRealizadasNoTurno > 0) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta: servo,
+      detalhe: 'a Alma só é anexada antes da primeira Ação do turno',
+    });
+  }
+  if (valorDaAnotacao(dono.anotacoes, CHAVE.almaAnexadaNoTurno) > 0) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta: servo,
+      detalhe: 'você já anexou uma Alma neste turno',
+    });
+  }
+  if (!dono.cartasDeClasse.some((item) => item.carta === servo)) {
+    return falha({ tipo: 'carta-de-classe-desconhecida', carta: servo });
+  }
+
+  if (!anexarAlma(ctx, jogador, servo)) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta: servo,
+      detalhe: 'não há Alma controlada livre, ou este Servo já tem uma',
+    });
+  }
+  registrarAnotacao(ctx, jogador, {
+    chave: CHAVE.almaAnexadaNoTurno,
+    origem: servo,
+    escopo: 'turno',
+    valor: 1,
+  });
+  return entregar(ctx);
+};
+
 export const ativarPassivaNaAcao = (
   partida: EstadoDaPartida,
   jogador: PlayerId,
@@ -1014,6 +1074,25 @@ export const resolverEscolhaPendente = (
   // sozinha — o avanço do início de turno faz isso. Nesse caso a decisão do
   // jogador continua valendo e a pendência se encerra; o que não existe mais é
   // o movimento. Registrado em docs/AMBIGUIDADES.md.
+  if (pendente.efeito === 'prontificar-carta-de-classe') {
+    const equipada = dono.cartasDeClasse.find((item) => item.carta === carta);
+    if (equipada?.estado === 'ativada') {
+      gravarJogador(ctx, {
+        ...dono,
+        cartasDeClasse: dono.cartasDeClasse.map((item) =>
+          item.carta === carta ? { ...item, estado: 'pronta' as const } : item,
+        ),
+      });
+      ctx.eventos.push({
+        tipo: 'carta-de-classe-prontificada-por-efeito',
+        jogador,
+        carta,
+        origem: pendente.origem,
+      });
+    }
+    return encerrarPendencia(ctx, pendente, jogador, carta);
+  }
+
   if (pendente.efeito === 'devolver-a-mao') {
     const movimento = devolverCartaAMao(dono, carta);
     if (movimento.ok) {

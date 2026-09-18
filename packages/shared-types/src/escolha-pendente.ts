@@ -16,7 +16,8 @@ import type { CardId, PlayerId } from './ids.js';
  * carta — por isso cabe aqui.
  */
 
-export type EfeitoDaEscolha = 'devolver-a-mao' | 'adiantar-uma-zona';
+export type EfeitoDaEscolha =
+  'devolver-a-mao' | 'adiantar-uma-zona' | 'prontificar-carta-de-classe';
 
 export interface EscolhaPendente {
   /** Quem precisa escolher. */

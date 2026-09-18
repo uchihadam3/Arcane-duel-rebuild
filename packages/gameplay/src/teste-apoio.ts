@@ -37,6 +37,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   guerreiro: ['W01', 'W02', 'W03', 'W04', 'W05', 'W06', 'W07', 'W08'],
   mago: ['M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07', 'M08'],
   clerigo: ['C01', 'C02', 'C08', 'C12', 'C17', 'C05', 'C06', 'C09'],
+  necromante: ['N01', 'N02', 'N03', 'N04', 'N07', 'N14', 'N16', 'N17'],
 } as const;
 
 /*
@@ -62,6 +63,11 @@ const PADROES = {
     passivas: ['CP03', 'CP06', 'CP07', 'CP10'],
     cartasDeClasse: ['CC01', 'CC04'],
     ultimate: 'CU01',
+  },
+  necromante: {
+    passivas: ['NP07', 'NP08', 'NP09', 'NP10'],
+    cartasDeClasse: ['NC01', 'NC06'],
+    ultimate: 'NU01',
   },
 } as const;
 
@@ -186,6 +192,34 @@ export const comDevocao = (
 export const devocaoDe = (partida: EstadoDaPartida, id: PlayerId): EstagioDeDevocao | null => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'clerigo' ? recurso.devocao : null;
+};
+
+/** Põe as Almas do Necromante em uma repartição exata. */
+export const comAlmas = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  controladas: number,
+  anexadas: readonly CardId[] = [],
+): EstadoDaPartida =>
+  jogador(partida, id).recurso.classe === 'necromante'
+    ? com(partida, id, {
+        recurso: {
+          classe: 'necromante',
+          almasControladas: controladas,
+          almasNoCemiterio: 4 - controladas - anexadas.length,
+          almasAnexadas: anexadas,
+        },
+      })
+    : partida;
+
+export const almasDe = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'necromante' ? recurso.almasControladas : -1;
+};
+
+export const almasNoCemiterio = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'necromante' ? recurso.almasNoCemiterio : -1;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

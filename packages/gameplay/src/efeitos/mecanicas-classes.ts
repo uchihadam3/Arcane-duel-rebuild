@@ -16,6 +16,12 @@ import {
   reiniciarReducaoVoluntaria,
 } from '../recursos-classe.js';
 import { lerPromessa } from './comum.js';
+import {
+  colheitaDoProprioTurno,
+  colheitaDoTurnoInimigo,
+  ecoDoCemiterioNoInicioDoTurno,
+  ritoDeOssosNaRuptura,
+} from './necromante.js';
 
 /*
  * As mecânicas próprias das dez classes da etapa quatro.
@@ -110,6 +116,9 @@ export const mecanicasDeClasseAposResolver = (
   devocaoNoProprioTurno(ctx, alvo, resumo);
   devocaoNoTurnoInimigo(ctx, alvo);
   brechaDaEsquiva(ctx, alvo, resumo);
+  colheitaDoProprioTurno(ctx, alvo, resumo.dano > 0);
+  colheitaDoTurnoInimigo(ctx, alvo, resumo.vidaPerdidaPeloDefensor > 0);
+  ritoDeOssosNaRuptura(ctx, alvo, resumo.ruptura);
 };
 
 /**
@@ -118,7 +127,14 @@ export const mecanicasDeClasseAposResolver = (
  * Cada função só age quando a classe é a dona daquele componente, então a
  * lista é percorrida inteira sem nenhum `if` de classe aqui.
  */
-export const mecanicasDeClasseAoAbrirTurno = (ctx: Contexto, jogador: PlayerId): void => {
+export const mecanicasDeClasseAoAbrirTurno = (
+  ctx: Contexto,
+  jogador: PlayerId,
+  cartasQueVoltaram = 0,
+): void => {
+  // Necromante: "quando uma carta voltar normalmente de CD1 para sua mão,
+  // colha 1 Alma." O avanço do cooldown acabou de acontecer.
+  ecoDoCemiterioNoInicioDoTurno(ctx, jogador, cartasQueVoltaram);
   // Bardo: a sequência de Notas e as Cadências são do turno, e o turno é novo.
   reiniciarNotas(ctx, jogador);
   // Monge: o Kata recomeça — Abertura, Fluxo e Finalização valem dentro do turno.

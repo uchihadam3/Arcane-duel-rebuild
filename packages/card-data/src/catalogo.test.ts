@@ -144,6 +144,48 @@ const NOMES_DO_CLERIGO: Readonly<Record<string, string>> = {
   CU03: 'Intercessão Divina',
 };
 
+const NOMES_DO_NECROMANTE: Readonly<Record<string, string>> = {
+  N01: 'Flecha Óssea',
+  N02: 'Lança de Ossos',
+  N03: 'Toque Murchante',
+  N04: 'Drenar Vitalidade',
+  N05: 'Onda dos Mortos',
+  N06: 'Ceifa Funesta',
+  N07: 'Mão do Túmulo',
+  N08: 'Roubo de Memória',
+  N09: 'Ruína Sepulcral',
+  N10: 'Colheita Profana',
+  N11: 'Oferenda ao Túmulo',
+  N12: 'Desenterrar',
+  N13: 'Comandar os Mortos',
+  N14: 'Selo Fúnebre',
+  N15: 'Rito de Ossos',
+  N16: 'Muralha de Ossos',
+  N17: 'Véu dos Mortos',
+  N18: 'Retorno Sepulcral',
+  N19: 'Recusar a Morte',
+  N20: 'Maldição Reflexa',
+  NP01: 'Colecionador de Almas',
+  NP02: 'Mestre do Murchar',
+  NP03: 'Memória dos Mortos',
+  NP04: 'Senhor dos Servos',
+  NP05: 'Fome da Cripta',
+  NP06: 'Guardião do Túmulo',
+  NP07: 'Último Suspiro',
+  NP08: 'Sacrifício Calculado',
+  NP09: 'Paciência Sepulcral',
+  NP10: 'Eco do Cemitério',
+  NC01: 'Guardião Esquelético',
+  NC02: 'Cão Tumular',
+  NC03: 'Espectro Faminto',
+  NC04: 'Mago Ósseo',
+  NC05: 'Ghoul Devorador',
+  NC06: 'Abominação Costurada',
+  NU01: 'Ceifador de Almas',
+  NU02: 'Rito da Segunda Morte',
+  NU03: 'Morte Negada',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -155,6 +197,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   guerreiro: NOMES_DO_GUERREIRO,
   mago: NOMES_DO_MAGO,
   clerigo: NOMES_DO_CLERIGO,
+  necromante: NOMES_DO_NECROMANTE,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -168,8 +211,8 @@ const COMPOSICAO = [
 const CARTAS_POR_CLASSE = 39;
 
 describe('catálogo oficial', () => {
-  it('implementa Guerreiro, Mago e Clérigo nesta etapa', () => {
-    expect([...CLASSES_IMPLEMENTADAS]).toEqual(['guerreiro', 'mago', 'clerigo']);
+  it('implementa, nesta etapa, exatamente as classes com catálogo e testes', () => {
+    expect([...CLASSES_IMPLEMENTADAS]).toEqual(['guerreiro', 'mago', 'clerigo', 'necromante']);
   });
 
   it('tem 39 cartas jogáveis por classe implementada e nada além disso', () => {

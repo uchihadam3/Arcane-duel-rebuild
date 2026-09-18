@@ -15,6 +15,7 @@ export const LIMITES_DE_RECURSO: Readonly<
 > = {
   mana: { minimo: 0, maximo: 6 },
   momentum: { minimo: 0, maximo: 3 },
+  alma: { minimo: 0, maximo: 4 },
 };
 
 /** Quanto o jogador tem, ou `null` quando a classe dele não usa esse recurso. */
@@ -24,6 +25,7 @@ export const valorDoRecurso = (
 ): number | null => {
   const atual = jogador.recurso;
   if (recurso === 'mana') return atual.classe === 'mago' ? atual.mana : null;
+  if (recurso === 'alma') return atual.classe === 'necromante' ? atual.almasControladas : null;
   return atual.classe === 'guerreiro' ? atual.momentum : null;
 };
 
@@ -52,6 +54,21 @@ export const definirRecurso = (
   if (recurso === 'momentum' && atual.classe === 'guerreiro') {
     return { ...jogador, recurso: { ...atual, momentum: limitado } };
   }
+  if (recurso === 'alma' && atual.classe === 'necromante') {
+    // As quatro fichas de Alma são conservadas: gastar move a ficha para o
+    // Cemitério e colher a traz de volta. O que está anexado a um Servo não
+    // participa desta troca — a ficha está sobre a carta, não em nenhuma pilha.
+    const disponiveis = atual.almasControladas + atual.almasNoCemiterio;
+    const controladas = Math.min(Math.max(limitado, 0), disponiveis);
+    return {
+      ...jogador,
+      recurso: {
+        ...atual,
+        almasControladas: controladas,
+        almasNoCemiterio: disponiveis - controladas,
+      },
+    };
+  }
   return jogador;
 };
 
@@ -68,5 +85,6 @@ export const somarRecurso = (
 /** O recurso próprio da classe, quando ela tem um que serve de custo. */
 export const recursoDaClasse = (jogador: EstadoDeJogador): RecursoDeCusto | null => {
   if (jogador.recurso.classe === 'mago') return 'mana';
+  if (jogador.recurso.classe === 'necromante') return 'alma';
   return jogador.recurso.classe === 'guerreiro' ? 'momentum' : null;
 };

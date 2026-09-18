@@ -15,6 +15,12 @@ import {
   ULTIMATES_DO_MAGO,
 } from './mago/complemento.js';
 import { HABILIDADES_DO_CLERIGO } from './clerigo/habilidades.js';
+import { HABILIDADES_DO_NECROMANTE } from './necromante/habilidades.js';
+import {
+  CARTAS_DE_CLASSE_DO_NECROMANTE,
+  PASSIVAS_DO_NECROMANTE,
+  ULTIMATES_DO_NECROMANTE,
+} from './necromante/complemento.js';
 import {
   CARTAS_DE_CLASSE_DO_CLERIGO,
   PASSIVAS_DO_CLERIGO,
@@ -55,14 +61,27 @@ export const CARTAS_DO_CLERIGO: readonly DefinicaoDeCarta[] = [
   ...ULTIMATES_DO_CLERIGO,
 ];
 
+export const CARTAS_DO_NECROMANTE: readonly DefinicaoDeCarta[] = [
+  ...HABILIDADES_DO_NECROMANTE,
+  ...PASSIVAS_DO_NECROMANTE,
+  ...CARTAS_DE_CLASSE_DO_NECROMANTE,
+  ...ULTIMATES_DO_NECROMANTE,
+];
+
 export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_GUERREIRO,
   ...CARTAS_DO_MAGO,
   ...CARTAS_DO_CLERIGO,
+  ...CARTAS_DO_NECROMANTE,
 ]);
 
 /** Classes cujo catálogo já está implementado por inteiro, com testes. */
-export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = ['guerreiro', 'mago', 'clerigo'];
+export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = [
+  'guerreiro',
+  'mago',
+  'clerigo',
+  'necromante',
+];
 
 /** A definição impressa de uma carta, ou `undefined` se ela não existe. */
 export const definicaoDe = (id: CardId): DefinicaoDeCarta | undefined => CATALOGO.porId(id);
@@ -92,4 +111,8 @@ export {
   PASSIVAS_DO_CLERIGO,
   CARTAS_DE_CLASSE_DO_CLERIGO,
   ULTIMATES_DO_CLERIGO,
+  HABILIDADES_DO_NECROMANTE,
+  PASSIVAS_DO_NECROMANTE,
+  CARTAS_DE_CLASSE_DO_NECROMANTE,
+  ULTIMATES_DO_NECROMANTE,
 };

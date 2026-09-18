@@ -103,6 +103,28 @@ export const CHAVE = {
   devocaoSeTerminarComReserva2: 'turno:devocao-se-reserva-2',
   /** O inimigo já estava com Guarda 0 quando esta Ação foi resolver. */
   guardaInimigaJaEraZero: 'acao:guarda-inimiga-zero',
+  /** O inimigo estava com 3 ou menos de Guarda quando a Ação foi declarada. */
+  guardaInimigaBaixaAoDeclarar: 'acao:guarda-inimiga-baixa',
+
+  /* Necromante ---------------------------------------------------------- */
+  /** A colheita automática do próprio turno já aconteceu. */
+  almaColhidaNoProprioTurno: 'turno:alma-colhida-proprio',
+  /** A colheita automática do turno inimigo já aconteceu. */
+  almaColhidaNoTurnoInimigo: 'turno:alma-colhida-inimigo',
+  /** A Alma anexada deste turno já foi colocada sobre um Servo. */
+  almaAnexadaNoTurno: 'turno:alma-anexada',
+  /** O dono moveu voluntariamente uma carta própria para uma zona mais distante. */
+  atrasouCartaPropria: 'turno:atrasou-carta-propria',
+  /** O dono deixou um Servo Pronto de novo neste turno. */
+  servoProntificadoNoTurno: 'turno:servo-prontificado',
+  /** Uma Reação do dono impediu Ruptura neste turno. */
+  reacaoImpediuRuptura: 'turno:reacao-impediu-ruptura',
+  /** Rito de Ossos armado: a Ruptura do próximo Ataque prontifica um Servo. */
+  ritoDeOssosArmado: 'turno:rito-de-ossos',
+  /** Quantos Servos já foram Exauridos na partida (Sacrifício Calculado). */
+  servosExauridos: 'partida:servos-exauridos',
+  /** Cartas devolvidas pelo Rito da Segunda Morte custam +1 AP neste turno. */
+  ritoEncarece: 'turno:rito-encarece',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

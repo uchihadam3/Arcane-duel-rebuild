@@ -56,6 +56,23 @@ export interface EscolhasDaAcao {
    * sobra quem escolhe é o jogador.
    */
   readonly bonusDoMilagre?: 'dano' | 'impacto' | 'cura';
+  /** Quantas Almas colher, quando o texto imprime "colha **até** N Almas". */
+  readonly almasColhidas?: number;
+  /**
+   * Devolver ao Cemitério a Alma anexada ao Servo usado nesta jogada.
+   *
+   * Todo lado Ativar de Servo imprime "você **pode** devolvê-la": é decisão de
+   * quem joga, e sem a decisão a Alma fica onde está.
+   */
+  readonly usarAlmaAnexada?: boolean;
+  /** Repartição de pontos entre Dano e Impacto, quando o texto manda dividir. */
+  readonly divisao?: { readonly dano: number; readonly impacto: number };
+  /** Quanto do custo em recurso de classe abater, quando o texto diz "em até N". */
+  readonly descontoDeRecurso?: number;
+  /** Carta do adversário escolhida por um texto que mexe no cooldown dele. */
+  readonly cartaAdversariaEmCooldown?: CardId;
+  /** Outra carta da própria mão, escolhida por um texto que a manda para o cooldown. */
+  readonly cartaDaMao?: CardId;
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};

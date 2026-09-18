@@ -24,12 +24,12 @@ export type MoedaDeCusto = 'ap' | 'reserva';
 /**
  * Recursos de classe que aparecem dentro do custo impresso de uma carta.
  *
- * Só entram aqui os recursos que o texto das cartas cobra como custo. Devoção,
- * Juramento e Forma, por exemplo, são estados que o texto exige, não moedas que
- * o custo consome — quando as classes delas chegarem, o custo delas será
- * modelado pelo que o catálogo realmente imprimir.
+ * Só entram aqui os recursos que o texto das cartas cobra como custo — "2 AP +
+ * 1 Mana", "1 AP + 1 Alma". Devoção, Juramento e Forma, por exemplo, são
+ * estados que o texto exige, não moedas que o custo consome, e por isso não
+ * aparecem nesta lista.
  */
-export type RecursoDeCusto = 'mana' | 'momentum';
+export type RecursoDeCusto = 'mana' | 'momentum' | 'alma';
 
 /** Parcela fixa do custo paga com o recurso da classe. */
 export interface ParcelaDeRecurso {
