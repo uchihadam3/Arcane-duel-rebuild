@@ -30,3 +30,9 @@ jobs:
 
       - name: npm run check
         run: npm run check
+
+      # A matriz de doze por doze em versão de fumaça: uma partida por
+      # configuração, 156 configurações. Ela falha o job se aparecer comando
+      # ilegal ou invariante quebrada.
+      - name: Matriz 12x12 (fumaça)
+        run: npm run simulate:matrix:smoke -- --seed ci-smoke

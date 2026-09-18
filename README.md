@@ -11,10 +11,14 @@ que é a fonte de verdade do projeto.
 Publicado em **https://uchihadam3.github.io/Arcane-duel-rebuild/**, a partir da
 branch `main`. O cliente é instalável como PWA no Android e no iPhone.
 
-> **Estado atual: fundação.** O motor de regras ainda não resolve combate e o
-> catálogo de cartas está vazio. Esta entrega monta a estrutura, as camadas, as
-> ferramentas e a integração dos assets aprovados. A tela inicial é um
-> diagnóstico da fundação — ela não simula partida.
+> **Estado atual: motor e catálogo completos, sem interface de batalha.** As
+> doze classes estão implementadas, com as 468 cartas jogáveis do
+> [`docs/CARD_CATALOG.md`](docs/CARD_CATALOG.md) — 39 por classe — e pelo menos
+> um teste de comportamento por carta. O motor resolve combate inteiro e roda
+> headless: a matriz de doze por doze (156 configurações) está em
+> [`docs/SIMULATION_STAGE4_MATRIX.md`](docs/SIMULATION_STAGE4_MATRIX.md).
+> A tela inicial ainda é um diagnóstico — ela não simula partida, e a interface
+> de batalha é escopo das etapas seguintes.
 
 ## Requisitos
 
@@ -56,6 +60,19 @@ Comandos individuais:
 | `npm run assets:check` | confere o manifesto contra os arquivos em `/assets`  |
 | `npm run assets:sync`  | espelha `/assets` em `apps/web/public/assets`        |
 | `npm run clean`        | remove builds e o espelho de assets                  |
+
+## Simulador headless
+
+```bash
+npm run simulate -- --games 10000 --seed baseline
+npm run simulate:matrix -- --seed etapa4-matrix   # 12x12: 156 configurações
+npm run simulate:matrix:smoke                     # uma partida por configuração
+```
+
+O simulador roda partidas inteiras sem interface, decidindo só pela projeção que
+um cliente receberia — ele não enxerga a mão do adversário. Qualquer comando
+ilegal ou invariante de estado quebrada faz o processo terminar com erro: um
+lote nessas condições não vale como medição.
 
 ## Estrutura
 
