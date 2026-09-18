@@ -18,6 +18,12 @@ import {
 } from '../recursos-classe.js';
 import { consumirPromessa, lerPromessa, prometerAoProximoAtaque } from './comum.js';
 import {
+  aplicarGritoAmeacador,
+  aplicarTotemDoUrso,
+  bonusDoFrenesi,
+  frenesiAposResolver,
+} from './barbaro.js';
+import {
   aplicarBonusDeMarca,
   consumirDescontoDoPatrulheiro,
   contarArmadilhas,
@@ -157,6 +163,12 @@ export const mecanicasDeClasseAposResolver = (
   brechaDoPassoFalso(ctx, alvo, resumo.houveReacao);
   contarAtivacoesDoBardo(ctx, alvo);
   contarArmadilhas(ctx, alvo);
+  frenesiAposResolver(ctx, alvo, resumo.houveAtaque);
+  // O bônus adiado vira bônus do próximo Ataque agora que a Ação acabou.
+  const adiado = consumirPromessa(ctx, alvo.atacante, CHAVE.proximoAtaqueDanoAdiado);
+  if (adiado > 0) {
+    prometerAoProximoAtaque(ctx, alvo.atacante, ORIGEM_DO_TURNO, CHAVE.proximoAtaqueDano, adiado);
+  }
   if (resumo.houveReacao) registrarReacaoDoPaladino(ctx, alvo);
 };
 
@@ -180,6 +192,9 @@ export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfei
   aplicarDesafinar(ctx, alvo);
   aplicarBonusDeEtapa(ctx, alvo);
   aplicarBonusDeMarca(ctx, alvo);
+  bonusDoFrenesi(ctx, alvo);
+  aplicarGritoAmeacador(ctx, alvo);
+  aplicarTotemDoUrso(ctx, alvo);
 };
 
 /**

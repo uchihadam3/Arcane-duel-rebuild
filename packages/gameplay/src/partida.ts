@@ -78,6 +78,7 @@ import { acaoTrancadaPelaFumaca, descontoDoPrimeiroAtaque } from './efeitos/ladi
 import { descontoDoBardo } from './efeitos/bardo.js';
 import { cobrarDisciplinaDoPasso, descontoDoMonge, disciplinaDoPasso } from './efeitos/monge.js';
 import { descontoDoPatrulheiro } from './efeitos/patrulheiro.js';
+import { descontoDoBarbaro } from './efeitos/barbaro.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
   mecanicasDeClasseAoDeclarar,
@@ -524,9 +525,12 @@ const descontosDoEstado = (
   // Descontos guardados para "a próxima Ação", sem dono de classe.
   const guardado = descontoGuardado(jogador, ordem);
 
+  // Bárbaro: o Frenesi sem Freio barateia os dois Ataques seguintes.
+  const barbaro = descontoDoBarbaro(jogador, perfil);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica || marcha || passos || bardo || monge || patrulheiro || guardado
+    ...(prismatica || marcha || passos || bardo || monge || patrulheiro || guardado || barbaro
       ? { ap: 1, apMinimo: 1 }
       : {}),
   };

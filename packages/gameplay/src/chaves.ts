@@ -241,6 +241,28 @@ export const CHAVE = {
   marcaAplicadaNaAcao: 'acao:marca-aplicada',
   /** Paciência do Caçador prometeu o desconto, se a Marca sobreviver ao turno. */
   pacienciaDoCacador: 'turno:paciencia-do-cacador',
+
+  /* Bárbaro ------------------------------------------------------------- */
+  /** Reduções voluntárias de Guarda feitas na partida inteira. */
+  reducoesVoluntariasNaPartida: 'partida:reducoes-voluntarias',
+  /** O dono entrou em Enfurecido por reduzir a própria Guarda neste turno. */
+  entrouEmEnfurecido: 'turno:entrou-em-enfurecido',
+  /** O dono não pode restaurar Guarda por efeitos próprios neste turno. */
+  proibidoRestaurarGuarda: 'turno:proibido-restaurar-guarda',
+  /** Ataques que ainda recebem o bônus do Frenesi neste turno. */
+  frenesiRestante: 'turno:frenesi-restante',
+  /** Ataques que ainda saem mais baratos pelo Frenesi sem Freio. */
+  frenesiSemFreioRestante: 'turno:frenesi-sem-freio',
+  /** O próximo Ataque inimigo que causar Dano causa 1 D a menos (Totem do Urso). */
+  totemDoUrso: 'partida:totem-do-urso',
+  /** O Grito Ameaçador enfraquece a próxima Reação inimiga. */
+  gritoAmeacador: 'turno:grito-ameacador',
+  /**
+   * Bônus prometido a "seu próximo Ataque" por um efeito que dispara **dentro**
+   * de um Ataque. Ele só vira `proximoAtaqueDano` depois que a Ação atual
+   * resolve — senão a própria Ação que o criou o consumiria.
+   */
+  proximoAtaqueDanoAdiado: 'turno:proximo-ataque-dano-adiado',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

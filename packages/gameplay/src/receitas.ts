@@ -253,6 +253,33 @@ export const ATIRADOR: BuildEquipada = {
   ultimate: cardId('RU01'), // Olho do Predador
 };
 
+/** Bárbaro, Receita 1 — Berserker. */
+export const BERSERKER: BuildEquipada = {
+  classe: 'barbaro',
+  personagem: PERSONAGEM_DA_CLASSE.barbaro,
+  habilidades: [
+    cardId('BA01'), // Machado Curto
+    cardId('BA02'), // Ombro Selvagem
+    cardId('BA03'), // Golpe Temerário
+    cardId('BA04'), // Investida Bestial
+    cardId('BA06'), // Corte em Frenesi
+    cardId('BA11'), // Rugido de Guerra
+    cardId('BA16'), // Pele Grossa
+    cardId('BA17'), // Aparar com o Machado
+  ],
+  passivas: [
+    cardId('BAP01'), // Sangue Quente
+    cardId('BAP02'), // Sem Medo
+    cardId('BAP03'), // Dor é Combustível
+    cardId('BAP08'), // Frenesi Crescente
+  ],
+  cartasDeClasse: [
+    cardId('BAC01'), // Instinto do Berserker
+    cardId('BAC05'), // Totem do Lobo
+  ],
+  ultimate: cardId('BAU02'), // Frenesi sem Freio
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
@@ -263,4 +290,5 @@ export const RECEITAS_INICIAIS = {
   bardo: CRESCENDO,
   monge: KATA_DO_TIGRE,
   patrulheiro: ATIRADOR,
+  barbaro: BERSERKER,
 } as const;

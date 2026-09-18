@@ -396,6 +396,48 @@ const NOMES_DO_PATRULHEIRO: Readonly<Record<string, string>> = {
   RU03: 'Caçada sem Saída',
 };
 
+const NOMES_DO_BARBARO: Readonly<Record<string, string>> = {
+  BA01: 'Machado Curto',
+  BA02: 'Ombro Selvagem',
+  BA03: 'Golpe Temerário',
+  BA04: 'Investida Bestial',
+  BA05: 'Quebra-Crânio',
+  BA06: 'Corte em Frenesi',
+  BA07: 'Machado Arremessado',
+  BA08: 'Golpe de Sangue',
+  BA09: 'Martelo da Fera',
+  BA10: 'Fúria Final',
+  BA11: 'Rugido de Guerra',
+  BA12: 'Quebrar Limites',
+  BA13: 'Frenesi',
+  BA14: 'Desafiar a Dor',
+  BA15: 'Grito Ameaçador',
+  BA16: 'Pele Grossa',
+  BA17: 'Aparar com o Machado',
+  BA18: 'Aceitar o Golpe',
+  BA19: 'Rugido de Retaliação',
+  BA20: 'Último Fôlego',
+  BAP01: 'Sangue Quente',
+  BAP02: 'Sem Medo',
+  BAP03: 'Dor é Combustível',
+  BAP04: 'Quebra-Ossos',
+  BAP05: 'Fera Acuada',
+  BAP06: 'Sem Reserva',
+  BAP07: 'Pele de Ferro',
+  BAP08: 'Frenesi Crescente',
+  BAP09: 'Coração Selvagem',
+  BAP10: 'Não Vou Cair',
+  BAC01: 'Instinto do Berserker',
+  BAC02: 'Instinto do Colosso',
+  BAC03: 'Instinto do Sobrevivente',
+  BAC04: 'Totem do Urso',
+  BAC05: 'Totem do Lobo',
+  BAC06: 'Totem da Tempestade',
+  BAU01: 'Fim do Mundo',
+  BAU02: 'Frenesi sem Freio',
+  BAU03: 'Recusar a Morte',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -413,6 +455,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   bardo: NOMES_DO_BARDO,
   monge: NOMES_DO_MONGE,
   patrulheiro: NOMES_DO_PATRULHEIRO,
+  barbaro: NOMES_DO_BARBARO,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -437,6 +480,7 @@ describe('catálogo oficial', () => {
       'bardo',
       'monge',
       'patrulheiro',
+      'barbaro',
     ]);
   });
 

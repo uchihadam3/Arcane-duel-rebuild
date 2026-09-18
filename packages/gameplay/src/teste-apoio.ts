@@ -44,6 +44,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   bardo: ['B01', 'B02', 'B04', 'B08', 'B14', 'B18', 'B10', 'B09'],
   monge: ['MO01', 'MO04', 'MO07', 'MO11', 'MO13', 'MO17', 'MO02', 'MO05'],
   patrulheiro: ['R01', 'R03', 'R06', 'R10', 'R11', 'R12', 'R16', 'R17'],
+  barbaro: ['BA01', 'BA04', 'BA07', 'BA08', 'BA11', 'BA16', 'BA05', 'BA06'],
 } as const;
 
 /*
@@ -99,6 +100,11 @@ const PADROES = {
     passivas: ['RP05', 'RP06', 'RP07', 'RP08'],
     cartasDeClasse: ['RC02', 'RC05'],
     ultimate: 'RU02',
+  },
+  barbaro: {
+    passivas: ['BAP06', 'BAP08', 'BAP09', 'BAP10'],
+    cartasDeClasse: ['BAC02', 'BAC05'],
+    ultimate: 'BAU01',
   },
 } as const;
 

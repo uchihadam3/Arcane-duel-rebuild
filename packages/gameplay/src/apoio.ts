@@ -147,6 +147,8 @@ export const ganharReservaExtra = (ctx: Contexto, jogador: PlayerId, quantidade:
 /** "Restaure 1 Guarda", sem passar do valor inicial. */
 export const restaurarGuardaEm = (ctx: Contexto, jogador: PlayerId, quantidade: number): void => {
   const antes = jogadorDo(ctx, jogador);
+  // "Você não pode restaurar Guarda por efeitos próprios neste turno."
+  if (contador(ctx, jogador, CHAVE.proibidoRestaurarGuarda) > 0) return;
   const depois = restaurarGuarda(antes, quantidade);
   if (depois.guarda === antes.guarda) return;
   gravarJogador(ctx, depois);
