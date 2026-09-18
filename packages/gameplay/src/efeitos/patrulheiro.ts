@@ -1,8 +1,15 @@
 import type { CardId, EstadoDeJogador, PlayerId } from '@arcane-duel/shared-types';
 import { cardId, valorDaAnotacao } from '@arcane-duel/shared-types';
-import { adiantarCartaNoCooldown, atrasarCartaNoCooldown } from '@arcane-duel/rules-engine';
+import {
+  adiantarCartaNoCooldown,
+  atrasarCartaNoCooldown,
+  emboscadaArmada,
+  emboscadaDe,
+} from '@arcane-duel/rules-engine';
 
 import { aplicarCondicaoEm, perderVidaDireta, reduzirNaResposta, somarAoAtaque } from '../apoio.js';
+import { CATALOGO } from '@arcane-duel/card-data';
+
 import { CHAVE } from '../chaves.js';
 import type { Contexto } from '../contexto.js';
 import { consumirLimitePorTurno, emitir, gravarJogador, jogadorDo, slotDe } from '../contexto.js';
@@ -22,7 +29,6 @@ import {
   exigirCartaEntre,
   lerPromessa,
   prometerAoProximoAtaque,
-  prometerEmSegredo,
 } from './comum.js';
 
 /*
@@ -332,10 +338,15 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
     {
       // "Escolha 1 Ataque da mão e coloque face-down no terceiro espaço de
       // Ação. No próximo turno, ele está reservado para ser a terceira Ação e
-      // custa 1 AP a menos."
+      // custa 1 AP a menos, mínimo 1. Se não for usado até o fim daquele
+      // turno, volta à mão."
+      legalidade: (consulta) =>
+        emboscadaDe(consulta.jogador) === null ? null : 'você já tem um Ataque reservado face-down',
       validarEscolhas: (consulta) => {
+        // "1 Ataque da mão" é literal nas duas metades: o tipo vem do catálogo,
+        // que é a autoridade sobre o que a carta é, e a zona é a mão de agora.
         const ataquesNaMao = consulta.jogador.mao.filter(
-          (carta) => carta !== consulta.perfil.carta,
+          (carta) => carta !== consulta.perfil.carta && ehAtaque(carta),
         );
         return exigirCartaEntre(
           consulta.escolhas.cartaDaMao,
@@ -347,18 +358,7 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       aposResolver: (ctx, alvo) => {
         const escolhida = escolhasDaAcao(ctx, alvo).cartaDaMao;
         if (escolhida === undefined) return;
-        // A chave carrega o identificador do Ataque reservado, e o texto diz
-        // "face-down": o estado canônico precisa saber qual é, o adversário
-        // não pode. A anotação nasce privada e a projeção não a copia para
-        // quem não é o dono.
-        prometerEmSegredo(
-          ctx,
-          alvo.atacante,
-          alvo.origem,
-          `${CHAVE.ataqueEmboscado}:${escolhida}`,
-          1,
-          'partida',
-        );
+        reservarEmboscada(ctx, alvo.atacante, escolhida);
       },
     },
   ],
@@ -708,10 +708,7 @@ export const CARTAS_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = new 
         // "Quando usar um Ataque colocado por Preparar Emboscada, ele recebe
         // +1 D e +1 I."
         legalidade: (consulta) =>
-          valorDaAnotacao(
-            consulta.jogador.anotacoes,
-            `${CHAVE.ataqueEmboscado}:${consulta.perfil.carta}`,
-          ) > 0
+          emboscadaArmada(consulta.jogador)?.carta === consulta.perfil.carta
             ? null
             : 'o Estilo do Emboscador pede o Ataque preparado por Emboscada',
         aoDeclarar: (ctx, alvo) => {
@@ -722,10 +719,7 @@ export const CARTAS_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = new 
       exaurir: {
         // "Aquele Ataque recebe +3 D e +1 I."
         legalidade: (consulta) =>
-          valorDaAnotacao(
-            consulta.jogador.anotacoes,
-            `${CHAVE.ataqueEmboscado}:${consulta.perfil.carta}`,
-          ) > 0
+          emboscadaArmada(consulta.jogador)?.carta === consulta.perfil.carta
             ? null
             : 'o Estilo do Emboscador pede o Ataque preparado por Emboscada',
         aoDeclarar: (ctx, alvo) => {
@@ -936,21 +930,141 @@ export const fechoDoPatrulheiro = (ctx: Contexto, jogador: PlayerId): void => {
   }
 };
 
-/** Descontos do Patrulheiro: o Ataque emboscado e a Paciência do Caçador. */
+/* ------------------------------------------------------------------ */
+/* Preparar Emboscada — o ciclo da reserva face-down                    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A carta reservada sai da mão e vive no componente de classe até uma de duas
+ * coisas acontecer: ser declarada como a terceira Ação do próximo turno, ou o
+ * turno acabar sem ela — e aí ela volta para a mão.
+ *
+ * O ciclo é de estado, não de contagem:
+ *
+ *   R13 resolve  ->  preparada  (não vale neste turno)
+ *   abre o próprio turno seguinte  ->  armada  (ocupa a terceira Ação)
+ *   declarada como terceira Ação   ->  some, e a carta segue o fluxo normal
+ *   fecha o turno sem usá-la       ->  some, e a carta volta à mão
+ *
+ * Nenhum dos caminhos deixa reserva pendurada, e nenhum depende de aritmética
+ * de turno.
+ */
+
+/** A terceira Ação, contada como o motor conta: o índice dois. */
+const TERCEIRO_ESPACO = 2;
+
+/** O catálogo é a autoridade sobre o que a carta é. */
+const ehAtaque = (carta: CardId): boolean => CATALOGO.porId(carta)?.tipo === 'ataque';
+
+/** Tira o Ataque escolhido da mão e o guarda face-down. */
+const reservarEmboscada = (ctx: Contexto, jogador: PlayerId, carta: CardId): void => {
+  const atual = jogadorDo(ctx, jogador);
+  if (atual.recurso.classe !== 'patrulheiro' || atual.recurso.emboscada !== null) return;
+  if (!atual.mao.includes(carta)) return;
+
+  gravarJogador(ctx, {
+    ...atual,
+    mao: atual.mao.filter((item) => item !== carta),
+    recurso: { ...atual.recurso, emboscada: { carta, estado: 'preparada' } },
+  });
+  emitir(ctx, { tipo: 'emboscada-preparada', jogador, carta, visibilidade: 'privada-do-dono' });
+};
+
+/** "No próximo turno": a reserva passa a valer quando o dono abre o turno. */
+export const armarEmboscadaNoInicioDoTurno = (ctx: Contexto, jogador: PlayerId): void => {
+  const atual = jogadorDo(ctx, jogador);
+  if (atual.recurso.classe !== 'patrulheiro') return;
+  const emboscada = atual.recurso.emboscada;
+  if (emboscada?.estado !== 'preparada') return;
+
+  gravarJogador(ctx, {
+    ...atual,
+    recurso: { ...atual.recurso, emboscada: { ...emboscada, estado: 'armada' } },
+  });
+  emitir(ctx, {
+    tipo: 'emboscada-armada',
+    jogador,
+    carta: emboscada.carta,
+    visibilidade: 'privada-do-dono',
+  });
+};
+
+/** "Se não for usado até o fim daquele turno, volta à mão." Sem cooldown. */
+export const devolverEmboscadaNoFimDoTurno = (ctx: Contexto, jogador: PlayerId): void => {
+  const atual = jogadorDo(ctx, jogador);
+  if (atual.recurso.classe !== 'patrulheiro') return;
+  const emboscada = atual.recurso.emboscada;
+  if (emboscada?.estado !== 'armada') return;
+
+  gravarJogador(ctx, {
+    ...atual,
+    mao: [...atual.mao, emboscada.carta],
+    recurso: { ...atual.recurso, emboscada: null },
+  });
+  emitir(ctx, {
+    tipo: 'emboscada-devolvida-a-mao',
+    jogador,
+    carta: emboscada.carta,
+    visibilidade: 'privada-do-dono',
+  });
+};
+
+/**
+ * A Emboscada armada compromete o terceiro espaço de Ação.
+ *
+ * Devolve o motivo da recusa, ou `null` quando a jogada pode seguir. São dois
+ * lados da mesma reserva: aquele espaço é daquela carta, e aquela carta é
+ * daquele espaço.
+ */
+export const travaDaEmboscada = (
+  jogador: EstadoDeJogador,
+  carta: CardId,
+  ordem: number,
+): string | null => {
+  const emboscada = emboscadaArmada(jogador);
+  if (emboscada === null) {
+    // Reserva ainda `preparada`: a carta está face-down e não é jogável neste
+    // turno, nem como terceira Ação nem como qualquer outra.
+    return emboscadaDe(jogador)?.carta === carta
+      ? 'o Ataque reservado só pode ser usado no próximo turno'
+      : null;
+  }
+  if (emboscada.carta === carta) {
+    return ordem === TERCEIRO_ESPACO + 1 ? null : 'o Ataque reservado é a terceira Ação do turno';
+  }
+  return ordem === TERCEIRO_ESPACO + 1
+    ? 'o terceiro espaço de Ação está reservado para o Ataque emboscado'
+    : null;
+};
+
+/**
+ * Descontos do Patrulheiro: o Ataque emboscado e a Paciência do Caçador.
+ *
+ * O desconto da Emboscada é o mais estreito do catálogo: só a carta reservada,
+ * só armada, só na terceira Ação. Fora desses três, ele não existe.
+ */
 export const descontoDoPatrulheiro = (
   jogador: EstadoDeJogador,
   perfil: { readonly carta: CardId },
-): boolean =>
-  jogador.recurso.classe === 'patrulheiro' &&
-  valorDaAnotacao(jogador.anotacoes, `${CHAVE.ataqueEmboscado}:${perfil.carta}`) > 0;
+  ordem: number,
+): boolean => {
+  if (jogador.recurso.classe !== 'patrulheiro') return false;
+  const emboscada = emboscadaArmada(jogador);
+  return emboscada?.carta === perfil.carta && ordem === TERCEIRO_ESPACO + 1;
+};
 
+/**
+ * A reserva já foi consumida pela declaração quando esta função roda, então o
+ * desconto não pode ser redescoberto do estado: quem declarou passa adiante a
+ * decisão tomada antes de a carta sair do terceiro espaço.
+ */
 export const consumirDescontoDoPatrulheiro = (
   ctx: Contexto,
   jogador: PlayerId,
   carta: CardId,
+  usouEmboscada: boolean,
 ): void => {
-  if (jogadorDo(ctx, jogador).recurso.classe !== 'patrulheiro') return;
-  if (consumirPromessa(ctx, jogador, `${CHAVE.ataqueEmboscado}:${carta}`) > 0) {
-    prometerAoProximoAtaque(ctx, jogador, carta, CHAVE.usouAtaqueEmboscado, 1);
-  }
+  if (!usouEmboscada) return;
+  // A marca que o Olho Firme lê: o Ataque emboscado foi realmente usado.
+  prometerAoProximoAtaque(ctx, jogador, carta, CHAVE.usouAtaqueEmboscado, 1);
 };

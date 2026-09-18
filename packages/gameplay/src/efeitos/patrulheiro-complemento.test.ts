@@ -76,7 +76,7 @@ describe('Patrulheiro — Passivas', () => {
   it('RP02 Olho Firme dá +1 D uma vez ao Ataque preparado por Emboscada', () => {
     const base = revelar(
       duelo(
-        patrulheiro(['R13', 'R03'], { passivas: ['RP02', 'RP05', 'RP07', 'RP08'] }),
+        patrulheiro(['R13', 'R03', 'R01', 'R06'], { passivas: ['RP02', 'RP05', 'RP07', 'RP08'] }),
         guerreiro,
         A,
       ),
@@ -87,9 +87,13 @@ describe('Patrulheiro — Passivas', () => {
       pedido: { carta: 'R13' as never, escolhas: { cartaDaMao: 'R03' as never } },
     }).partida;
     const proximo = virarTurno(virarTurno(preparado, A), B);
-    const { partida: depois } = jogar(proximo, A, { pedido: { carta: 'R03' as never } });
+    // O Ataque emboscado é a terceira Ação do turno, e só ela.
+    const uma = jogar(proximo, A, { pedido: { carta: 'R01' as never } }).partida;
+    const duas = jogar(uma, A, { pedido: { carta: 'R06' as never } }).partida;
+    const antes = jogador(duas, B).vida;
+    const { partida: depois } = jogar(duas, A, { pedido: { carta: 'R03' as never } });
     // 3 D impressos + 1 D do Olho Firme.
-    expect(jogador(depois, B).vida).toBe(30 - 4);
+    expect(antes - jogador(depois, B).vida).toBe(4);
   });
 
   it('RP03 Pista Fresca dá +1 I ao próximo Ataque depois de aplicar nova Marca', () => {
@@ -301,7 +305,7 @@ describe('Patrulheiro — Estilos e Armadilhas', () => {
 
   it('RC03 Estilo do Emboscador Ativado só entra no Ataque emboscado', () => {
     const base = duelo(
-      patrulheiro(['R13', 'R03'], { cartasDeClasse: ['RC03', 'RC06'] }),
+      patrulheiro(['R13', 'R03', 'R01', 'R06'], { cartasDeClasse: ['RC03', 'RC06'] }),
       guerreiro,
       A,
     );
@@ -315,18 +319,23 @@ describe('Patrulheiro — Estilos e Armadilhas', () => {
       pedido: { carta: 'R13' as never, escolhas: { cartaDaMao: 'R03' as never } },
     }).partida;
     const proximo = virarTurno(virarTurno(preparado, A), B);
-    const { partida: depois } = jogar(proximo, A, {
+    const duas = jogar(jogar(proximo, A, { pedido: { carta: 'R01' as never } }).partida, A, {
+      pedido: { carta: 'R06' as never },
+    }).partida;
+    const antes = jogador(duas, B).vida;
+    const { partida: depois } = jogar(duas, A, {
       pedido: {
         carta: 'R03' as never,
         cartasDeClasse: [{ carta: 'RC03' as never, modo: 'ativar' }],
       },
     });
-    expect(jogador(depois, B).vida).toBe(30 - 4);
+    // 3 D impressos + 1 D do Estilo Ativado.
+    expect(antes - jogador(depois, B).vida).toBe(4);
   });
 
   it('RC03 Exaurido dá +3 D e +1 I ao Ataque emboscado', () => {
     const base = duelo(
-      patrulheiro(['R13', 'R03'], { cartasDeClasse: ['RC03', 'RC06'] }),
+      patrulheiro(['R13', 'R03', 'R01', 'R06'], { cartasDeClasse: ['RC03', 'RC06'] }),
       guerreiro,
       A,
     );
@@ -334,13 +343,18 @@ describe('Patrulheiro — Estilos e Armadilhas', () => {
       pedido: { carta: 'R13' as never, escolhas: { cartaDaMao: 'R03' as never } },
     }).partida;
     const proximo = virarTurno(virarTurno(preparado, A), B);
-    const { partida: depois } = jogar(proximo, A, {
+    const duas = jogar(jogar(proximo, A, { pedido: { carta: 'R01' as never } }).partida, A, {
+      pedido: { carta: 'R06' as never },
+    }).partida;
+    const antes = jogador(duas, B).vida;
+    const { partida: depois } = jogar(duas, A, {
       pedido: {
         carta: 'R03' as never,
         cartasDeClasse: [{ carta: 'RC03' as never, modo: 'exaurir' }],
       },
     });
-    expect(jogador(depois, B).vida).toBe(30 - 6);
+    // 3 D impressos + 3 D do Estilo Exaurido.
+    expect(antes - jogador(depois, B).vida).toBe(6);
   });
 
   it('RC04 Laço de Caça Ativado enfraquece a terceira Ação inimiga', () => {

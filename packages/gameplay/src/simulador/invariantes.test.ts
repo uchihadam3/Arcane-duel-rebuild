@@ -3,7 +3,18 @@ import type { CardId, EstadoDaPartida, EstadoDeJogador, PlayerId } from '@arcane
 import { cardId } from '@arcane-duel/shared-types';
 
 import { conferirInvariantes, conferirInvariantesDaTransicao } from './invariantes.js';
-import { A, B, build, carta, com, duelo, jogador, jogar, virarTurno } from '../teste-apoio.js';
+import {
+  A,
+  B,
+  build,
+  carta,
+  com,
+  comEmboscadaDeTeste,
+  duelo,
+  jogador,
+  jogar,
+  virarTurno,
+} from '../teste-apoio.js';
 import { anexarAlmaNoServo, declarar, resolver } from '../partida.js';
 
 /*
@@ -259,8 +270,75 @@ describe('recursos das doze classes', () => {
     const quebrado = comRecurso(base, A, {
       classe: 'patrulheiro',
       marcaDaPresa: 1 as never,
+      emboscada: null,
     });
     expect(quebras(quebrado)).toContain('Marca da Presa deixou de ser booleana');
+  });
+
+  it('acusa componente do Patrulheiro sem o campo da Emboscada', () => {
+    // O tipo impede montar isto em código; um replay malformado, não. A
+    // invariante precisa acusar em vez de lançar exceção.
+    const base = duelo(build('patrulheiro'), guerreiro, A);
+    const quebrado = comRecurso(base, A, {
+      classe: 'patrulheiro',
+      marcaDaPresa: false,
+    } as never);
+    expect(quebras(quebrado)).toContain('perdeu o campo da Emboscada');
+  });
+
+  it('não acusa nada numa Emboscada legítima', () => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R01'] });
+    const base = duelo(patrulheiro, guerreiro, A);
+    const preparada = jogar(base, A, {
+      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: carta('R05') } },
+    }).partida;
+    expect(conferirInvariantes(preparada)).toEqual([]);
+  });
+
+  it('acusa carta reservada que continua na mão', () => {
+    // O apoio de teste tira a carta da mão de propósito; aqui a dupla zona é
+    // montada à mão, que é exatamente o estado que a invariante deve acusar.
+    const base = duelo(build('patrulheiro', { habilidades: ['R05'] }), guerreiro, A);
+    const partida = comRecurso(base, A, {
+      classe: 'patrulheiro',
+      marcaDaPresa: false,
+      emboscada: { carta: carta('R05'), estado: 'preparada' },
+    });
+    expect(jogador(partida, A).mao).toContain(carta('R05'));
+    expect(quebras(partida)).toContain('está reservada e na mão ao mesmo tempo');
+  });
+
+  it('acusa carta reservada que não é Ataque', () => {
+    const base = duelo(build('patrulheiro', { habilidades: ['R05'] }), guerreiro, A);
+    // R12 é Técnica, e não está na mão desta build: a única quebra é o tipo.
+    const partida = comEmboscadaDeTeste(base, A, { carta: carta('R12'), estado: 'armada' });
+    expect(quebras(partida)).toContain('reservada sem ser Ataque');
+  });
+
+  it('acusa carta reservada de outra classe', () => {
+    const base = duelo(build('patrulheiro', { habilidades: ['R05'] }), guerreiro, A);
+    const partida = comEmboscadaDeTeste(base, A, { carta: carta('W01'), estado: 'armada' });
+    expect(quebras(partida)).toContain('é carta de guerreiro');
+  });
+
+  it('acusa carta reservada que também está no cooldown', () => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R01'] });
+    const base = duelo(patrulheiro, guerreiro, A);
+    // R13 vai ao cooldown ao ser usada; plantar a reserva nela é a dupla zona.
+    const usada = jogar(base, A, {
+      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: carta('R05') } },
+    }).partida;
+    const partida = comEmboscadaDeTeste(usada, A, { carta: carta('R13'), estado: 'armada' });
+    expect(quebras(partida)).toContain('está reservada e no cooldown');
+  });
+
+  it('acusa estado de Emboscada fora do ciclo', () => {
+    const base = duelo(build('patrulheiro', { habilidades: ['R01'] }), guerreiro, A);
+    const partida = comEmboscadaDeTeste(base, A, {
+      carta: carta('R05'),
+      estado: 'guardada' as never,
+    });
+    expect(quebras(partida)).toContain('Emboscada em estado desconhecido');
   });
 
   it('exige que o Preço Proibido do Bruxo continue booleano', () => {
@@ -297,6 +375,38 @@ describe('invariantes de transição', () => {
     const base = duelo(guerreiro, guerreiro, A);
     const depois = jogar(base, A, { pedido: { carta: carta('W01') } }).partida;
     expect(semTransicao(base, depois)).toEqual([]);
+  });
+
+  it('acusa Emboscada armada que volta a preparada', () => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R05'] });
+    const base = duelo(patrulheiro, guerreiro, A);
+    const armada = comEmboscadaDeTeste(base, A, { carta: carta('R05'), estado: 'armada' });
+    const renovada = comEmboscadaDeTeste(base, A, { carta: carta('R05'), estado: 'preparada' });
+    expect(semTransicao(armada, renovada).join(' | ')).toContain('voltou de armada a preparada');
+  });
+
+  it('acusa Emboscada que troca de carta sem ser desfeita', () => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R05'] });
+    const base = duelo(patrulheiro, guerreiro, A);
+    const uma = comEmboscadaDeTeste(base, A, { carta: carta('R05'), estado: 'armada' });
+    const outra = comEmboscadaDeTeste(base, A, { carta: carta('R02'), estado: 'armada' });
+    expect(semTransicao(uma, outra).join(' | ')).toContain('sem ser desfeita');
+  });
+
+  it('não acusa o ciclo legítimo da Emboscada', () => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R02', 'R01'] });
+    const base = duelo(patrulheiro, guerreiro, A);
+    const preparada = jogar(base, A, {
+      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: carta('R05') } },
+    }).partida;
+    const armada = virarTurno(virarTurno(preparada, A), B);
+    const devolvida = virarTurno(armada, A);
+
+    for (const estado of [preparada, armada, devolvida]) {
+      expect(conferirInvariantes(estado)).toEqual([]);
+    }
+    expect(semTransicao(preparada, armada)).toEqual([]);
+    expect(semTransicao(armada, devolvida)).toEqual([]);
   });
 
   it('acusa Carta de Classe Exaurida que volta ao campo', () => {

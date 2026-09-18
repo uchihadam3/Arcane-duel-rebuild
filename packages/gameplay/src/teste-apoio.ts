@@ -342,10 +342,36 @@ export const comMarca = (
   partida: EstadoDaPartida,
   id: PlayerId,
   marcada: boolean,
-): EstadoDaPartida =>
-  jogador(partida, id).recurso.classe === 'patrulheiro'
-    ? com(partida, id, { recurso: { classe: 'patrulheiro', marcaDaPresa: marcada } })
+): EstadoDaPartida => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'patrulheiro'
+    ? com(partida, id, { recurso: { ...recurso, marcaDaPresa: marcada } })
     : partida;
+};
+
+/** Põe o Patrulheiro com uma Emboscada em um ponto exato do ciclo. */
+export const comEmboscadaDeTeste = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  emboscada: { readonly carta: CardId; readonly estado: 'preparada' | 'armada' } | null,
+): EstadoDaPartida => {
+  const dono = jogador(partida, id);
+  if (dono.recurso.classe !== 'patrulheiro') return partida;
+  return com(partida, id, {
+    recurso: { ...dono.recurso, emboscada },
+    // A carta reservada não pode estar nas duas zonas ao mesmo tempo.
+    mao: emboscada === null ? dono.mao : dono.mao.filter((item) => item !== emboscada.carta),
+  });
+};
+
+/** A Emboscada do Patrulheiro, como o estado canônico a guarda. */
+export const emboscadaDeTeste = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+): { readonly carta: CardId; readonly estado: string } | null => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'patrulheiro' ? recurso.emboscada : null;
+};
 
 export const marcaDe = (partida: EstadoDaPartida, id: PlayerId): boolean => {
   const recurso = jogador(partida, id).recurso;

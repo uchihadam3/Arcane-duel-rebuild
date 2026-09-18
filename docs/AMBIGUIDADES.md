@@ -318,24 +318,45 @@ inventado.
     motor lê a frase como auto-alvo e exige a escolha entre as Condições
     negativas **do próprio jogador**. Se o documento quis dizer o adversário, é
     outra carta.
-52. **Preparar Emboscada não cria uma zona nova.** O texto manda "coloque 1
-    Ataque da mão face-down no terceiro espaço de Ação", reservado para o
-    próximo turno. O estado não tem zona de carta face-down fora da mão, e
-    inventar uma mudaria a projeção, o replay e a contagem de zonas. O motor
-    modela a reserva como marcação: a carta continua na mão, fica anotada como
-    reservada para a terceira Ação do próximo turno e sai 1 AP mais barata lá.
-    O efeito jogável é o impresso; o que não existe é a zona física.
+52. **Preparar Emboscada tem zona própria, no componente de classe do
+    Patrulheiro.** O texto manda "coloque 1 Ataque da mão face-down no terceiro
+    espaço de Ação", reservado para o próximo turno. Não havia, no estado, zona
+    de carta face-down fora da mão. Ela existe agora, e não como zona nova e
+    genérica: é um campo do componente de classe do Patrulheiro
+    (`RecursoDoPatrulheiro.emboscada`), único e anulável, com dois estados —
+    `preparada` no turno em que a carta foi posta ali, `armada` no próprio turno
+    seguinte. O ciclo é de estado e não de contagem de turnos: `preparada` vira
+    `armada` quando o dono abre o próprio turno, e a reserva termina quando ele o
+    fecha.
 
-    Duas consequências que o modelo deixa em aberto, registradas aqui para não
-    passarem por implementadas: a marcação não força a carta a ser a **terceira**
-    Ação, e ela é de escopo `partida`, então a reserva não expira "até o fim
-    daquele turno" — o desconto espera pela carta. "Volta à mão" já está
-    satisfeito de graça, porque a carta nunca saiu de lá. Fechar as duas é
-    mudança de mecânica, não de privacidade.
+    Com isso as cinco exigências do texto estão implementadas, e nenhuma fica em
+    aberto:
 
-    A privacidade, essa sim, é fechada: o texto diz **face-down**, então a
-    escolha `cartaDaMao` e a anotação que carrega o identificador não
-    atravessam a projeção para o adversário nem para o espectador (item 53).
+    - **"1 Ataque da mão"**: o tipo vem do catálogo, e a zona é a mão de agora.
+      Técnica, Reação, carta inexistente ou carta fora da mão são recusadas com
+      erro tipado, sem mutação e sem custo pago.
+    - **"coloque face-down"**: a carta **sai da mão** e passa a viver na reserva.
+      A contagem da mão cai, e a identidade não atravessa a projeção.
+    - **"no próximo turno"**: a reserva só vale na janela — no turno em que foi
+      preparada a carta não pode ser declarada, e no turno seguinte ela pode.
+    - **"reservado para ser a terceira Ação"**: o terceiro espaço é dele nos dois
+      sentidos. A carta reservada não sai como primeira nem como segunda Ação, e
+      nenhuma outra carta ocupa o terceiro espaço enquanto a reserva estiver
+      armada.
+    - **"custa 1 AP a menos, mínimo 1" / "volta à mão"**: o desconto é o mais
+      estreito do catálogo — só a carta reservada, só armada, só na terceira
+      Ação —, respeita o mínimo de 1 AP, e a carta não usada volta à mão no fecho
+      daquele turno, sem cooldown e sem desconto guardado.
+
+    Não há reserva eterna: ela não sobrevive ao turno em que ficou armada. Não há
+    duas Emboscadas ao mesmo tempo: o campo é único, e R13 é recusada enquanto
+    uma reserva estiver de pé.
+
+    A privacidade continua fechada: o texto diz **face-down**, então a escolha
+    `cartaDaMao` não atravessa a projeção para o adversário nem para o espectador
+    (item 53). O que o adversário vê é que **existe** uma carta reservada — ele
+    precisa ver, porque isso compromete o terceiro espaço —, e a identidade vem
+    como `{ visivel: false }`.
 
 53. **Escolhas e anotações têm visibilidade, porque nem toda informação do
     estado é pública.** O estado canônico precisa saber o que Preparar Emboscada
@@ -348,3 +369,10 @@ inventado.
     origem de cada escolha (`ORIGEM_DAS_ESCOLHAS`) e a visibilidade de cada
     anotação (`publica` ou `privada-do-dono`), e a visão ganhou tipos próprios
     para os espaços de Ação em vez de reaproveitar os canônicos.
+
+    A chave `ataque-emboscado:<carta>` não existe mais: quando a reserva virou
+    zona do componente de classe (item 52), o caminho da anotação deixou de ser
+    necessário e foi removido em vez de continuar filtrado. O protocolo de
+    visibilidade continua valendo — a escolha `cartaDaMao` ainda é de
+    `zona-secreta`, a Passiva oculta ainda é `passiva-propria`, e a reserva
+    projetada mostra o estado sem a identidade.

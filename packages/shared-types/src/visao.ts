@@ -4,7 +4,11 @@ import type { IndiceDeAcao } from './zones.js';
 import type { Anotacoes } from './anotacoes.js';
 import type { EstadoDePassiva } from './card-state.js';
 import type { EscolhasDaAcao } from './escolhas.js';
-import type { RecursoDeClasse } from './recursos-de-classe.js';
+import type {
+  EstadoDaEmboscada,
+  RecursoDeClasse,
+  RecursoDoPatrulheiro,
+} from './recursos-de-classe.js';
 import type { CarimboDeVersao } from './versions.js';
 import type {
   CartaDeClasseEquipada,
@@ -42,6 +46,34 @@ export interface PassivaProjetada {
   /** Oculta para o adversário enquanto a Passiva não é revelada. */
   readonly carta: CartaProjetada;
 }
+
+/**
+ * A Emboscada como um observador a enxerga.
+ *
+ * Que existe uma carta face-down é público — o adversário vê o terceiro espaço
+ * comprometido, e precisa ver, porque isso muda o que ele pode esperar. Qual
+ * carta é continua sendo só do dono.
+ */
+export interface EmboscadaProjetada {
+  readonly estado: EstadoDaEmboscada;
+  readonly carta: CartaProjetada;
+}
+
+/**
+ * O componente de classe do Patrulheiro, com a Emboscada filtrada.
+ *
+ * É o único recurso de classe com parte secreta, e por isso o único que ganha
+ * forma projetada própria. Os outros onze são fichas e trilhas na mesa (§16) e
+ * atravessam como estão.
+ */
+export interface RecursoDoPatrulheiroProjetado {
+  readonly classe: 'patrulheiro';
+  readonly marcaDaPresa: boolean;
+  readonly emboscada: EmboscadaProjetada | null;
+}
+
+export type RecursoProjetado =
+  Exclude<RecursoDeClasse, RecursoDoPatrulheiro> | RecursoDoPatrulheiroProjetado;
 
 /*
  * Os espaços de Ação como um observador os enxerga.
@@ -118,7 +150,7 @@ export interface VisaoDeJogador {
   readonly acoes: SlotsDeAcaoProjetados;
   readonly acoesPermitidasNoTurno: number;
   readonly condicoes: EstadoDeCondicoes;
-  readonly recurso: RecursoDeClasse;
+  readonly recurso: RecursoProjetado;
   /** Só as anotações que este observador pode conhecer. */
   readonly anotacoes: Anotacoes;
   readonly removidas: readonly CardId[];

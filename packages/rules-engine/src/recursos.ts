@@ -1,4 +1,9 @@
-import type { EstadoDeJogador, RecursoDeCusto } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EmboscadaPreparada,
+  EstadoDeJogador,
+  RecursoDeCusto,
+} from '@arcane-duel/shared-types';
 
 /*
  * Leitura e escrita do componente próprio de classe.
@@ -111,3 +116,46 @@ export const recursoDaClasse = (jogador: EstadoDeJogador): RecursoDeCusto | null
   if (jogador.recurso.classe === 'monge') return 'chi';
   return jogador.recurso.classe === 'guerreiro' ? 'momentum' : null;
 };
+
+/* ------------------------------------------------------------------ */
+/* Patrulheiro — a Emboscada face-down                                 */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A reserva de Preparar Emboscada.
+ *
+ * Ela mora no componente de classe do Patrulheiro porque é isso que ela é: uma
+ * carta guardada face-down sobre o terceiro espaço de Ação. O motor precisa
+ * saber dela para três coisas — aceitar a declaração vinda daquela zona,
+ * recusar outra carta naquele espaço e devolver a carta à mão quando o turno
+ * passar sem ela ser usada.
+ */
+
+/** A Emboscada deste jogador, ou `null` quando não há nenhuma. */
+export const emboscadaDe = (jogador: EstadoDeJogador): EmboscadaPreparada | null =>
+  jogador.recurso.classe === 'patrulheiro' ? jogador.recurso.emboscada : null;
+
+/** A Emboscada está armada — isto é, é o turno em que ela vale? */
+export const emboscadaArmada = (jogador: EstadoDeJogador): EmboscadaPreparada | null => {
+  const emboscada = emboscadaDe(jogador);
+  return emboscada?.estado === 'armada' ? emboscada : null;
+};
+
+/** Esta carta é a que está armada na Emboscada? */
+export const emboscadaArmadaCom = (jogador: EstadoDeJogador, carta: CardId): boolean =>
+  emboscadaArmada(jogador)?.carta === carta;
+
+/** Grava a Emboscada, respeitando a classe. */
+export const comEmboscada = (
+  jogador: EstadoDeJogador,
+  emboscada: EmboscadaPreparada | null,
+): EstadoDeJogador =>
+  jogador.recurso.classe === 'patrulheiro'
+    ? { ...jogador, recurso: { ...jogador.recurso, emboscada } }
+    : jogador;
+
+/** O componente de classe sem Emboscada nenhuma. */
+export const semEmboscada = (jogador: EstadoDeJogador): EstadoDeJogador['recurso'] =>
+  jogador.recurso.classe === 'patrulheiro'
+    ? { ...jogador.recurso, emboscada: null }
+    : jogador.recurso;

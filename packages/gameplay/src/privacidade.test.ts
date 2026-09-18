@@ -12,7 +12,16 @@ import { projetarParaEspectador, projetarParaJogador } from '@arcane-duel/rules-
 
 import { RECEITAS_INICIAIS } from './receitas.js';
 import { JOGADOR_A, JOGADOR_B, simularPartida } from './simulador/motor.js';
-import { build, carta, com, duelo, jogador, jogar, virarTurno } from './teste-apoio.js';
+import {
+  build,
+  carta,
+  com,
+  duelo,
+  emboscadaDeTeste,
+  jogador,
+  jogar,
+  virarTurno,
+} from './teste-apoio.js';
 
 /*
  * Privacidade da projeção, nas doze classes.
@@ -261,6 +270,16 @@ describe('Preparar Emboscada (R13) preserva a identidade face-down', () => {
     return { partida, antes };
   };
 
+  /**
+   * Leva a partida até o terceiro espaço do turno em que a Emboscada está
+   * armada: a carta reservada só pode ser declarada ali.
+   */
+  const terceiraAcao = (partida: EstadoDaPartida): EstadoDaPartida => {
+    const proximo = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
+    const uma = jogar(proximo, JOGADOR_A, { pedido: { carta: carta('R02') } }).partida;
+    return jogar(uma, JOGADOR_A, { pedido: { carta: carta('R01') } }).partida;
+  };
+
   const visaoDe = (partida: EstadoDaPartida, quem: PlayerId | null): string =>
     JSON.stringify(
       quem === null ? projetarParaEspectador(partida) : projetarParaJogador(partida, quem),
@@ -273,20 +292,26 @@ describe('Preparar Emboscada (R13) preserva a identidade face-down', () => {
 
   it('2. o estado canônico sabe que R05 foi reservado', () => {
     const { partida } = emboscar();
-    const anotacao = jogador(partida, JOGADOR_A).anotacoes.find((atual) =>
-      atual.chave.endsWith(`:${RESERVADA}`),
-    );
-    expect(anotacao).toBeDefined();
-    expect(anotacao?.visibilidade).toBe('privada-do-dono');
+    // A reserva é uma zona do componente de classe, e não uma anotação: a
+    // carta saiu da mão e está face-down sobre o terceiro espaço.
+    expect(emboscadaDeTeste(partida, JOGADOR_A)).toEqual({
+      carta: RESERVADA,
+      estado: 'preparada',
+    });
+    expect(jogador(partida, JOGADOR_A).mao).not.toContain(RESERVADA);
   });
 
-  it('3. a visão do dono contém a identidade R05, na escolha e na anotação', () => {
+  it('3. a visão do dono contém a identidade R05, na escolha e na reserva', () => {
     const { partida } = emboscar();
     const visao = projetarParaJogador(partida, JOGADOR_A);
     const dono = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
 
     expect(dono?.acoes[0].escolhas.cartaDaMao).toBe(RESERVADA);
-    expect(dono?.anotacoes.some((atual) => atual.chave.includes(RESERVADA))).toBe(true);
+    const recurso = dono?.recurso;
+    expect(recurso?.classe).toBe('patrulheiro');
+    const reserva = recurso?.classe === 'patrulheiro' ? recurso.emboscada : null;
+    expect(reserva?.estado).toBe('preparada');
+    expect(reserva?.carta).toEqual({ visivel: true, carta: RESERVADA });
   });
 
   it('4. a visão do adversário não contém R05 pela escolha', () => {
@@ -346,27 +371,38 @@ describe('Preparar Emboscada (R13) preserva a identidade face-down', () => {
     for (const escondida of naMao) {
       expect(apareceEm(texto, escondida), `${escondida} vazou`).toBe(false);
     }
-    expect(naMao).toContain(RESERVADA);
+    // Nem a reservada, que saiu da mão sem virar pública.
+    expect(naMao).not.toContain(RESERVADA);
     expect(jogador(antes, JOGADOR_A).mao).toContain(RESERVADA);
+
+    // O que ele vê é que existe uma carta face-down, e só isso.
+    const visao = projetarParaJogador(partida, JOGADOR_B);
+    const recurso = visao.jogadores.find((atual) => atual.id === JOGADOR_A)?.recurso;
+    const reserva = recurso?.classe === 'patrulheiro' ? recurso.emboscada : null;
+    expect(reserva).not.toBeNull();
+    expect(reserva?.carta).toEqual({ visivel: false });
   });
 
   it('11. jogado depois, o Ataque reservado passa a ser público normalmente', () => {
     const { partida } = emboscar();
-    const proximo = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
-    const { partida: atacou } = jogar(proximo, JOGADOR_A, { pedido: { carta: RESERVADA } });
+    const { partida: atacou } = jogar(terceiraAcao(partida), JOGADOR_A, {
+      pedido: { carta: RESERVADA },
+    });
 
     const visao = projetarParaJogador(atacou, JOGADOR_B);
     const patrulheiro = visao.jogadores.find((atual) => atual.id === JOGADOR_A);
-    // Agora ele é uma Ação declarada à vista de todos.
-    expect(patrulheiro?.acoes[0].perfil?.carta).toBe(RESERVADA);
+    // Agora ele é uma Ação declarada à vista de todos, no terceiro espaço.
+    expect(patrulheiro?.acoes[2].perfil?.carta).toBe(RESERVADA);
     expect(apareceEm(JSON.stringify(visao), RESERVADA)).toBe(true);
+    // E a reserva deixou de existir: nada de emboscada eterna.
+    expect(emboscadaDeTeste(atacou, JOGADOR_A)).toBeNull();
   });
 
   it('12. o desconto de 1 AP continua sendo aplicado à carta reservada', () => {
     const { partida } = emboscar();
-    const proximo = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
-    const apAntes = jogador(proximo, JOGADOR_A).pontosDeAcao;
-    const { partida: depois } = jogar(proximo, JOGADOR_A, { pedido: { carta: RESERVADA } });
+    const pronto = terceiraAcao(partida);
+    const apAntes = jogador(pronto, JOGADOR_A).pontosDeAcao;
+    const { partida: depois } = jogar(pronto, JOGADOR_A, { pedido: { carta: RESERVADA } });
     // R05 custa 2 AP impressos e sai por 1.
     expect(apAntes - jogador(depois, JOGADOR_A).pontosDeAcao).toBe(1);
   });
@@ -380,12 +416,15 @@ describe('Preparar Emboscada (R13) preserva a identidade face-down', () => {
     expect(apAntes - jogador(depois, JOGADOR_A).pontosDeAcao).toBe(2);
   });
 
-  it('14. sem ser usado, o Ataque reservado continua na mão', () => {
+  it('14. sem ser usado, o Ataque reservado volta à mão sem virar público', () => {
     const { partida } = emboscar();
-    const virada = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
-    // A reserva é marcação, e não uma zona física nova (AMBIGUIDADES, 52):
-    // a carta nunca saiu da mão, então "volta à mão" já está satisfeito.
+    const armada = virarTurno(virarTurno(partida, JOGADOR_A), JOGADOR_B);
+    expect(jogador(armada, JOGADOR_A).mao).not.toContain(RESERVADA);
+
+    // "Se não for usado até o fim daquele turno, volta à mão."
+    const virada = virarTurno(armada, JOGADOR_A);
     expect(jogador(virada, JOGADOR_A).mao).toContain(RESERVADA);
+    expect(emboscadaDeTeste(virada, JOGADOR_A)).toBeNull();
     expect(apareceEm(visaoDe(virada, JOGADOR_B), RESERVADA)).toBe(false);
   });
 
@@ -558,10 +597,7 @@ describe('o log distingue replay de visão entregue ao cliente', () => {
       pedido: { carta: carta('R13'), escolhas: { cartaDaMao: carta('R05') } },
     });
 
-    const daEmboscada = eventos.find(
-      (evento) =>
-        evento.tipo === 'anotacao-registrada' && evento.chave.includes('ataque-emboscado'),
-    );
+    const daEmboscada = eventos.find((evento) => evento.tipo === 'emboscada-preparada');
     expect(daEmboscada).toBeDefined();
     expect(
       daEmboscada && 'visibilidade' in daEmboscada ? daEmboscada.visibilidade : undefined,

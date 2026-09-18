@@ -13,6 +13,7 @@ import { expirarAnotacoes, falha, sucesso } from '@arcane-duel/shared-types';
 import type { RespostaDeComando } from './comando.js';
 import { encerrarSeVidaZerou, exigirJogadorDaPartida, exigirTurnoEmAndamento } from './comando.js';
 import { REGRAS_UNIVERSAIS } from './constants.js';
+import { emboscadaArmadaCom, semEmboscada } from './recursos.js';
 import { concluiuASegundaAcao, consumirLento, resolverSangramento } from './condicoes.js';
 import { resolverAtaque } from './combate.js';
 import { enviarParaCooldown } from './cooldown.js';
@@ -93,7 +94,14 @@ export const declararAcao = (
   }
   if (perfil.custo.moeda !== 'ap')
     return falha({ tipo: 'moeda-de-custo-invalida', esperada: 'ap' });
-  if (!atacante.mao.includes(perfil.carta)) {
+  /*
+   * A carta pode vir de duas zonas próprias: a mão, que é o caso de sempre, e
+   * a Emboscada armada, onde ela está face-down aguardando a terceira Ação. A
+   * reserva é a única zona além da mão de onde se declara uma Ação, e por isso
+   * é conferida aqui, junto da mão, e não por uma exceção espalhada.
+   */
+  const daEmboscada = emboscadaArmadaCom(atacante, perfil.carta);
+  if (!atacante.mao.includes(perfil.carta) && !daEmboscada) {
     return falha({ tipo: 'carta-fora-da-mao', carta: perfil.carta });
   }
 
@@ -129,6 +137,9 @@ export const declararAcao = (
   atualizado = {
     ...atualizado,
     mao: atualizado.mao.filter((carta) => carta !== perfil.carta),
+    // Declarada, a carta reservada deixa de estar face-down: a Emboscada
+    // termina aqui, e a identidade passa a ser pública como a de qualquer Ação.
+    ...(daEmboscada ? { recurso: semEmboscada(atualizado) } : {}),
   };
   atualizado = substituirSlot(atualizado, {
     ...slot,

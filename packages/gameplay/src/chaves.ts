@@ -226,8 +226,6 @@ export const CHAVE = {
   explorouMarcaNoTurno: 'turno:explorou-marca',
   /** A Marca atravessou um turno inteiro sem ser Explorada. */
   marcaMantidaPorUmTurno: 'partida:marca-mantida',
-  /** Ataque reservado pela Emboscada para a terceira Ação do próximo turno. */
-  ataqueEmboscado: 'partida:ataque-emboscado',
   /** O Ataque em curso foi o preparado pela Emboscada. */
   usouAtaqueEmboscado: 'turno:usou-ataque-emboscado',
   /** Bônus guardado para o próximo Ataque contra alvo Marcado. */

@@ -1,10 +1,17 @@
 import type {
   CardId,
+  EmboscadaPreparada,
   EstadoDaPartida,
   EstadoDeJogador,
   PedraDeChi,
 } from '@arcane-duel/shared-types';
-import { ESTADOS_DE_JURAMENTO, ESTAGIOS_DE_DEVOCAO } from '@arcane-duel/shared-types';
+import {
+  ESTADOS_DE_EMBOSCADA,
+  ESTADOS_DE_JURAMENTO,
+  ESTAGIOS_DE_DEVOCAO,
+} from '@arcane-duel/shared-types';
+import { CATALOGO } from '@arcane-duel/card-data';
+import { projetarParaJogador } from '@arcane-duel/rules-engine';
 import {
   LIMITE_DE_CONDICAO,
   LIMITES_DE_RECURSO,
@@ -171,6 +178,61 @@ const conferirAcoes = (quebras: string[], jogador: EstadoDeJogador): void => {
   }
 };
 
+/**
+ * A Emboscada do Patrulheiro (R13).
+ *
+ * A reserva é uma zona física de uma carta só: o campo é único e anulável, e
+ * por isso "no máximo uma Emboscada" é garantido pelo tipo, não por conferência.
+ * O que o tipo não garante — e por isso é conferido aqui — é que a carta
+ * reservada seja mesmo um Ataque da classe de quem a reservou, e que ela esteja
+ * em **uma** zona só: face-down é sair da mão, e não estar nos dois lugares.
+ */
+const conferirEmboscada = (
+  quebras: string[],
+  jogador: EstadoDeJogador,
+  emboscada: EmboscadaPreparada | null | undefined,
+): void => {
+  // O tipo garante o campo, mas a invariante lê estado que pode ter vindo de
+  // um replay: campo ausente é quebra, e não motivo para lançar exceção.
+  if (emboscada === undefined) {
+    quebras.push('patrulheiro: o componente de classe perdeu o campo da Emboscada');
+    return;
+  }
+  if (emboscada === null) return;
+  const reservada = emboscada.carta;
+
+  if (!ESTADOS_DE_EMBOSCADA.includes(emboscada.estado)) {
+    quebras.push(`patrulheiro: Emboscada em estado desconhecido: ${emboscada.estado}`);
+  }
+
+  // "Escolha 1 Ataque da mão": o catálogo é a autoridade sobre o que a carta é.
+  const definicao = CATALOGO.porId(reservada);
+  if (definicao === undefined) {
+    quebras.push(`patrulheiro: ${reservada} está reservada mas não existe no catálogo`);
+    return;
+  }
+  if (definicao.tipo !== 'ataque') {
+    quebras.push(`patrulheiro: ${reservada} está reservada sem ser Ataque (${definicao.tipo})`);
+  }
+  // A reserva é do dono: a carta face-down saiu da mão dele, e de mais ninguém.
+  if (definicao.classe !== jogador.classe) {
+    quebras.push(`patrulheiro: ${reservada} está reservada mas é carta de ${definicao.classe}`);
+  }
+
+  // "Coloque face-down no terceiro espaço": a carta saiu da mão.
+  if (jogador.mao.includes(reservada)) {
+    quebras.push(`patrulheiro: ${reservada} está reservada e na mão ao mesmo tempo`);
+  }
+  for (const [zona, cartas] of Object.entries(jogador.cooldown)) {
+    if (cartas.includes(reservada)) {
+      quebras.push(`patrulheiro: ${reservada} está reservada e no cooldown ${zona}`);
+    }
+  }
+  if (jogador.removidas.includes(reservada)) {
+    quebras.push(`patrulheiro: ${reservada} está reservada e entre as removidas`);
+  }
+};
+
 const conferirRecurso = (quebras: string[], jogador: EstadoDeJogador): void => {
   const recurso = jogador.recurso;
   switch (recurso.classe) {
@@ -224,6 +286,7 @@ const conferirRecurso = (quebras: string[], jogador: EstadoDeJogador): void => {
       if (typeof recurso.marcaDaPresa !== 'boolean') {
         quebras.push('patrulheiro: Marca da Presa deixou de ser booleana');
       }
+      conferirEmboscada(quebras, jogador, recurso.emboscada);
       return;
 
     case 'barbaro':
@@ -323,9 +386,38 @@ const conferirChi = (quebras: string[], chi: readonly PedraDeChi[]): void => {
  *
  * A lista vazia é o resultado esperado; qualquer linha nela invalida o lote.
  */
+/**
+ * A identidade reservada não atravessa a projeção do adversário.
+ *
+ * Esta é a única invariante que olha a projeção em vez do estado: a carta
+ * face-down é o caso em que o estado canônico **precisa** saber algo que
+ * observador nenhum pode ler, e por isso a prova tem de ser feita do lado de
+ * fora.
+ */
+const conferirPrivacidadeDaEmboscada = (quebras: string[], partida: EstadoDaPartida): void => {
+  for (const dono of partida.jogadores) {
+    if (dono.recurso.classe !== 'patrulheiro') continue;
+    // `?? null` pela mesma razão do conferidor acima: campo ausente já foi
+    // acusado ali, e aqui não há o que projetar.
+    const emboscada = dono.recurso.emboscada ?? null;
+    if (emboscada === null) continue;
+
+    for (const outro of partida.jogadores) {
+      if (outro.id === dono.id) continue;
+      const texto = JSON.stringify(projetarParaJogador(partida, outro.id));
+      if (new RegExp(`(?<![A-Za-z0-9_-])${emboscada.carta}(?![A-Za-z0-9_-])`).test(texto)) {
+        quebras.push(
+          `patrulheiro: ${emboscada.carta} está face-down e aparece na visão de ${outro.id}`,
+        );
+      }
+    }
+  }
+};
+
 export const conferirInvariantes = (partida: EstadoDaPartida): readonly string[] => {
   const quebras: string[] = [];
   for (const jogador of partida.jogadores) conferirJogador(quebras, jogador);
+  conferirPrivacidadeDaEmboscada(quebras, partida);
   return quebras;
 };
 
@@ -365,6 +457,25 @@ const conferirTransicaoDoJogador = (
     if (devolta !== undefined) {
       quebras.push(
         `${depois.classe}: ${carta} voltou ao campo como ${devolta.estado} depois de Exaurida`,
+      );
+    }
+  }
+
+  // A Emboscada só anda para a frente: "preparada" vira "armada", e "armada"
+  // vira usada ou devolvida. Voltar a "preparada" seria uma reserva renovando
+  // a própria janela — a emboscada eterna que o texto não permite.
+  const reservaAntes = antes.recurso.classe === 'patrulheiro' ? antes.recurso.emboscada : null;
+  const reservaDepois = depois.recurso.classe === 'patrulheiro' ? depois.recurso.emboscada : null;
+  if (reservaAntes !== null && reservaDepois !== null) {
+    if (reservaAntes.estado === 'armada' && reservaDepois.estado === 'preparada') {
+      quebras.push(
+        `${depois.classe}: a Emboscada de ${reservaDepois.carta} voltou de armada a preparada`,
+      );
+    }
+    // Uma reserva de pé não troca de carta: ela é a carta que foi posta ali.
+    if (reservaAntes.carta !== reservaDepois.carta) {
+      quebras.push(
+        `${depois.classe}: a Emboscada trocou ${reservaAntes.carta} por ${reservaDepois.carta} sem ser desfeita`,
       );
     }
   }

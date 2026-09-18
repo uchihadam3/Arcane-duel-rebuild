@@ -127,8 +127,38 @@ export interface RecursoDoMonge {
   readonly sequenciaDeKata: readonly PassoDeKata[];
 }
 
+/**
+ * Em que ponto do ciclo está a Emboscada preparada.
+ *
+ * - `preparada`: nasceu neste turno e ainda não vale. "No **próximo** turno"
+ *   é literal: ela não pode ser usada no mesmo turno em que foi criada.
+ * - `armada`: é o próximo próprio turno, e ela ocupa a terceira Ação.
+ *
+ * O ciclo é de estado, e não de contagem de turnos: `preparada` vira `armada`
+ * quando o dono abre o próprio turno, e a reserva termina quando ele o fecha.
+ * Assim ela não sobrevive a nada nem depende de aritmética de turno.
+ */
+export type EstadoDaEmboscada = 'preparada' | 'armada';
+
+/** Os dois estados do ciclo, na ordem em que ele anda. */
+export const ESTADOS_DE_EMBOSCADA: readonly EstadoDaEmboscada[] = ['preparada', 'armada'];
+
+/** O Ataque que Preparar Emboscada guardou face-down. */
+export interface EmboscadaPreparada {
+  readonly carta: CardId;
+  readonly estado: EstadoDaEmboscada;
+}
+
 export interface RecursoDoPatrulheiro {
   readonly classe: 'patrulheiro';
+  /**
+   * O Ataque reservado face-down para a terceira Ação do próximo turno.
+   *
+   * O campo é um só: não existem duas Emboscadas simultâneas, e o tipo não
+   * consegue representá-las. Enquanto ele não for `null`, a carta **não** está
+   * na mão — ela está aqui, e só o dono conhece a identidade dela.
+   */
+  readonly emboscada: EmboscadaPreparada | null;
   /** Uma única Marca, colocada sobre o adversário. */
   readonly marcaDaPresa: boolean;
 }

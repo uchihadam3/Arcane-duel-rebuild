@@ -8,6 +8,7 @@ import type {
   EstadoDeJogador,
   PassivaProjetada,
   PlayerId,
+  RecursoProjetado,
   SlotDeAcao,
   SlotDeAcaoProjetado,
   SlotsDeAcaoProjetados,
@@ -170,7 +171,7 @@ export const projetarJogador = (
   acoes: projetarSlots(jogador, dono, contexto),
   acoesPermitidasNoTurno: jogador.acoesPermitidasNoTurno,
   condicoes: { ...jogador.condicoes },
-  recurso: { ...jogador.recurso },
+  recurso: projetarRecurso(jogador, dono),
   // Quase toda anotação nasce de texto que resolveu em público. As poucas que
   // guardam informação de zona secreta se declaram `privada-do-dono`, e essas
   // não são copiadas para quem não é o dono.
@@ -193,6 +194,34 @@ const projetarSlots = (
       contexto.ocultasDeQuemRespondeu,
     );
   return [projetarIndice(0), projetarIndice(1), projetarIndice(2), projetarIndice(3)];
+};
+
+/**
+ * Projeta o componente de classe.
+ *
+ * Onze classes têm componente inteiramente público — fichas, trilhas e
+ * marcadores na mesa (§16) — e atravessam como estão. O Patrulheiro é a
+ * exceção: a Emboscada guarda um Ataque **face-down**, e o que o adversário
+ * pode saber é que ela existe, não qual carta é.
+ */
+const projetarRecurso = (jogador: EstadoDeJogador, dono: boolean): RecursoProjetado => {
+  const recurso = jogador.recurso;
+  if (recurso.classe !== 'patrulheiro') return { ...recurso };
+
+  // Lida com `?? null` de propósito: a projeção é o que o cliente recebe e não
+  // pode lançar exceção por causa de um estado malformado vindo de um replay.
+  const emboscada = recurso.emboscada ?? null;
+  return {
+    classe: 'patrulheiro',
+    marcaDaPresa: recurso.marcaDaPresa,
+    emboscada:
+      emboscada === null
+        ? null
+        : {
+            estado: emboscada.estado,
+            carta: dono ? revelar(emboscada.carta) : ocultar(),
+          },
+  };
 };
 
 const projetarAnotacoes = (anotacoes: Anotacoes, dono: boolean): Anotacoes =>

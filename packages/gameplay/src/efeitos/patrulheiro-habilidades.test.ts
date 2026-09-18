@@ -155,15 +155,20 @@ describe('Patrulheiro — habilidades', () => {
     expect(antes - jogador(depois, B).vida).toBe(4);
   });
 
-  it('R13 Preparar Emboscada reserva um Ataque e o barateia no próximo turno', () => {
-    const base = duelo(patrulheiro(['R13', 'R07']), guerreiro, A);
+  it('R13 Preparar Emboscada reserva um Ataque e o barateia na terceira Ação', () => {
+    const base = duelo(patrulheiro(['R13', 'R07', 'R01', 'R06']), guerreiro, A);
     const preparado = jogar(base, A, {
       pedido: { carta: 'R13' as never, escolhas: { cartaDaMao: 'R07' as never } },
     }).partida;
+    // A carta sai da mão e fica face-down no componente de classe.
+    expect(jogador(preparado, A).mao).not.toContain('R07');
+
     const proximo = virarTurno(virarTurno(preparado, A), B);
-    const apAntes = jogador(proximo, A).pontosDeAcao;
-    const { partida: depois } = jogar(proximo, A, { pedido: { carta: 'R07' as never } });
-    // Flecha de Impacto custa 3 AP; emboscada, sai por 2.
+    const uma = jogar(proximo, A, { pedido: { carta: 'R01' as never } }).partida;
+    const duas = jogar(uma, A, { pedido: { carta: 'R06' as never } }).partida;
+    const apAntes = jogador(duas, A).pontosDeAcao;
+    const { partida: depois } = jogar(duas, A, { pedido: { carta: 'R07' as never } });
+    // Flecha de Impacto custa 3 AP; emboscada na terceira Ação, sai por 2.
     expect(apAntes - jogador(depois, A).pontosDeAcao).toBe(2);
   });
 

@@ -151,6 +151,32 @@ export type EventoUniversal =
       readonly visibilidade?: VisibilidadeDaAnotacao;
     }
   | { readonly tipo: 'acao-extra-liberada'; readonly jogador: PlayerId; readonly origem: CardId }
+  /*
+   * A Emboscada do Patrulheiro, do começo ao fim.
+   *
+   * Os três eventos carregam a carta porque o log é registro de replay e
+   * precisa reconstruir a partida. Eles são privados do dono pela mesma razão
+   * que a reserva é: o texto diz face-down. Quem entregar o log a um cliente
+   * filtra por `visibilidade`, como nas anotações.
+   */
+  | {
+      readonly tipo: 'emboscada-preparada';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly visibilidade?: VisibilidadeDaAnotacao;
+    }
+  | {
+      readonly tipo: 'emboscada-armada';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly visibilidade?: VisibilidadeDaAnotacao;
+    }
+  | {
+      readonly tipo: 'emboscada-devolvida-a-mao';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly visibilidade?: VisibilidadeDaAnotacao;
+    }
   | {
       readonly tipo: 'escolha-pendente-registrada';
       readonly jogador: PlayerId;

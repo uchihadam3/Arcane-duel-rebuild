@@ -32,6 +32,7 @@ import {
   ativarPassiva,
   consumirUltimate,
   devolverCartaAMao,
+  emboscadaArmadaCom,
   encerrarSeVidaZerou,
   expirarAnotacoesDaAcao,
   criarPartida,
@@ -524,7 +525,7 @@ const descontosDoEstado = (
 
   // O Patrulheiro guarda desconto para o Ataque emboscado e para o primeiro
   // Ataque depois de um turno inteiro de Marca mantida.
-  const patrulheiro = descontoDoPatrulheiro(jogador, perfil);
+  const patrulheiro = descontoDoPatrulheiro(jogador, perfil, ordem);
 
   // Descontos guardados para "a próxima Ação", sem dono de classe.
   const guardado = descontoGuardado(jogador, ordem);
@@ -604,7 +605,9 @@ export const declarar = (
   const ehUltimate = atual.ultimate.carta === pedido.carta;
   if (ehUltimate) {
     if (atual.ultimate.estado !== 'disponivel') return falha({ tipo: 'ultimate-ja-consumida' });
-  } else if (!atual.mao.includes(pedido.carta)) {
+  } else if (!atual.mao.includes(pedido.carta) && !emboscadaArmadaCom(atual, pedido.carta)) {
+    // A Emboscada armada é a outra zona própria de onde se declara uma Ação: a
+    // carta está face-down sobre o terceiro espaço, e não na mão.
     return falha({ tipo: 'carta-fora-da-mao', carta: pedido.carta });
   }
 
@@ -629,6 +632,10 @@ export const declarar = (
 
   const escolhaFaltando = recusaDeEscolhas(consulta, usos);
   if (escolhaFaltando !== null) return falha(escolhaFaltando);
+
+  // Lido antes de declarar: a declaração tira a carta do terceiro espaço, e
+  // depois disso não há mais como saber que ela veio da Emboscada.
+  const usouEmboscada = descontoDoPatrulheiro(atual, perfil.valor, ordem);
 
   const doEstado = descontosDoEstado(atual, perfil.valor, ordem, escolhas);
   const somados = somar(descontosDaDeclaracao(consulta, usos), doEstado);
@@ -669,7 +676,7 @@ export const declarar = (
     gastarChi(ctx, jogador, ignorado);
     cobrarDisciplinaDoPasso(ctx, jogador, true);
   }
-  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor, ordem, escolhas);
+  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor, ordem, escolhas, usouEmboscada);
   for (const uso of usos) {
     const comando =
       uso.modo === 'ativar'

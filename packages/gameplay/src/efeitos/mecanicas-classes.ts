@@ -45,9 +45,12 @@ import {
 } from './barbaro.js';
 import {
   aplicarBonusDeMarca,
+  armarEmboscadaNoInicioDoTurno,
   consumirDescontoDoPatrulheiro,
   contarArmadilhas,
+  devolverEmboscadaNoFimDoTurno,
   fechoDoPatrulheiro,
+  travaDaEmboscada,
 } from './patrulheiro.js';
 import {
   aplicarBonusDeEtapa,
@@ -235,6 +238,9 @@ export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfei
  */
 export const legalidadeDeClasse = (consulta: ConsultaDeLegalidade): string | null =>
   travaDeTecnicaDoPaladino(consulta.jogador, consulta.perfil.tipo === 'tecnica') ??
+  // O terceiro espaço reservado pela Emboscada é dele e de mais ninguém, e a
+  // carta reservada não sai de lá antes da hora.
+  travaDaEmboscada(consulta.jogador, consulta.perfil.carta, consulta.ordem) ??
   legalidadeDoBruxo(consulta);
 
 /**
@@ -282,6 +288,7 @@ export const mecanicasDeClasseAoDeclarar = (
   perfil: PerfilDeHabilidade,
   ordem: number,
   escolhas: EscolhasDaAcao = {},
+  usouEmboscada = false,
 ): void => {
   // Bruxo: o preço em Vida sai agora, depois de o AP descontado ter sido pago
   // e antes de qualquer texto de carta ler "já perdeu Vida neste turno".
@@ -292,7 +299,7 @@ export const mecanicasDeClasseAoDeclarar = (
   consumirPromessa(ctx, jogador, CHAVE.proximaAcaoDescontoAp);
   if (ordem === 1) consumirPromessa(ctx, jogador, CHAVE.primeiraAcaoDoProximoTurnoMaisBarata);
   consumirDescontoDoMonge(ctx, jogador, perfil);
-  consumirDescontoDoPatrulheiro(ctx, jogador, perfil.carta);
+  consumirDescontoDoPatrulheiro(ctx, jogador, perfil.carta, usouEmboscada);
 };
 
 /**
@@ -328,6 +335,9 @@ export const mecanicasDeClasseAoAbrirTurno = (
   reiniciarMetamorfose(ctx, jogador);
   // Bruxo: o Preço Proibido vale uma vez em cada próprio turno.
   reiniciarPrecoProibido(ctx, jogador);
+  // Patrulheiro: "no próximo turno" chegou — a Emboscada passa a valer e
+  // compromete o terceiro espaço de Ação deste turno.
+  armarEmboscadaNoInicioDoTurno(ctx, jogador);
   // "Último Contrato: enquanto começar o turno com 5 de Vida ou menos."
   marcarInicioDoBruxo(ctx, jogador);
 };
@@ -340,6 +350,8 @@ export const mecanicasDeClasseAoFecharTurno = (ctx: Contexto, jogador: PlayerId)
   // Isso cobre também as Brechas criadas no turno inimigo, que duram até o fim
   // do turno seguinte dele.
   limparBrechas(ctx, jogador);
+  // Patrulheiro: "se não for usado até o fim daquele turno, volta à mão."
+  devolverEmboscadaNoFimDoTurno(ctx, jogador);
 };
 
 /**

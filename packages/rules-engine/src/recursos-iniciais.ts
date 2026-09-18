@@ -34,7 +34,7 @@ const POR_CLASSE: Construtores = {
     chi: ['pronta', 'pronta', 'pronta'],
     sequenciaDeKata: [],
   }),
-  patrulheiro: () => ({ classe: 'patrulheiro', marcaDaPresa: false }),
+  patrulheiro: () => ({ classe: 'patrulheiro', marcaDaPresa: false, emboscada: null }),
   barbaro: () => ({ classe: 'barbaro', guardaReduzidaVoluntariamenteNoTurno: 0 }),
   druida: () => ({ classe: 'druida', forma: 'humana', metamorfoseGratuitaUsadaNoTurno: false }),
   bruxo: () => ({ classe: 'bruxo', precoProibidoUsadoNoTurno: false }),
