@@ -1,5 +1,7 @@
 import { CARD_DATA_VERSION, CATALOGO, CLASSES_IMPLEMENTADAS } from '@arcane-duel/card-data';
-import { RECEITAS_INICIAIS } from '@arcane-duel/gameplay';
+// Caminho direto de propósito: o barril de `gameplay` traz o registro de
+// efeitos das doze classes junto, e o cliente só precisa das Receitas.
+import { RECEITAS_INICIAIS } from '@arcane-duel/gameplay/receitas';
 import { COMPOSICAO_DA_BUILD, REGRAS_UNIVERSAIS, RULES_VERSION } from '@arcane-duel/rules-engine';
 import { AssetProvider, MANIFESTO_DE_ASSETS } from '@arcane-duel/ui';
 

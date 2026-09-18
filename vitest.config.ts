@@ -15,6 +15,9 @@ export default defineConfig({
       '@arcane-duel/shared-types': fromRoot('./packages/shared-types/src/index.ts'),
       '@arcane-duel/rules-engine': fromRoot('./packages/rules-engine/src/index.ts'),
       '@arcane-duel/card-data': fromRoot('./packages/card-data/src/index.ts'),
+      // O caminho direto existe para o cliente ler as Receitas sem arrastar o
+      // registro de efeitos inteiro para dentro do bundle.
+      '@arcane-duel/gameplay/receitas': fromRoot('./packages/gameplay/src/receitas.ts'),
       '@arcane-duel/gameplay': fromRoot('./packages/gameplay/src/index.ts'),
       '@arcane-duel/ai': fromRoot('./packages/ai/src/index.ts'),
       '@arcane-duel/audio': fromRoot('./packages/audio/src/index.ts'),

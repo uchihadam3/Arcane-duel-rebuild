@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { CARD_DATA_VERSION, CATALOGO, CLASSES_IMPLEMENTADAS } from '@arcane-duel/card-data';
-import { RECEITAS_INICIAIS } from '@arcane-duel/gameplay';
+import { RECEITAS_INICIAIS } from '@arcane-duel/gameplay/receitas';
 import { RULES_VERSION } from '@arcane-duel/rules-engine';
 import { MANIFESTO_DE_ASSETS } from '@arcane-duel/ui';
 import { render, screen, within } from '@testing-library/react';
