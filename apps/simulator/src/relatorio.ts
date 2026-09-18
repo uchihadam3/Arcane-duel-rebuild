@@ -99,7 +99,8 @@ export const formatarMatriz = (resumo: ResumoDaMatriz): string => {
     `interrompidas por limite .... ${String(resumo.interrompidasPorLimiteTecnico)}`,
     `bloqueios de regra .......... ${String(resumo.bloqueiosDeRegra)}`,
     `comandos ilegais ............ ${String(resumo.comandosIlegais)}`,
-    `invariantes quebradas ....... ${String(resumo.invariantesQuebradas.length)}`,
+    `invariantes de instantâneo .. ${String(resumo.invariantesQuebradas.length)}`,
+    `invariantes de transição .... ${String(resumo.invariantesDeTransicaoQuebradas.length)}`,
     '',
     'vitórias por classe (os dois lados somados)',
   ];
@@ -120,6 +121,9 @@ export const formatarMatriz = (resumo: ResumoDaMatriz): string => {
   }
 
   for (const quebra of resumo.invariantesQuebradas) linhas.push(`  INVARIANTE: ${quebra}`);
+  for (const quebra of resumo.invariantesDeTransicaoQuebradas) {
+    linhas.push(`  TRANSIÇÃO: ${quebra}`);
+  }
   for (const ilegal of resumo.exemplosDeComandoIlegal) {
     linhas.push(`  ILEGAL: ${JSON.stringify(ilegal)}`);
   }

@@ -291,6 +291,27 @@ const gastouAlmaAnexada = (
   return liberarAlmaDoServo(ctx, alvo.dono, servo);
 };
 
+/**
+ * "Se o Servo for Exaurido com uma Alma anexada, a Alma retorna ao Cemitério."
+ *
+ * A outra metade da frase — "permanece até ser usada por aquele Servo" — já
+ * passa por `gastouAlmaAnexada`, que é escolha de quem joga. Esta aqui não é
+ * escolha: é consequência, e acontece no fim da Ação para que o próprio
+ * Exaurir ainda possa ter usado a ficha enquanto o Servo estava em campo.
+ *
+ * A reconciliação é idempotente de propósito: ela olha onde as fichas estão e
+ * devolve as que ficaram sobre carta que não está mais lá.
+ */
+export const devolverAlmasDeServosExauridos = (ctx: Contexto, jogador: PlayerId): void => {
+  const dono = jogadorDo(ctx, jogador);
+  if (dono.recurso.classe !== 'necromante') return;
+
+  const emCampo = new Set<string>(dono.cartasDeClasse.map((item) => item.carta));
+  for (const servo of dono.recurso.almasAnexadas) {
+    if (!emCampo.has(servo)) liberarAlmaDoServo(ctx, jogador, servo);
+  }
+};
+
 const pediuAlmaAnexada = (ctx: Contexto, alvo: AlvoDoEfeito): boolean =>
   (alvo.dono === alvo.atacante ? escolhasDaAcao(ctx, alvo) : escolhasDaResposta(ctx, alvo))
     .usarAlmaAnexada === true;

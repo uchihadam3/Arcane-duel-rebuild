@@ -1,4 +1,10 @@
-import type { EstadoDaPartida, EstadoDeJogador } from '@arcane-duel/shared-types';
+import type {
+  CardId,
+  EstadoDaPartida,
+  EstadoDeJogador,
+  PedraDeChi,
+} from '@arcane-duel/shared-types';
+import { ESTADOS_DE_JURAMENTO, ESTAGIOS_DE_DEVOCAO } from '@arcane-duel/shared-types';
 import {
   LIMITE_DE_CONDICAO,
   LIMITES_DE_RECURSO,
@@ -8,10 +14,15 @@ import {
 /*
  * As invariantes do estado.
  *
- * Elas não são regra nova: são a leitura literal do que o documento fixa —
- * faixas de Vida, Guarda, pontos de Ação, Reserva, Condições e recursos de
- * classe — conferidas em **todo** estado que o simulador produz. Um lote só
- * vale como medição se nenhuma delas quebrar em nenhum instante.
+ * Elas não são regra nova: são a leitura literal do que o documento fixa, e
+ * nada além disso. Onde o documento não fixa teto, a invariante **não inventa
+ * um** — ela confere só o que está escrito.
+ *
+ * São de duas naturezas:
+ *
+ * - de instantâneo (`conferirInvariantes`), que olham um estado sozinho;
+ * - de transição (`conferirInvariantesDaTransicao`), que precisam de dois
+ *   estados consecutivos porque falam de uma porta que não reabre.
  *
  * Cada violação vira uma linha legível em vez de uma exceção: o relatório
  * precisa dizer qual invariante quebrou e em qual jogador.
@@ -32,26 +43,37 @@ const faixa = (
   }
 };
 
+const naoNegativo = (
+  quebras: string[],
+  jogador: EstadoDeJogador,
+  nome: string,
+  valor: number,
+): void => {
+  if (valor < 0) quebras.push(`${jogador.classe}: ${nome} negativo: ${String(valor)}`);
+};
+
 const conferirJogador = (quebras: string[], jogador: EstadoDeJogador): void => {
   faixa(quebras, jogador, 'Vida', jogador.vida, 0, REGRAS_UNIVERSAIS.vidaInicial);
   faixa(quebras, jogador, 'Guarda', jogador.guarda, 0, REGRAS_UNIVERSAIS.guardaInicial);
-  faixa(
-    quebras,
-    jogador,
-    'pontos de Ação',
-    jogador.pontosDeAcao,
-    0,
-    REGRAS_UNIVERSAIS.pontosDeAcaoPorTurno + REGRAS_UNIVERSAIS.maximoDeReserva,
-  );
+
+  /*
+   * Pontos de Ação: só o piso.
+   *
+   * O documento fixa "cinco pontos de Ação no início do próprio turno" (§6),
+   * "até dois pontos não utilizados podem ser convertidos em Reserva" e o
+   * Impulso Inicial de exatamente um ponto (§7). Nenhum desses trechos define
+   * um teto universal de AP **depois** que uma carta recupera pontos, e
+   * Reserva não é AP: ela é outra moeda, com máximo próprio, e somar as duas
+   * para fabricar um teto de sete seria regra inventada.
+   *
+   * Por isso a invariante universal de AP é só `AP >= 0`. O teto que existe
+   * hoje — `recuperarPontosDeAcao` não passa dos cinco do turno — é decisão de
+   * uma função do motor, não regra do documento, e não é conferida aqui.
+   */
+  naoNegativo(quebras, jogador, 'pontos de Ação', jogador.pontosDeAcao);
+
   faixa(quebras, jogador, 'Reserva', jogador.reserva, 0, REGRAS_UNIVERSAIS.maximoDeReserva);
-  faixa(
-    quebras,
-    jogador,
-    'Ações no turno',
-    jogador.acoesRealizadasNoTurno,
-    0,
-    REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno + 1,
-  );
+  conferirAcoes(quebras, jogador);
 
   for (const [condicao, limite] of Object.entries(LIMITE_DE_CONDICAO)) {
     const valor = jogador.condicoes[condicao as keyof typeof jogador.condicoes];
@@ -84,36 +106,95 @@ const conferirJogador = (quebras: string[], jogador: EstadoDeJogador): void => {
   conferirRecurso(quebras, jogador);
 };
 
+/**
+ * Ações por turno.
+ *
+ * O limite universal é três (§8). A quarta Ação existe só quando uma carta a
+ * abriu — e abrir é um ato visível no estado: `acoesPermitidasNoTurno` sobe
+ * para quatro **e** o quarto espaço deixa de ser `indisponivel`. Conferir os
+ * dois juntos é o que impede um "menor ou igual a quatro" solto de aceitar
+ * quarta Ação sem permissão nenhuma.
+ */
+const conferirAcoes = (quebras: string[], jogador: EstadoDeJogador): void => {
+  const universal = REGRAS_UNIVERSAIS.maximoDeAcoesPorTurno;
+  const permitidas = jogador.acoesPermitidasNoTurno;
+  const quartoEspacoAberto = jogador.acoes[universal]?.situacao !== 'indisponivel';
+
+  if (permitidas !== universal && permitidas !== universal + 1) {
+    quebras.push(
+      `${jogador.classe}: Ações permitidas no turno fora do jogo-base: ${String(permitidas)}`,
+    );
+  }
+  if (permitidas > universal && !quartoEspacoAberto) {
+    quebras.push(`${jogador.classe}: quarta Ação permitida sem o quarto espaço aberto por carta`);
+  }
+  if (permitidas <= universal && quartoEspacoAberto) {
+    quebras.push(`${jogador.classe}: quarto espaço aberto sem carta que o libere`);
+  }
+
+  naoNegativo(quebras, jogador, 'Ações realizadas no turno', jogador.acoesRealizadasNoTurno);
+  if (jogador.acoesRealizadasNoTurno > permitidas) {
+    quebras.push(
+      `${jogador.classe}: ${String(jogador.acoesRealizadasNoTurno)} Ações realizadas com ${String(permitidas)} permitidas`,
+    );
+  }
+};
+
 const conferirRecurso = (quebras: string[], jogador: EstadoDeJogador): void => {
   const recurso = jogador.recurso;
   switch (recurso.classe) {
     case 'guerreiro':
       faixa(quebras, jogador, 'Momentum', recurso.momentum, 0, LIMITES_DE_RECURSO.momentum.maximo);
       return;
+
     case 'mago':
       faixa(quebras, jogador, 'Mana', recurso.mana, 0, LIMITES_DE_RECURSO.mana.maximo);
       return;
-    case 'necromante': {
-      const total = recurso.almasControladas + recurso.almasNoCemiterio;
-      faixa(quebras, jogador, 'Almas controladas', recurso.almasControladas, 0, 4);
-      // "As Almas são quatro fichas": elas circulam, nunca nascem nem somem.
-      if (total !== 4) {
-        quebras.push(`necromante: as 4 Almas viraram ${String(total)} — a conservação quebrou`);
+
+    case 'clerigo':
+      // A Devoção é trilha de quatro estágios, e só deles (§16).
+      if (!ESTAGIOS_DE_DEVOCAO.includes(recurso.devocao)) {
+        quebras.push(`clerigo: estágio de Devoção fora da trilha: ${recurso.devocao}`);
       }
       return;
-    }
+
+    case 'necromante':
+      conferirAlmas(
+        quebras,
+        jogador,
+        recurso.almasControladas,
+        recurso.almasNoCemiterio,
+        recurso.almasAnexadas,
+      );
+      return;
+
+    case 'paladino':
+      // O Juramento tem três estados, e só eles (§16).
+      if (!ESTADOS_DE_JURAMENTO.includes(recurso.juramento)) {
+        quebras.push(`paladino: estado de Juramento fora da trilha: ${recurso.juramento}`);
+      }
+      return;
+
     case 'ladino':
       faixa(quebras, jogador, 'Brechas', recurso.brechasNoAdversario, 0, 3);
       return;
-    case 'monge': {
-      if (recurso.chi.length !== 3) {
-        quebras.push(`monge: as pedras de Chi viraram ${String(recurso.chi.length)}`);
-      }
-      return;
-    }
+
     case 'bardo':
       faixa(quebras, jogador, 'Cadências no turno', recurso.cadenciasNoTurno, 0, 3);
       return;
+
+    case 'monge':
+      conferirChi(quebras, recurso.chi);
+      return;
+
+    case 'patrulheiro':
+      // A Marca da Presa é marcador booleano, e não Condição: ela não pode ter
+      // virado acúmulo nem ter ido parar na área de Condições (§15, §16).
+      if (typeof recurso.marcaDaPresa !== 'boolean') {
+        quebras.push('patrulheiro: Marca da Presa deixou de ser booleana');
+      }
+      return;
+
     case 'barbaro':
       faixa(
         quebras,
@@ -124,18 +205,168 @@ const conferirRecurso = (quebras: string[], jogador: EstadoDeJogador): void => {
         2,
       );
       return;
-    default:
+
+    case 'druida':
+      if (recurso.forma !== 'humana' && recurso.forma !== 'selvagem') {
+        quebras.push(`druida: Forma fora das duas impressas: ${String(recurso.forma)}`);
+      }
+      if (typeof recurso.metamorfoseGratuitaUsadaNoTurno !== 'boolean') {
+        quebras.push('druida: a Metamorfose gratuita deixou de ser booleana');
+      }
+      return;
+
+    case 'bruxo':
+      // O Preço Proibido vale uma vez por próprio turno: o estado dele é o
+      // próprio limite, e é booleano — nunca contador.
+      if (typeof recurso.precoProibidoUsadoNoTurno !== 'boolean') {
+        quebras.push('bruxo: o Preço Proibido usado no turno deixou de ser booleano');
+      }
       return;
   }
 };
 
+/** As quatro fichas de Alma, nas três casas onde uma ficha pode estar. */
+const conferirAlmas = (
+  quebras: string[],
+  jogador: EstadoDeJogador,
+  controladas: number,
+  cemiterio: number,
+  anexadas: readonly CardId[],
+): void => {
+  naoNegativo(quebras, jogador, 'Almas controladas', controladas);
+  naoNegativo(quebras, jogador, 'Almas no Cemitério', cemiterio);
+
+  /*
+   * "As Almas são quatro fichas": elas circulam e nunca nascem nem somem.
+   *
+   * São três casas, não duas. Anexar move a ficha de `controladas` para cima de
+   * um Servo, e liberar a manda para o Cemitério — em nenhum dos dois momentos
+   * a ficha deixa de existir. Somar só controladas e Cemitério acusaria três
+   * fichas toda vez que uma estivesse anexada, que é justamente o estado que a
+   * classe existe para produzir.
+   */
+  const total = controladas + cemiterio + anexadas.length;
+  if (total !== 4) {
+    quebras.push(
+      `necromante: as 4 Almas viraram ${String(total)} (${String(controladas)} controladas + ${String(cemiterio)} no Cemitério + ${String(anexadas.length)} anexadas) — a conservação quebrou`,
+    );
+  }
+
+  // Cada ficha anexada está sobre um Servo distinto: o mesmo Servo não segura
+  // duas Almas.
+  const vistos = new Set<string>();
+  for (const servo of anexadas) {
+    if (vistos.has(servo)) {
+      quebras.push(`necromante: o Servo ${servo} aparece com duas Almas anexadas`);
+    }
+    vistos.add(servo);
+  }
+
+  // A ficha está **sobre uma carta**: o Servo precisa ser uma Carta de Classe
+  // do próprio Necromante, em campo ou já Exaurida.
+  const proprias = new Set<string>([
+    ...jogador.cartasDeClasse.map((item) => item.carta),
+    ...jogador.removidas,
+  ]);
+  for (const servo of anexadas) {
+    if (!proprias.has(servo)) {
+      quebras.push(`necromante: Alma anexada ao Servo ${servo}, que não é Carta de Classe dele`);
+    }
+  }
+};
+
+/** Três pedras, cada uma Pronta ou Gasta — nunca outro valor, nunca outro número. */
+const conferirChi = (quebras: string[], chi: readonly PedraDeChi[]): void => {
+  if (chi.length !== 3) {
+    quebras.push(`monge: as pedras de Chi viraram ${String(chi.length)}`);
+  }
+  for (const pedra of chi) {
+    if (pedra !== 'pronta' && pedra !== 'gasta') {
+      quebras.push(`monge: pedra de Chi em estado desconhecido: ${String(pedra)}`);
+    }
+  }
+};
+
 /**
- * Confere o estado inteiro e devolve as invariantes quebradas.
+ * Confere o estado inteiro e devolve as invariantes de instantâneo quebradas.
  *
  * A lista vazia é o resultado esperado; qualquer linha nela invalida o lote.
  */
 export const conferirInvariantes = (partida: EstadoDaPartida): readonly string[] => {
   const quebras: string[] = [];
   for (const jogador of partida.jogadores) conferirJogador(quebras, jogador);
+  return quebras;
+};
+
+/* ------------------------------------------------------------------ */
+/* Invariantes de transição                                            */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Portas que não reabrem.
+ *
+ * Um instantâneo sozinho não consegue provar isto: "Exaurida sai do campo em
+ * definitivo" e "a Ultimate é uma única utilização por partida" são frases
+ * sobre o tempo, não sobre um estado. Elas só se verificam comparando dois
+ * estados consecutivos.
+ *
+ * O catálogo atual não possui nenhuma carta que recupere Carta de Classe
+ * Exaurida nem Ultimate Consumida — as cartas que "deixam Pronta" agem sobre
+ * uma Carta de Classe **Ativada**, que continua em campo. Se algum dia uma
+ * carta recuperar esses estados, a exceção entra aqui, impressa e nomeada;
+ * até lá, qualquer volta é bug.
+ */
+
+const porJogador = (partida: EstadoDaPartida): ReadonlyMap<string, EstadoDeJogador> =>
+  new Map(partida.jogadores.map((jogador) => [jogador.id, jogador]));
+
+const conferirTransicaoDoJogador = (
+  quebras: string[],
+  antes: EstadoDeJogador,
+  depois: EstadoDeJogador,
+): void => {
+  // "Exaurida sai do campo em definitivo" (§13).
+  for (const carta of antes.removidas) {
+    if (!depois.removidas.includes(carta)) {
+      quebras.push(`${depois.classe}: ${carta} saiu das cartas removidas depois de Exaurida`);
+    }
+    const devolta = depois.cartasDeClasse.find((item) => item.carta === carta);
+    if (devolta !== undefined) {
+      quebras.push(
+        `${depois.classe}: ${carta} voltou ao campo como ${devolta.estado} depois de Exaurida`,
+      );
+    }
+  }
+
+  // "A Ultimate é uma única utilização por partida" (§14).
+  if (antes.ultimate.estado === 'consumida' && depois.ultimate.estado !== 'consumida') {
+    quebras.push(
+      `${depois.classe}: a Ultimate ${depois.ultimate.carta} voltou a ${depois.ultimate.estado} depois de Consumida`,
+    );
+  }
+};
+
+/**
+ * Confere o que só dois estados consecutivos conseguem provar.
+ *
+ * Recebe o estado anterior e o posterior da **mesma** partida. Devolve as
+ * invariantes de transição quebradas; a lista vazia é o resultado esperado.
+ */
+export const conferirInvariantesDaTransicao = (
+  anterior: EstadoDaPartida,
+  posterior: EstadoDaPartida,
+): readonly string[] => {
+  const quebras: string[] = [];
+  const antes = porJogador(anterior);
+
+  for (const depois of posterior.jogadores) {
+    const anteriorDoJogador = antes.get(depois.id);
+    if (anteriorDoJogador === undefined) {
+      quebras.push(`jogador ${depois.id} apareceu na partida entre dois estados`);
+      continue;
+    }
+    conferirTransicaoDoJogador(quebras, anteriorDoJogador, depois);
+  }
+
   return quebras;
 };

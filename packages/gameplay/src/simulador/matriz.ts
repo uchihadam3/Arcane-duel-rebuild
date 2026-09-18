@@ -2,7 +2,7 @@ import type { EstadoDaPartida } from '@arcane-duel/shared-types';
 import type { BuildEquipada } from '@arcane-duel/rules-engine';
 
 import { RECEITAS_INICIAIS } from '../receitas.js';
-import { conferirInvariantes } from './invariantes.js';
+import { conferirInvariantes, conferirInvariantesDaTransicao } from './invariantes.js';
 import type { ComandoIlegal } from './motor.js';
 import { JOGADOR_A, LIMITE_TECNICO_DE_TURNOS, simularPartida } from './motor.js';
 
@@ -61,8 +61,10 @@ export interface ResumoDaMatriz {
   /** Precisa ser zero: um comando ilegal invalida a matriz inteira. */
   readonly comandosIlegais: number;
   readonly exemplosDeComandoIlegal: readonly ComandoIlegal[];
-  /** Precisa ser vazia: qualquer linha aqui é invariante quebrada. */
+  /** Precisa ser vazia: qualquer linha aqui é invariante de instantâneo quebrada. */
   readonly invariantesQuebradas: readonly string[];
+  /** Precisa ser vazia: qualquer linha aqui é invariante de transição quebrada. */
+  readonly invariantesDeTransicaoQuebradas: readonly string[];
 }
 
 const receita = (classe: string): BuildEquipada =>
@@ -104,6 +106,7 @@ export const rodarMatriz = (configuracao: ConfiguracaoDaMatriz): ResumoDaMatriz 
   const pares: ResultadoDoPar[] = [];
   const ilegais: ComandoIlegal[] = [];
   const quebras = new Set<string>();
+  const quebrasDeTransicao = new Set<string>();
   let comandosIlegais = 0;
   let indefinidas = 0;
   let interrompidas = 0;
@@ -112,8 +115,25 @@ export const rodarMatriz = (configuracao: ConfiguracaoDaMatriz): ResumoDaMatriz 
   let partidas = 0;
   let configuracoes = 0;
 
-  const observador = (estado: EstadoDaPartida): void => {
-    for (const quebra of conferirInvariantes(estado)) quebras.add(quebra);
+  /*
+   * Um observador por partida.
+   *
+   * As invariantes de transição comparam dois estados consecutivos da **mesma**
+   * partida, então o estado anterior não pode atravessar a fronteira entre uma
+   * partida e a seguinte: cada simulação recebe um observador novo, que começa
+   * sem anterior nenhum.
+   */
+  const criarObservador = (): ((estado: EstadoDaPartida) => void) => {
+    let anterior: EstadoDaPartida | null = null;
+    return (estado) => {
+      for (const quebra of conferirInvariantes(estado)) quebras.add(quebra);
+      if (anterior !== null) {
+        for (const quebra of conferirInvariantesDaTransicao(anterior, estado)) {
+          quebrasDeTransicao.add(quebra);
+        }
+      }
+      anterior = estado;
+    };
   };
 
   for (const par of paresDaMatriz(classes)) {
@@ -134,7 +154,7 @@ export const rodarMatriz = (configuracao: ConfiguracaoDaMatriz): ResumoDaMatriz 
           buildB: receita(par.b),
           primeiroJogador: primeiro,
           limiteDeTurnos: limite,
-          observador,
+          observador: criarObservador(),
         });
 
         partidasDoPar += 1;
@@ -205,5 +225,6 @@ export const rodarMatriz = (configuracao: ConfiguracaoDaMatriz): ResumoDaMatriz 
     comandosIlegais,
     exemplosDeComandoIlegal: ilegais,
     invariantesQuebradas: [...quebras],
+    invariantesDeTransicaoQuebradas: [...quebrasDeTransicao],
   };
 };

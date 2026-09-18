@@ -79,6 +79,7 @@ import {
 import {
   colheitaDoProprioTurno,
   colheitaDoTurnoInimigo,
+  devolverAlmasDeServosExauridos,
   ecoDoCemiterioNoInicioDoTurno,
   ritoDeOssosNaRuptura,
 } from './necromante.js';
@@ -193,6 +194,10 @@ export const mecanicasDeClasseAposResolver = (
     prometerAoProximoAtaque(ctx, alvo.atacante, ORIGEM_DO_TURNO, CHAVE.proximoAtaqueDano, adiado);
   }
   if (resumo.houveReacao) registrarReacaoDoPaladino(ctx, alvo);
+  // "Se o Servo for Exaurido com uma Alma anexada, a Alma retorna ao
+  // Cemitério." Vale para os dois lados: Exaurir também acontece em Resposta.
+  devolverAlmasDeServosExauridos(ctx, alvo.atacante);
+  devolverAlmasDeServosExauridos(ctx, alvo.defensor);
 };
 
 /**

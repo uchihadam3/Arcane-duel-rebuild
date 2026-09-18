@@ -29,7 +29,11 @@ export const codigoDeSaida = (resumo: ResumoDoLote): number => (resumo.comandosI
  * bug, e nenhum dos dois pode passar despercebido para dentro de um relatório.
  */
 export const codigoDeSaidaDaMatriz = (resumo: ResumoDaMatriz): number =>
-  resumo.comandosIlegais > 0 || resumo.invariantesQuebradas.length > 0 ? 1 : 0;
+  resumo.comandosIlegais > 0 ||
+  resumo.invariantesQuebradas.length > 0 ||
+  resumo.invariantesDeTransicaoQuebradas.length > 0
+    ? 1
+    : 0;
 
 /** O relatório da matriz no formato pedido. */
 export const renderizarMatriz = (
