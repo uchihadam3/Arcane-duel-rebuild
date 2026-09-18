@@ -76,6 +76,7 @@ import { efeitoDeCartaDeClasse, efeitoDePassiva, efeitoJogavel } from './registr
 import { descontoDaMarcha } from './efeitos/paladino.js';
 import { acaoTrancadaPelaFumaca, descontoDoPrimeiroAtaque } from './efeitos/ladino.js';
 import { descontoDoBardo } from './efeitos/bardo.js';
+import { cobrarDisciplinaDoPasso, descontoDoMonge, disciplinaDoPasso } from './efeitos/monge.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
   mecanicasDeClasseAoDeclarar,
@@ -86,7 +87,7 @@ import {
   mecanicasDeClasseDepoisDaConversao,
   mecanicasDeClasseAposResolver,
 } from './efeitos/mecanicas-classes.js';
-import { anexarAlma, avancarDevocao } from './recursos-classe.js';
+import { anexarAlma, avancarDevocao, gastarChi } from './recursos-classe.js';
 import {
   aplicarPromessasDoAtaque,
   definirPromessa,
@@ -489,6 +490,7 @@ const descontosDoEstado = (
   jogador: EstadoDeJogador,
   perfil: PerfilDeHabilidade,
   ordem: number,
+  escolhas: EscolhasDaAcao = {},
 ): DescontosDeCusto => {
   const encarecida =
     valorDaAnotacao(jogador.anotacoes, `${CHAVE.ecoEncarece}:${perfil.carta}`) > 0 ||
@@ -510,9 +512,12 @@ const descontosDoEstado = (
   // O Bardo guarda descontos para "a próxima Ação", com ou sem Ataque.
   const bardo = descontoDoBardo(jogador, perfil, ordem);
 
+  // O Monge guarda descontos por etapa de Kata.
+  const monge = descontoDoMonge(jogador, perfil, escolhas);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica || marcha || passos || bardo ? { ap: 1, apMinimo: 1 } : {}),
+    ...(prismatica || marcha || passos || bardo || monge ? { ap: 1, apMinimo: 1 } : {}),
   };
 };
 
@@ -595,10 +600,15 @@ export const declarar = (
   const escolhaFaltando = recusaDeEscolhas(consulta, usos);
   if (escolhaFaltando !== null) return falha(escolhaFaltando);
 
-  const descontos = somar(
-    descontosDaDeclaracao(consulta, usos),
-    descontosDoEstado(atual, perfil.valor, ordem),
-  );
+  const doEstado = descontosDoEstado(atual, perfil.valor, ordem, escolhas);
+  const somados = somar(descontosDaDeclaracao(consulta, usos), doEstado);
+
+  // "Disciplina do Passo": o Monge gasta 1 Chi para ignorar 1 ponto de aumento
+  // de custo. Ela é lida depois de o aumento estar somado, e só quando ele
+  // existe de verdade.
+  const ignorado = disciplinaDoPasso(consulta, somados.apAdicional ?? 0);
+  const descontos =
+    ignorado === 0 ? somados : { ...somados, apAdicional: (somados.apAdicional ?? 0) - ignorado };
 
   if (ehUltimate) {
     // A Ultimate é consumida ao ser jogada e entra no espaço de Ação sem passar
@@ -625,6 +635,10 @@ export const declarar = (
   if (erro !== null) return falha(erro);
 
   const indice = (ordem - 1) as IndiceDeAcao;
+  if (ignorado > 0) {
+    gastarChi(ctx, jogador, ignorado);
+    cobrarDisciplinaDoPasso(ctx, jogador, true);
+  }
   mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor, ordem);
   for (const uso of usos) {
     const comando =
@@ -824,7 +838,9 @@ export const responder = (
     perfil: perfil.valor,
     acaoRespondida: perfilDaAcao,
   };
-  const recusaDaReacao = recusaDeLegalidade({ ...consulta, perfil: perfilDaAcao }, usos);
+  // As Cartas de Classe usadas na Resposta opinam sobre a **Reação**, não
+  // sobre a Ação que ela enfrenta: é o perfil dela que elas leem.
+  const recusaDaReacao = recusaDeLegalidade(consultaDaReacao, usos);
   // A condição impressa na própria carta de Reação — "Requer Graça ou mais",
   // "só pode ser usada com 10 de Vida ou menos" — é avaliada com o perfil dela,
   // não com o da Ação que ela enfrenta.

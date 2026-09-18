@@ -8,6 +8,7 @@ import * as necromante from './efeitos/necromante.js';
 import * as paladino from './efeitos/paladino.js';
 import * as ladino from './efeitos/ladino.js';
 import * as bardo from './efeitos/bardo.js';
+import * as monge from './efeitos/monge.js';
 
 /*
  * Onde mora o comportamento de cada carta.
@@ -45,6 +46,8 @@ export const EFEITOS_JOGAVEIS: ReadonlyMap<CardId, EfeitoDeCarta> = juntar(
   ladino.ULTIMATES,
   bardo.HABILIDADES,
   bardo.ULTIMATES,
+  monge.HABILIDADES,
+  monge.ULTIMATES,
 );
 
 export const EFEITOS_DE_PASSIVA: ReadonlyMap<CardId, EfeitoDePassiva> = juntar(
@@ -55,6 +58,7 @@ export const EFEITOS_DE_PASSIVA: ReadonlyMap<CardId, EfeitoDePassiva> = juntar(
   paladino.PASSIVAS,
   ladino.PASSIVAS,
   bardo.PASSIVAS,
+  monge.PASSIVAS,
 );
 
 export const EFEITOS_DE_CARTA_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = juntar(
@@ -65,6 +69,7 @@ export const EFEITOS_DE_CARTA_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClas
   paladino.CARTAS_DE_CLASSE,
   ladino.CARTAS_DE_CLASSE,
   bardo.CARTAS_DE_CLASSE,
+  monge.CARTAS_DE_CLASSE,
 );
 
 export const efeitoJogavel = (carta: CardId): EfeitoDeCarta => EFEITOS_JOGAVEIS.get(carta) ?? {};

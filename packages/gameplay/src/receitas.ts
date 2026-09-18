@@ -199,6 +199,33 @@ export const CRESCENDO: BuildEquipada = {
   ultimate: cardId('BU01'), // Grande Finale
 };
 
+/** Monge, Receita 1 — Kata do Tigre. */
+export const KATA_DO_TIGRE: BuildEquipada = {
+  classe: 'monge',
+  personagem: PERSONAGEM_DA_CLASSE.monge,
+  habilidades: [
+    cardId('MO01'), // Palma de Ferro
+    cardId('MO04'), // Passo do Vento
+    cardId('MO07'), // Punho do Dragão
+    cardId('MO02'), // Chute do Calcanhar
+    cardId('MO05'), // Joelhada Ascendente
+    cardId('MO11'), // Respiração Centrada
+    cardId('MO16'), // Antebraço de Pedra
+    cardId('MO17'), // Desvio Lateral
+  ],
+  passivas: [
+    cardId('MOP01'), // Disciplina Perfeita
+    cardId('MOP02'), // Primeiro Passo
+    cardId('MOP03'), // Fluxo Contínuo
+    cardId('MOP04'), // Golpe Derradeiro
+  ],
+  cartasDeClasse: [
+    cardId('MOC01'), // Postura do Tigre
+    cardId('MOC04'), // Mantra do Fôlego
+  ],
+  ultimate: cardId('MOU01'), // Punho dos Cem Ecos
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
@@ -207,4 +234,5 @@ export const RECEITAS_INICIAIS = {
   paladino: BASTIAO,
   ladino: ASSASSINO,
   bardo: CRESCENDO,
+  monge: KATA_DO_TIGRE,
 } as const;

@@ -48,6 +48,13 @@ import {
   ULTIMATES_DO_BARDO,
 } from './bardo/complemento.js';
 
+import { HABILIDADES_DO_MONGE } from './monge/habilidades.js';
+import {
+  CARTAS_DE_CLASSE_DO_MONGE,
+  PASSIVAS_DO_MONGE,
+  ULTIMATES_DO_MONGE,
+} from './monge/complemento.js';
+
 /*
  * O catálogo oficial.
  *
@@ -110,6 +117,13 @@ export const CARTAS_DO_BARDO: readonly DefinicaoDeCarta[] = [
   ...ULTIMATES_DO_BARDO,
 ];
 
+export const CARTAS_DO_MONGE: readonly DefinicaoDeCarta[] = [
+  ...HABILIDADES_DO_MONGE,
+  ...PASSIVAS_DO_MONGE,
+  ...CARTAS_DE_CLASSE_DO_MONGE,
+  ...ULTIMATES_DO_MONGE,
+];
+
 export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_GUERREIRO,
   ...CARTAS_DO_MAGO,
@@ -118,6 +132,7 @@ export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_PALADINO,
   ...CARTAS_DO_LADINO,
   ...CARTAS_DO_BARDO,
+  ...CARTAS_DO_MONGE,
 ]);
 
 /** Classes cujo catálogo já está implementado por inteiro, com testes. */
@@ -129,6 +144,7 @@ export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = [
   'paladino',
   'ladino',
   'bardo',
+  'monge',
 ];
 
 /** A definição impressa de uma carta, ou `undefined` se ela não existe. */
@@ -175,4 +191,8 @@ export {
   PASSIVAS_DO_BARDO,
   CARTAS_DE_CLASSE_DO_BARDO,
   ULTIMATES_DO_BARDO,
+  HABILIDADES_DO_MONGE,
+  PASSIVAS_DO_MONGE,
+  CARTAS_DE_CLASSE_DO_MONGE,
+  ULTIMATES_DO_MONGE,
 };

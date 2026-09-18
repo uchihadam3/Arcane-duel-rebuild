@@ -194,6 +194,28 @@ export const CHAVE = {
   primeiroAtaqueDoProximoTurnoImpacto: 'partida:primeiro-ataque-proximo-turno-impacto',
   /** Desconto guardado para a primeira Ação do próximo turno. */
   primeiraAcaoDoProximoTurnoMaisBarata: 'partida:primeira-acao-proximo-turno-barata',
+
+  /* Monge --------------------------------------------------------------- */
+  /** O Fluxo Interior já recuperou Chi neste turno. */
+  fluxoInteriorNoTurno: 'turno:fluxo-interior',
+  /** Um Kata foi completado neste turno. */
+  kataCompletadoNoTurno: 'turno:kata-completado',
+  /** Bônus guardado para a próxima Ação de Fluxo do turno. */
+  proximoFluxoDano: 'turno:proximo-fluxo-dano',
+  proximoFluxoImpacto: 'turno:proximo-fluxo-impacto',
+  /** Bônus guardado para a próxima Finalização do turno. */
+  proximaFinalizacaoDano: 'turno:proxima-finalizacao-dano',
+  proximaFinalizacaoImpacto: 'turno:proxima-finalizacao-impacto',
+  /** A próxima Finalização do turno custa 1 AP a menos. */
+  finalizacaoMaisBarata: 'turno:finalizacao-mais-barata',
+  /** A próxima Ação de Fluxo do turno custa 1 AP a menos. */
+  fluxoMaisBarato: 'turno:fluxo-mais-barato',
+  /** Bônus guardado para o próximo Ataque de Abertura do turno. */
+  proximaAberturaImpacto: 'turno:proxima-abertura-impacto',
+  /** A Disciplina do Passo já foi usada neste turno. */
+  disciplinaDoPassoUsada: 'turno:disciplina-do-passo',
+  /** A Postura do Rio já corrigiu uma sequência na partida. */
+  posturaDoRioUsada: 'partida:postura-do-rio',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

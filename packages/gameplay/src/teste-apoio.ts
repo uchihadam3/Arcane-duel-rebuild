@@ -42,6 +42,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   paladino: ['P01', 'P03', 'P05', 'P06', 'P10', 'P11', 'P15', 'P18'],
   ladino: ['L01', 'L02', 'L03', 'L06', 'L07', 'L11', 'L15', 'L16'],
   bardo: ['B01', 'B02', 'B04', 'B08', 'B14', 'B18', 'B10', 'B09'],
+  monge: ['MO01', 'MO04', 'MO07', 'MO11', 'MO13', 'MO17', 'MO02', 'MO05'],
 } as const;
 
 /*
@@ -87,6 +88,11 @@ const PADROES = {
     passivas: ['BP05', 'BP07', 'BP08', 'BP10'],
     cartasDeClasse: ['BC03', 'BC05'],
     ultimate: 'BU02',
+  },
+  monge: {
+    passivas: ['MOP05', 'MOP07', 'MOP08', 'MOP10'],
+    cartasDeClasse: ['MOC03', 'MOC06'],
+    ultimate: 'MOU01',
   },
 } as const;
 
@@ -280,6 +286,30 @@ export const notasDe = (partida: EstadoDaPartida, id: PlayerId): readonly string
 export const cadenciasDe = (partida: EstadoDaPartida, id: PlayerId): number => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'bardo' ? recurso.cadenciasNoTurno : -1;
+};
+
+/** Põe as pedras de Chi do Monge em um número exato de Prontas. */
+export const comChi = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  prontas: number,
+): EstadoDaPartida => {
+  const atual = jogador(partida, id);
+  if (atual.recurso.classe !== 'monge') return partida;
+  const lado = (indice: number): 'pronta' | 'gasta' => (indice < prontas ? 'pronta' : 'gasta');
+  return com(partida, id, {
+    recurso: { ...atual.recurso, chi: [lado(0), lado(1), lado(2)] },
+  });
+};
+
+export const chiDe = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'monge' ? recurso.chi.filter((pedra) => pedra === 'pronta').length : -1;
+};
+
+export const kataDe = (partida: EstadoDaPartida, id: PlayerId): readonly string[] => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'monge' ? recurso.sequenciaDeKata : [];
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

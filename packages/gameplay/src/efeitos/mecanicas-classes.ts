@@ -1,4 +1,4 @@
-import type { PlayerId } from '@arcane-duel/shared-types';
+import type { PassoDeKata, PlayerId } from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
 
 import { CHAVE, ORIGEM_DO_TURNO } from '../chaves.js';
@@ -16,6 +16,13 @@ import {
   reiniciarReducaoVoluntaria,
 } from '../recursos-classe.js';
 import { lerPromessa, prometerAoProximoAtaque } from './comum.js';
+import {
+  aplicarBonusDeEtapa,
+  consumirDescontoDoMonge,
+  marcasDoMongeNoInicioDoTurno,
+  registrarEtapaDoKata,
+  respiracaoProfundaNoInicioDoTurno,
+} from './monge.js';
 import {
   aplicarDesafinar,
   consumirDescontoDoBardo,
@@ -156,12 +163,15 @@ export const mecanicasDeClasseAposResolver = (
  */
 export const mecanicasDeClasseAoResolver = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
   registrarNotaDaAcao(ctx, alvo);
+  // Monge: a etapa entra na sequência aqui, e com ela o Fluxo Interior e o Kata.
+  registrarEtapaDoKata(ctx, alvo);
 };
 
 /** O que as classes fazem logo antes de a Ação ser resolvida. */
 export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
   marcaDeGolpeAntesDeResolver(ctx, alvo);
   aplicarDesafinar(ctx, alvo);
+  aplicarBonusDeEtapa(ctx, alvo);
 };
 
 /**
@@ -181,12 +191,17 @@ export const legalidadeDeClasse = (consulta: ConsultaDeLegalidade): string | nul
 export const mecanicasDeClasseAoDeclarar = (
   ctx: Contexto,
   jogador: PlayerId,
-  perfil: { readonly custo: { readonly valor: number }; readonly valores: unknown },
+  perfil: {
+    readonly custo: { readonly valor: number };
+    readonly valores: unknown;
+    readonly kata?: PassoDeKata;
+  },
   ordem: number,
 ): void => {
   consumirDescontoDaMarcha(ctx, jogador, perfil.valores !== null, perfil.custo.valor);
   consumirDescontoDoPrimeiroAtaque(ctx, jogador, ordem);
   consumirDescontoDoBardo(ctx, jogador, ordem);
+  consumirDescontoDoMonge(ctx, jogador, perfil);
 };
 
 /**
@@ -211,6 +226,8 @@ export const mecanicasDeClasseAoAbrirTurno = (
   }
   marcasDoInicioDoTurno(ctx, jogador);
   marcasDoBardoNoInicioDoTurno(ctx, jogador);
+  marcasDoMongeNoInicioDoTurno(ctx, jogador);
+  respiracaoProfundaNoInicioDoTurno(ctx, jogador);
   // Bardo: a sequência de Notas e as Cadências são do turno, e o turno é novo.
   reiniciarNotas(ctx, jogador);
   // Monge: o Kata recomeça — Abertura, Fluxo e Finalização valem dentro do turno.

@@ -312,6 +312,48 @@ const NOMES_DO_BARDO: Readonly<Record<string, string>> = {
   BU03: 'Silêncio da Plateia',
 };
 
+const NOMES_DO_MONGE: Readonly<Record<string, string>> = {
+  MO01: 'Palma de Ferro',
+  MO02: 'Chute do Calcanhar',
+  MO03: 'Toque dos Nervos',
+  MO04: 'Passo do Vento',
+  MO05: 'Joelhada Ascendente',
+  MO06: 'Cotovelo Giratório',
+  MO07: 'Punho do Dragão',
+  MO08: 'Martelo Descendente',
+  MO09: 'Punho do Vazio',
+  MO10: 'Varredura Final',
+  MO11: 'Respiração Centrada',
+  MO12: 'Passo sem Sombra',
+  MO13: 'Quebrar o Ritmo',
+  MO14: 'Circular Energia',
+  MO15: 'Selar o Kata',
+  MO16: 'Antebraço de Pedra',
+  MO17: 'Desvio Lateral',
+  MO18: 'Redirecionar Força',
+  MO19: 'Contra-Golpe',
+  MO20: 'Corpo Vazio',
+  MOP01: 'Disciplina Perfeita',
+  MOP02: 'Primeiro Passo',
+  MOP03: 'Fluxo Contínuo',
+  MOP04: 'Golpe Derradeiro',
+  MOP05: 'Mente Imóvel',
+  MOP06: 'Dor como Mestre',
+  MOP07: 'Respiração Profunda',
+  MOP08: 'Forma Adaptável',
+  MOP09: 'Corpo e Espírito',
+  MOP10: 'Último Mestre',
+  MOC01: 'Postura do Tigre',
+  MOC02: 'Postura da Garça',
+  MOC03: 'Postura do Rio',
+  MOC04: 'Mantra do Fôlego',
+  MOC05: 'Mantra do Vazio',
+  MOC06: 'Mantra do Retorno',
+  MOU01: 'Punho dos Cem Ecos',
+  MOU02: 'Mente Vazia',
+  MOU03: 'Três Portões',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -327,6 +369,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   paladino: NOMES_DO_PALADINO,
   ladino: NOMES_DO_LADINO,
   bardo: NOMES_DO_BARDO,
+  monge: NOMES_DO_MONGE,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -349,6 +392,7 @@ describe('catálogo oficial', () => {
       'paladino',
       'ladino',
       'bardo',
+      'monge',
     ]);
   });
 

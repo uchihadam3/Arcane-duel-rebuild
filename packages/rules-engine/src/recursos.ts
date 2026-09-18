@@ -17,6 +17,7 @@ export const LIMITES_DE_RECURSO: Readonly<
   momentum: { minimo: 0, maximo: 3 },
   alma: { minimo: 0, maximo: 4 },
   brecha: { minimo: 0, maximo: 3 },
+  chi: { minimo: 0, maximo: 3 },
 };
 
 /** Quanto o jogador tem, ou `null` quando a classe dele não usa esse recurso. */
@@ -30,6 +31,11 @@ export const valorDoRecurso = (
   // As Brechas ficam sobre o adversário, mas são do Ladino: quem as cria e quem
   // as consome é ele, então o custo impresso lê o número aqui.
   if (recurso === 'brecha') return atual.classe === 'ladino' ? atual.brechasNoAdversario : null;
+  // O Chi não é um número guardado: são três pedras, e o que o custo lê é
+  // quantas delas estão Prontas.
+  if (recurso === 'chi') {
+    return atual.classe === 'monge' ? atual.chi.filter((pedra) => pedra === 'pronta').length : null;
+  }
   return atual.classe === 'guerreiro' ? atual.momentum : null;
 };
 
@@ -57,6 +63,14 @@ export const definirRecurso = (
   }
   if (recurso === 'momentum' && atual.classe === 'guerreiro') {
     return { ...jogador, recurso: { ...atual, momentum: limitado } };
+  }
+  if (recurso === 'chi' && atual.classe === 'monge') {
+    const chi = [0, 1, 2].map((indice) => (indice < limitado ? 'pronta' : 'gasta')) as [
+      'pronta' | 'gasta',
+      'pronta' | 'gasta',
+      'pronta' | 'gasta',
+    ];
+    return { ...jogador, recurso: { ...atual, chi } };
   }
   if (recurso === 'brecha' && atual.classe === 'ladino') {
     return { ...jogador, recurso: { ...atual, brechasNoAdversario: limitado } };
@@ -94,5 +108,6 @@ export const recursoDaClasse = (jogador: EstadoDeJogador): RecursoDeCusto | null
   if (jogador.recurso.classe === 'mago') return 'mana';
   if (jogador.recurso.classe === 'necromante') return 'alma';
   if (jogador.recurso.classe === 'ladino') return 'brecha';
+  if (jogador.recurso.classe === 'monge') return 'chi';
   return jogador.recurso.classe === 'guerreiro' ? 'momentum' : null;
 };

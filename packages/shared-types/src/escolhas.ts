@@ -1,6 +1,6 @@
 import type { CardId } from './ids.js';
 import type { CondicaoId } from './conditions.js';
-import type { FormaDoDruida, Nota } from './recursos-de-classe.js';
+import type { FormaDoDruida, Nota, PassoDeKata } from './recursos-de-classe.js';
 
 /*
  * Escolhas legais que acompanham uma Ação ou uma Resposta.
@@ -89,6 +89,15 @@ export interface EscolhasDaAcao {
   readonly nota?: Nota;
   /** Passiva própria escolhida por um texto que mexe no estado dela. */
   readonly passiva?: CardId;
+  /**
+   * O Monge gasta 1 Chi para ignorar 1 ponto de aumento de custo em AP.
+   *
+   * "Disciplina do Passo" é escolha dele: sem o pedido explícito, o Chi fica
+   * onde está e o aumento vale por inteiro.
+   */
+  readonly disciplinaDoPasso?: boolean;
+  /** Etapa de Kata escolhida por um texto que manda escolher uma. */
+  readonly passoDeKata?: PassoDeKata;
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};
