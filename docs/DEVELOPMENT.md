@@ -54,6 +54,64 @@ deve ser editado à mão nela.
 `apps/web/src/deploy.test.ts` verifica essas garantias lendo o próprio
 workflow. Um erro ali só apareceria depois do deploy, com o jogo no ar.
 
+### Do push ao aplicativo instalado
+
+Esta é a regra do projeto, e vale para todo merge ou push em `main`:
+
+1. o CI roda `npm run check` e a matriz de fumaça;
+2. o workflow publica o build no GitHub Pages;
+3. o PWA já instalado **detecta** a versão nova sozinho;
+4. ao abrir ou reabrir o aplicativo fora de uma partida ativa, ele **aplica**
+   a versão nova e recarrega nela;
+5. **não é necessário reinstalar o aplicativo.**
+
+O aplicativo instalado é sempre o mesmo produto do site. Não existe "versão
+PWA separada": o que está em `gh-pages` é o que o aplicativo mostra, e o
+commit publicado aparece na própria tela para conferir isso sem adivinhação.
+
+#### Quando o cliente pergunta por versão nova
+
+`apps/web/src/pwa/atualizacao.ts` coordena, e pergunta:
+
+- na abertura do aplicativo, imediatamente;
+- quando ele volta do segundo plano (`visibilitychange` e `focus`);
+- quando a conexão volta (`online`);
+- a cada 30 minutos enquanto fica aberto — rede de segurança, não polling.
+
+#### Quem decide aplicar
+
+`apps/web/src/pwa/politica-de-atualizacao.ts`, e só ela. A decisão depende do
+que o jogador está fazendo:
+
+| Situação        | Decisão                                              |
+| --------------- | ---------------------------------------------------- |
+| `sem-partida`   | aplica na hora: ativa o worker em espera e recarrega |
+| `partida-ativa` | adia; a atualização fica pendente até ser seguro     |
+
+Hoje a interface não tem partida, então a situação é sempre `sem-partida` e a
+atualização é automática. Quando a partida existir, quem a conhece passa a
+informar `partida-ativa` — e nada mais da estratégia de PWA precisa mudar.
+
+#### Por que `registerType: 'prompt'`
+
+Parece o contrário do que se quer, mas é o oposto: `'autoUpdate'` recarrega
+sempre, sem passar por política nenhuma, e não deixaria como adiar a troca
+durante um duelo. Com `'prompt'` o worker novo fica em espera e **nós**
+mandamos trocar — hoje, imediatamente.
+
+Do lado do Workbox: `skipWaiting: false` (quem manda a mensagem é o
+coordenador), `clientsClaim: true` (o worker recém-ativado assume as páginas
+já abertas) e `cleanupOutdatedCaches: true` (o precache das versões antigas é
+apagado, para nenhuma build velha ressuscitar offline).
+
+#### Identificador de build
+
+A tela mostra `RULES_VERSION`, `CARD_DATA_VERSION`, a versão do cliente, o
+commit curto e um identificador de build. O identificador é determinístico:
+`actions-<número da execução>` no GitHub Actions, `local-<commit curto>` fora
+dele. Nada de carimbo de tempo — duas builds do mesmo commit precisam ter o
+mesmo identificador.
+
 ### Prefixo de publicação
 
 O prefixo vem de `BASE_PATH` e alimenta três coisas ao mesmo tempo: o `base`

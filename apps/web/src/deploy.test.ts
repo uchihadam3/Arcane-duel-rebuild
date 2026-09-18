@@ -32,6 +32,12 @@ describe('workflow de publicação', () => {
     expect(workflow).toContain('BASE_PATH: /${{ github.event.repository.name }}/');
   });
 
+  it('passa o número da execução como identificador de build', () => {
+    // É o que aparece na tela do aplicativo instalado. Sem ele, duas builds
+    // do mesmo `package.json` ficariam indistinguíveis.
+    expect(workflow).toContain('GITHUB_RUN_NUMBER: ${{ github.run_number }}');
+  });
+
   it('faz o fallback de SPA servindo o mesmo documento em 404.html', () => {
     // É assim que o Pages responde a /login, /builds, /match e /profile.
     expect(workflow).toContain('cp apps/web/dist/index.html apps/web/dist/404.html');

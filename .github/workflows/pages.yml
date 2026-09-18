@@ -34,6 +34,10 @@ jobs:
         env:
           # No Pages o cliente é servido sob o nome do repositório, não na raiz.
           BASE_PATH: /${{ github.event.repository.name }}/
+          # O número da execução vira o identificador de build mostrado na
+          # tela: é determinístico, sobe a cada publicação e é fácil de
+          # comparar com o que está no ar.
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
       - name: Preparar o site
         run: |

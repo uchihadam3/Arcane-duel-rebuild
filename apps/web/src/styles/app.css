@@ -158,6 +158,21 @@
   background: #1a1608;
 }
 
+.barra-de-atualizacao[data-estado='aplicando'] {
+  border-color: var(--borda);
+  background: #0f1620;
+}
+
+.lista-simples {
+  margin: var(--espaco) 0 0;
+  padding-left: 18px;
+  color: var(--texto-suave);
+}
+
+.lista-simples li {
+  margin-bottom: 4px;
+}
+
 .barra-de-atualizacao button {
   border: 1px solid var(--destaque);
   border-radius: 6px;

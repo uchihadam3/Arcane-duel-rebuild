@@ -15,6 +15,7 @@
     "@arcane-duel/ai": "*",
     "@arcane-duel/audio": "*",
     "@arcane-duel/card-data": "*",
+    "@arcane-duel/gameplay": "*",
     "@arcane-duel/rules-engine": "*",
     "@arcane-duel/shared-types": "*",
     "@arcane-duel/ui": "*",

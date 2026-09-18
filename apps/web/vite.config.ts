@@ -36,13 +36,30 @@ const descobrirCommit = (): string => {
   }
 };
 
+/**
+ * Identificador determinístico deste build.
+ *
+ * No GitHub Actions é o número da execução do workflow, que sobe a cada
+ * publicação e é fácil de comparar de cabeça. Fora dele, o commit curto.
+ * Nada de carimbo de tempo: dois builds do mesmo commit precisam ter o mesmo
+ * identificador, senão ele deixa de servir para conferir o que está no ar.
+ */
+const descobrirBuild = (commit: string): string => {
+  const execucao = process.env.GITHUB_RUN_NUMBER;
+  if (execucao !== undefined && execucao !== '') return `actions-${execucao}`;
+  return commit === 'desconhecido' ? 'local' : `local-${commit.slice(0, 7)}`;
+};
+
 const comoRegex = (valor: string): string => valor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const commit = descobrirCommit();
 
 export default defineConfig({
   base,
   define: {
     __VERSAO_DO_CLIENTE__: JSON.stringify(version),
-    __COMMIT_DO_CLIENTE__: JSON.stringify(descobrirCommit()),
+    __COMMIT_DO_CLIENTE__: JSON.stringify(commit),
+    __BUILD_DO_CLIENTE__: JSON.stringify(descobrirBuild(commit)),
   },
   server: { host: true, port: 5173 },
   preview: { port: 4173 },
@@ -56,8 +73,15 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // 'prompt' em vez de atualização automática: nunca recarregar o cliente
-      // no meio de uma partida sem o jogador mandar.
+      /*
+       * 'prompt' mantém o worker novo em espera até alguém mandar trocar — e
+       * quem manda é o coordenador em `src/pwa/atualizacao.ts`, não o jogador.
+       *
+       * Parece contraintuitivo pedir 'prompt' para atualizar sozinho, mas é o
+       * contrário: 'autoUpdate' recarrega sempre, sem passar por política
+       * nenhuma, e não deixaria como adiar a troca durante uma partida. Com
+       * 'prompt' a decisão é nossa, e hoje ela é "aplique agora".
+       */
       registerType: 'prompt',
       includeAssets: ['icons/apple-touch-icon.png'],
       manifest: (() => {
@@ -73,6 +97,24 @@ export default defineConfig({
         // ficam em cache sob demanda, para a primeira instalação não baixar
         // dezenas de megabytes de uma vez.
         globPatterns: ['**/*.{js,css,html,svg,webmanifest}'],
+        /*
+         * A troca de versão, do lado do worker.
+         *
+         * `skipWaiting: false` é o par de `registerType: 'prompt'`: o worker
+         * novo espera a mensagem, e quem a envia é o coordenador. Sem ele a
+         * recarga ficaria fora do nosso controle.
+         *
+         * `clientsClaim: true` faz o worker recém-ativado assumir as páginas
+         * já abertas em vez de esperar a próxima navegação — é isso que impede
+         * o cliente de continuar servido pelo worker antigo depois da troca.
+         *
+         * `cleanupOutdatedCaches: true` apaga os precaches das versões
+         * anteriores. Sem ele, shell e bundles velhos ficariam ocupando espaço
+         * e podendo ressuscitar em uma navegação offline.
+         */
+        skipWaiting: false,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         // Nada que não seja navegação pode cair no index.html, e nada
         // autenticado ou de partida pode ser servido do cache de navegação.
         navigateFallbackDenylist: [
