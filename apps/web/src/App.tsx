@@ -94,6 +94,8 @@ export const App = (): React.JSX.Element => {
               setTela({ nome: 'menu' });
             }}
             estadoDaAtualizacao={textoDaAtualizacao}
+            aoVerificarAtualizacao={atualizacao.verificarAgora}
+            aoForcarAtualizacao={atualizacao.aplicarAgora}
           />
         )}
 

@@ -16,11 +16,21 @@ const config = readFileSync(
 );
 
 describe('configuração do service worker', () => {
-  it('mantém o worker novo em espera até o coordenador mandar trocar', () => {
-    // 'prompt' + skipWaiting falso é o par que deixa a decisão com a política,
-    // em vez de recarregar sempre, sem passar por ela.
+  it('deixa a decisão de recarregar com o coordenador, e não com o plugin', () => {
+    // 'autoUpdate' recarregaria sempre, sem passar pela política — inclusive
+    // no meio de uma partida.
     expect(config).toContain("registerType: 'prompt'");
-    expect(config).toContain('skipWaiting: false');
+  });
+
+  it('ativa o worker novo sem depender do cliente antigo cooperar', () => {
+    /*
+     * Com `skipWaiting: false`, um cliente instalado antes de o coordenador
+     * existir nunca mandava a mensagem que tira o worker novo da espera, e o
+     * aplicativo ficava preso na build antiga para sempre. Ativar sozinho não
+     * recarrega ninguém: quem recarrega continua sendo o coordenador.
+     */
+    expect(config).toContain('skipWaiting: true');
+    expect(config).not.toContain('skipWaiting: false');
   });
 
   it('faz o worker recém-ativado assumir as páginas já abertas', () => {

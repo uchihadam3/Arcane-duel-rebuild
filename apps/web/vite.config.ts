@@ -74,13 +74,13 @@ export default defineConfig({
     react(),
     VitePWA({
       /*
-       * 'prompt' mantém o worker novo em espera até alguém mandar trocar — e
-       * quem manda é o coordenador em `src/pwa/atualizacao.ts`, não o jogador.
+       * 'prompt' deixa a decisão de **recarregar** com o coordenador em
+       * `src/pwa/atualizacao.ts`, e não com o plugin: 'autoUpdate' recarrega
+       * sempre, sem passar por política nenhuma, e não deixaria como adiar a
+       * troca durante uma partida.
        *
-       * Parece contraintuitivo pedir 'prompt' para atualizar sozinho, mas é o
-       * contrário: 'autoUpdate' recarrega sempre, sem passar por política
-       * nenhuma, e não deixaria como adiar a troca durante uma partida. Com
-       * 'prompt' a decisão é nossa, e hoje ela é "aplique agora".
+       * Recarregar é decisão nossa. **Ativar** não pode ser — veja
+       * `skipWaiting` abaixo.
        */
       registerType: 'prompt',
       includeAssets: ['icons/apple-touch-icon.png'],
@@ -100,19 +100,26 @@ export default defineConfig({
         /*
          * A troca de versão, do lado do worker.
          *
-         * `skipWaiting: false` é o par de `registerType: 'prompt'`: o worker
-         * novo espera a mensagem, e quem a envia é o coordenador. Sem ele a
-         * recarga ficaria fora do nosso controle.
+         * `skipWaiting: true` conserta um impasse real, visto em campo: um
+         * cliente instalado antes de o coordenador existir **nunca** manda a
+         * mensagem que tira o worker novo da espera. O navegador baixava a
+         * versão nova a cada abertura, o worker novo ficava esperando para
+         * sempre, e o aplicativo continuou servindo o primeiro deploy por dias.
          *
-         * `clientsClaim: true` faz o worker recém-ativado assumir as páginas
-         * já abertas em vez de esperar a próxima navegação — é isso que impede
-         * o cliente de continuar servido pelo worker antigo depois da troca.
+         * Ativar sozinho não recarrega ninguém: a página aberta continua com o
+         * JavaScript que já carregou, e quem decide recarregar continua sendo o
+         * coordenador — que não recarrega durante uma partida. O que muda é que
+         * a ativação deixa de depender de o cliente antigo cooperar.
+         *
+         * `clientsClaim: true` faz o worker recém-ativado assumir as páginas já
+         * abertas em vez de esperar a próxima navegação — é isso que impede o
+         * cliente de continuar servido pelo worker antigo depois da troca.
          *
          * `cleanupOutdatedCaches: true` apaga os precaches das versões
          * anteriores. Sem ele, shell e bundles velhos ficariam ocupando espaço
          * e podendo ressuscitar em uma navegação offline.
          */
-        skipWaiting: false,
+        skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         // Nada que não seja navegação pode cair no index.html, e nada

@@ -1598,3 +1598,20 @@
     display: none;
   }
 }
+
+/*
+ * Os botões manuais de atualização, na tela de status.
+ *
+ * Eles são a saída de emergência: se a troca automática falhar, dá para
+ * perguntar por uma versão nova e aplicá-la à mão, sem reinstalar.
+ */
+.acoes-da-atualizacao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.acoes-da-atualizacao .botao {
+  font-size: 0.78rem;
+}

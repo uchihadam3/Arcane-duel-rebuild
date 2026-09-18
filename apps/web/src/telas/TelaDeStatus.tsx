@@ -34,11 +34,15 @@ const ENTREGUE: readonly string[] = [
 export interface TelaDeStatusProps {
   readonly aoVoltar: () => void;
   readonly estadoDaAtualizacao: string;
+  readonly aoVerificarAtualizacao: () => void;
+  readonly aoForcarAtualizacao: () => void;
 }
 
 export const TelaDeStatus = ({
   aoVoltar,
   estadoDaAtualizacao,
+  aoVerificarAtualizacao,
+  aoForcarAtualizacao,
 }: TelaDeStatusProps): React.JSX.Element => {
   const orientacao = useOrientacao();
   const modo = useModoDeExibicao();
@@ -130,6 +134,23 @@ export const TelaDeStatus = ({
               <dd>{instalado ? 'Instalado' : 'Navegador'}</dd>
               <dt>Atualização</dt>
               <dd data-teste="estado-da-atualizacao">{estadoDaAtualizacao}</dd>
+              <dt>Forçar</dt>
+              <dd className="acoes-da-atualizacao">
+                <BotaoDeJogo
+                  tom="secundario"
+                  aoTocar={aoVerificarAtualizacao}
+                  dadoDeTeste="verificar-atualizacao"
+                >
+                  Buscar versão nova
+                </BotaoDeJogo>
+                <BotaoDeJogo
+                  tom="secundario"
+                  aoTocar={aoForcarAtualizacao}
+                  dadoDeTeste="forcar-atualizacao"
+                >
+                  Aplicar agora
+                </BotaoDeJogo>
+              </dd>
               <dt>Orientação</dt>
               <dd>{orientacao}</dd>
             </dl>

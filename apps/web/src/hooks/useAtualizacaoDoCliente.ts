@@ -18,6 +18,8 @@ export interface AtualizacaoDoCliente {
   readonly estado: EstadoDaAtualizacao;
   /** Botão de emergência: existe para o caso de a troca automática falhar. */
   readonly aplicarAgora: () => void;
+  /** Pergunta por uma versão nova fora dos gatilhos automáticos. */
+  readonly verificarAgora: () => void;
 }
 
 export const useAtualizacaoDoCliente = (
@@ -56,6 +58,11 @@ export const useAtualizacaoDoCliente = (
       aplicar: async () => {
         await updateServiceWorker(true);
       },
+      // Quando o worker já assumiu sozinho não há o que ativar: falta só a
+      // página buscar a versão que ele já está servindo.
+      recarregar: () => {
+        window.location.reload();
+      },
       situacaoDoCliente: () => situacaoAtual.current,
       aoMudarEstado: setEstado,
       janela: window,
@@ -85,10 +92,32 @@ export const useAtualizacaoDoCliente = (
     if (precisaAtualizar) coordenador.current.aoEncontrarAtualizacao();
   }, [precisaAtualizar]);
 
+  /*
+   * O worker novo assumiu o controle desta página.
+   *
+   * Com `skipWaiting` a ativação acontece sem pedir licença, então este é o
+   * aviso que chega primeiro — antes, e às vezes em vez, de `needRefresh`. Sem
+   * escutá-lo, a página continuaria mostrando a build antiga até alguém fechar
+   * e reabrir o aplicativo.
+   */
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const aoTrocar = (): void => {
+      coordenador.current.aoTrocarDeControlador();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', aoTrocar);
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', aoTrocar);
+    };
+  }, []);
+
   return {
     estado,
     aplicarAgora: () => {
       coordenador.current.aplicarAgora();
+    },
+    verificarAgora: () => {
+      coordenador.current.verificarAgora();
     },
   };
 };

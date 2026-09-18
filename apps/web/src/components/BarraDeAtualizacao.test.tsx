@@ -6,7 +6,7 @@ import { BarraDeAtualizacao } from './BarraDeAtualizacao.js';
 import type { EstadoDaAtualizacao } from '../pwa/atualizacao.js';
 
 const barra = (estado: EstadoDaAtualizacao, aplicarAgora = vi.fn()): void => {
-  render(<BarraDeAtualizacao atualizacao={{ estado, aplicarAgora }} />);
+  render(<BarraDeAtualizacao atualizacao={{ estado, aplicarAgora, verificarAgora: vi.fn() }} />);
 };
 
 describe('barra de atualização', () => {

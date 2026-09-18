@@ -287,3 +287,87 @@ describe('coordenador de atualização', () => {
     expect(estados).toContain('aplicando');
   });
 });
+
+/*
+ * O resgate de um cliente preso.
+ *
+ * Um aplicativo instalado antes deste coordenador existir nunca manda a
+ * mensagem que tira o worker novo da espera. Com `skipWaiting`, o worker ativa
+ * sozinho, e o aviso que chega à página é a troca de controlador — é por ele
+ * que ela descobre que precisa buscar a versão nova.
+ */
+describe('quando o worker novo assume sozinho', () => {
+  const comControlador = (
+    situacaoInicial: SituacaoDoCliente,
+  ): {
+    readonly coordenador: ReturnType<typeof criarCoordenadorDeAtualizacao>;
+    readonly recargas: () => number;
+    readonly aplicacoes: () => number;
+    situacao: SituacaoDoCliente;
+  } => {
+    const alvo = criarAlvo();
+    let recargas = 0;
+    let aplicacoes = 0;
+    const caixa: { situacao: SituacaoDoCliente } = { situacao: situacaoInicial };
+
+    const coordenador = criarCoordenadorDeAtualizacao({
+      verificar: () => undefined,
+      aplicar: () => {
+        aplicacoes += 1;
+      },
+      recarregar: () => {
+        recargas += 1;
+      },
+      situacaoDoCliente: () => caixa.situacao,
+      aoMudarEstado: () => undefined,
+      janela: alvo.alvo,
+      documento: alvo.alvo,
+      agendar: () => () => undefined,
+    });
+
+    return {
+      coordenador,
+      recargas: () => recargas,
+      aplicacoes: () => aplicacoes,
+      get situacao() {
+        return caixa.situacao;
+      },
+      set situacao(valor: SituacaoDoCliente) {
+        caixa.situacao = valor;
+      },
+    };
+  };
+
+  it('recarrega a página fora de partida, sem mexer no worker', () => {
+    const bancada = comControlador('sem-partida');
+
+    bancada.coordenador.aoTrocarDeControlador();
+
+    expect(bancada.recargas()).toBe(1);
+    // Não há o que ativar: o worker já está no comando.
+    expect(bancada.aplicacoes()).toBe(0);
+    expect(bancada.coordenador.estado()).toBe('aplicando');
+  });
+
+  it('espera o fim da partida antes de recarregar', () => {
+    const bancada = comControlador('partida-ativa');
+
+    bancada.coordenador.aoTrocarDeControlador();
+
+    expect(bancada.recargas()).toBe(0);
+    expect(bancada.coordenador.estado()).toBe('pendente');
+  });
+
+  it('a versão fica guardada e sai quando a partida acaba', () => {
+    const bancada = comControlador('partida-ativa');
+
+    bancada.coordenador.aoTrocarDeControlador();
+    expect(bancada.recargas()).toBe(0);
+
+    bancada.situacao = 'sem-partida';
+    bancada.coordenador.aplicarPendente();
+
+    expect(bancada.coordenador.estado()).toBe('aplicando');
+    expect(bancada.aplicacoes()).toBe(1);
+  });
+});

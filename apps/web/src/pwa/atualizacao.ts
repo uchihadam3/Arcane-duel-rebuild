@@ -47,6 +47,13 @@ export interface PortasDeAtualizacao {
   readonly verificar: () => void | Promise<void>;
   /** Ativa o worker em espera e recarrega o cliente na versão nova. */
   readonly aplicar: () => void | Promise<void>;
+  /**
+   * Recarrega o cliente sem mexer no worker.
+   *
+   * É o caminho de quando o worker **já** assumiu sozinho: não há o que
+   * ativar, só a página a atualizar. Ausente, o coordenador cai em `aplicar`.
+   */
+  readonly recarregar?: () => void | Promise<void>;
   /** O que o jogador está fazendo agora. */
   readonly situacaoDoCliente: () => SituacaoDoCliente;
   /** Avisa quem desenha a tela que o estado mudou. */
@@ -63,6 +70,8 @@ export interface CoordenadorDeAtualizacao {
   readonly iniciar: () => () => void;
   /** O service worker avisou que existe uma versão nova pronta. */
   readonly aoEncontrarAtualizacao: () => void;
+  /** Um worker novo assumiu o controle desta página por conta própria. */
+  readonly aoTrocarDeControlador: () => void;
   /** Aplica uma atualização que ficou pendente, se já for seguro. */
   readonly aplicarPendente: () => void;
   /** Força a aplicação, para o botão de emergência da interface. */
@@ -120,6 +129,28 @@ export const criarCoordenadorDeAtualizacao = (
     mudarPara('pendente');
   };
 
+  /*
+   * O worker novo assumiu sozinho.
+   *
+   * Com `skipWaiting`, a ativação não espera mais por mensagem nenhuma — e é
+   * isso que resgata um cliente instalado antes deste coordenador existir. Não
+   * há nada a ativar aqui: o que falta é a página, que continua rodando o
+   * JavaScript antigo, buscar a nova. Fora de partida ela recarrega na hora;
+   * durante um duelo ela espera, como qualquer outra atualização.
+   */
+  const aoTrocarDeControlador = (): void => {
+    temVersaoEmEspera = true;
+    if (decidirAtualizacao(portas.situacaoDoCliente()) !== 'aplicar') {
+      mudarPara('pendente');
+      return;
+    }
+    mudarPara('aplicando');
+    const recarregar = portas.recarregar ?? portas.aplicar;
+    void Promise.resolve(recarregar()).catch(() => {
+      repousar();
+    });
+  };
+
   const aplicarPendente = (): void => {
     if (!temVersaoEmEspera) return;
     if (!podeAplicarPendente(portas.situacaoDoCliente())) return;
@@ -166,6 +197,7 @@ export const criarCoordenadorDeAtualizacao = (
   return {
     iniciar,
     aoEncontrarAtualizacao,
+    aoTrocarDeControlador,
     aplicarPendente,
     aplicarAgora,
     verificarAgora,
