@@ -57,6 +57,9 @@ const apareceEm = (texto: string, id: CardId): boolean =>
  * registro do replay e carrega até a semente, que projeção nenhuma mostra.
  */
 const citadosPor = (evento: EventoUniversal): readonly string[] => {
+  // Um evento que registra anotação privada não torna nada público: ele é
+  // registro de replay, e o que ele carrega é justamente o segredo.
+  if ('visibilidade' in evento && evento.visibilidade === 'privada-do-dono') return [];
   const citados: string[] = [];
   for (const valor of Object.values(evento as Record<string, unknown>)) {
     if (typeof valor === 'string') citados.push(valor);
@@ -537,5 +540,41 @@ describe('guarda estrutural da projeção', () => {
     expect(patrulheiro?.acoes[0].escolhas.cartaEmCooldown).toBe(emCooldown);
     expect(patrulheiro?.acoes[0].escolhas.reforco).toBe('dano');
     expect(patrulheiro?.acoes[0].escolhas.guardaReduzida).toBe(2);
+  });
+});
+
+/*
+ * O log é registro de replay, não a visão do cliente.
+ *
+ * Ele pode guardar o que a partida precisa para ser reconstruída — inclusive a
+ * carta reservada face-down. O que não pode é ser entregue inteiro ao cliente
+ * adversário como atalho, e para isso o evento precisa dizer o que é privado.
+ */
+describe('o log distingue replay de visão entregue ao cliente', () => {
+  it('marca como privado o evento que registra anotação privada', () => {
+    const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R01'] });
+    const base = duelo(patrulheiro, build('guerreiro'), JOGADOR_A);
+    const { eventos } = jogar(base, JOGADOR_A, {
+      pedido: { carta: carta('R13'), escolhas: { cartaDaMao: carta('R05') } },
+    });
+
+    const daEmboscada = eventos.find(
+      (evento) =>
+        evento.tipo === 'anotacao-registrada' && evento.chave.includes('ataque-emboscado'),
+    );
+    expect(daEmboscada).toBeDefined();
+    expect(
+      daEmboscada && 'visibilidade' in daEmboscada ? daEmboscada.visibilidade : undefined,
+    ).toBe('privada-do-dono');
+  });
+
+  it('não marca como privado um evento de anotação comum', () => {
+    const base = duelo(build('guerreiro', { habilidades: ['W11'] }), build('mago'), JOGADOR_A);
+    const { eventos } = jogar(base, JOGADOR_A, { pedido: { carta: carta('W11') } });
+    const comuns = eventos.filter((evento) => evento.tipo === 'anotacao-registrada');
+    expect(comuns.length).toBeGreaterThan(0);
+    for (const evento of comuns) {
+      expect('visibilidade' in evento ? evento.visibilidade : undefined).toBeUndefined();
+    }
   });
 });

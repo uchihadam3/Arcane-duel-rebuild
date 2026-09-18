@@ -94,6 +94,9 @@ export const registrarAnotacao = (
     origem: anotacao.origem,
     escopo: anotacao.escopo,
     valor: anotacao.valor,
+    // A visibilidade viaja junto: o log guarda o que o replay precisa, e quem
+    // for entregá-lo a um cliente precisa saber o que filtrar.
+    ...(anotacao.visibilidade === undefined ? {} : { visibilidade: anotacao.visibilidade }),
   });
 };
 

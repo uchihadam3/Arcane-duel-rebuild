@@ -3,6 +3,7 @@ import type {
   CondicaoId,
   EfeitoDaEscolha,
   EscopoDaAnotacao,
+  VisibilidadeDaAnotacao,
   EstadoDeJuramento,
   EstagioDeDevocao,
   FormaDoDruida,
@@ -137,6 +138,17 @@ export type EventoUniversal =
       readonly origem: CardId;
       readonly escopo: EscopoDaAnotacao;
       readonly valor: number;
+      /**
+       * Acompanha a visibilidade da anotação que o evento registra.
+       *
+       * O log é o registro do replay e pode guardar o que a partida precisa
+       * para ser reconstruída — inclusive a carta que Preparar Emboscada
+       * reservou face-down. O que ele não pode é ser entregue inteiro ao
+       * cliente adversário como atalho, e este campo é o que permite filtrá-lo
+       * quando essa entrega existir, em vez de descobrir tarde demais que a
+       * chave carregava um identificador secreto.
+       */
+      readonly visibilidade?: VisibilidadeDaAnotacao;
     }
   | { readonly tipo: 'acao-extra-liberada'; readonly jogador: PlayerId; readonly origem: CardId }
   | {
