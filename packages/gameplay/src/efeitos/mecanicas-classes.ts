@@ -1,7 +1,7 @@
 import type { PlayerId } from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
 
-import { CHAVE } from '../chaves.js';
+import { CHAVE, ORIGEM_DO_TURNO } from '../chaves.js';
 import type { Contexto } from '../contexto.js';
 import { consumirLimitePorTurno, jogadorDo, slotDe } from '../contexto.js';
 import type { AlvoDoEfeito, ConsultaDeLegalidade, ResumoDaResolucao } from '../ganchos.js';
@@ -15,7 +15,14 @@ import {
   reiniciarPrecoProibido,
   reiniciarReducaoVoluntaria,
 } from '../recursos-classe.js';
-import { lerPromessa } from './comum.js';
+import { lerPromessa, prometerAoProximoAtaque } from './comum.js';
+import {
+  aplicarDesafinar,
+  consumirDescontoDoBardo,
+  contarAtivacoesDoBardo,
+  marcasDoBardoNoInicioDoTurno,
+  registrarNotaDaAcao,
+} from './bardo.js';
 import {
   brechaDoPassoFalso,
   consumirDescontoDoPrimeiroAtaque,
@@ -135,12 +142,26 @@ export const mecanicasDeClasseAposResolver = (
   ritoDeOssosNaRuptura(ctx, alvo, resumo.ruptura);
   cumprimentosAposResolver(ctx, alvo, resumo);
   brechaDoPassoFalso(ctx, alvo, resumo.houveReacao);
+  contarAtivacoesDoBardo(ctx, alvo);
   if (resumo.houveReacao) registrarReacaoDoPaladino(ctx, alvo);
+};
+
+/**
+ * O que as classes fazem no instante em que a Ação resolve, antes de o texto
+ * pós-resolução rodar.
+ *
+ * A Nota do Bardo entra aqui: ela precisa já estar na sequência quando o texto
+ * das cartas perguntar pela Cadência, e não pode ser afetada por uma
+ * substituição que aquela mesma Ação acabou de criar.
+ */
+export const mecanicasDeClasseAoResolver = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
+  registrarNotaDaAcao(ctx, alvo);
 };
 
 /** O que as classes fazem logo antes de a Ação ser resolvida. */
 export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
   marcaDeGolpeAntesDeResolver(ctx, alvo);
+  aplicarDesafinar(ctx, alvo);
 };
 
 /**
@@ -165,6 +186,7 @@ export const mecanicasDeClasseAoDeclarar = (
 ): void => {
   consumirDescontoDaMarcha(ctx, jogador, perfil.valores !== null, perfil.custo.valor);
   consumirDescontoDoPrimeiroAtaque(ctx, jogador, ordem);
+  consumirDescontoDoBardo(ctx, jogador, ordem);
 };
 
 /**
@@ -182,8 +204,13 @@ export const mecanicasDeClasseAoAbrirTurno = (
   // Necromante: "quando uma carta voltar normalmente de CD1 para sua mão,
   // colha 1 Alma." O avanço do cooldown acabou de acontecer.
   ecoDoCemiterioNoInicioDoTurno(ctx, jogador, cartasQueVoltaram);
-  // Paladino: o que ele leu no começo do turno vira marca para as cartas dele.
-  marcasDoInicioDoTurno(ctx, jogador, reservaAntes);
+  // "Se começou este turno com 2 de Reserva": a Reserva de antes da conversão
+  // do início do turno. A marca é de todas as classes que perguntam por ela.
+  if (reservaAntes === 2) {
+    prometerAoProximoAtaque(ctx, jogador, ORIGEM_DO_TURNO, CHAVE.comecouTurnoComReserva2, 1);
+  }
+  marcasDoInicioDoTurno(ctx, jogador);
+  marcasDoBardoNoInicioDoTurno(ctx, jogador);
   // Bardo: a sequência de Notas e as Cadências são do turno, e o turno é novo.
   reiniciarNotas(ctx, jogador);
   // Monge: o Kata recomeça — Abertura, Fluxo e Finalização valem dentro do turno.

@@ -172,6 +172,33 @@ export const ASSASSINO: BuildEquipada = {
   ultimate: cardId('LU01'), // Golpe Perfeito
 };
 
+/** Bardo, Receita 1 — Crescendo. */
+export const CRESCENDO: BuildEquipada = {
+  classe: 'bardo',
+  personagem: PERSONAGEM_DA_CLASSE.bardo,
+  habilidades: [
+    cardId('B01'), // Batida Marcial
+    cardId('B02'), // Corda Cortante
+    cardId('B03'), // Acorde Estridente
+    cardId('B04'), // Crescendo
+    cardId('B11'), // Improviso
+    cardId('B12'), // Preparar o Refrão
+    cardId('B16'), // Contracanto
+    cardId('B17'), // Quebra de Ritmo
+  ],
+  passivas: [
+    cardId('BP01'), // Ouvido Absoluto
+    cardId('BP02'), // Crescendo Natural
+    cardId('BP06'), // Ritmo Sustentado
+    cardId('BP09'), // Último Refrão
+  ],
+  cartasDeClasse: [
+    cardId('BC01'), // Canção da Marcha
+    cardId('BC04'), // Tambor de Guerra
+  ],
+  ultimate: cardId('BU01'), // Grande Finale
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
@@ -179,4 +206,5 @@ export const RECEITAS_INICIAIS = {
   necromante: OSSOMANTE,
   paladino: BASTIAO,
   ladino: ASSASSINO,
+  bardo: CRESCENDO,
 } as const;

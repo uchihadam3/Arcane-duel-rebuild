@@ -270,6 +270,48 @@ const NOMES_DO_LADINO: Readonly<Record<string, string>> = {
   LU03: 'Desaparecer',
 };
 
+const NOMES_DO_BARDO: Readonly<Record<string, string>> = {
+  B01: 'Batida Marcial',
+  B02: 'Corda Cortante',
+  B03: 'Acorde Estridente',
+  B04: 'Crescendo',
+  B05: 'Nota Perfurante',
+  B06: 'Refrão Cortante',
+  B07: 'Dissonância',
+  B08: 'Pancada de Compasso',
+  B09: 'Arpejo de Guerra',
+  B10: 'Afinar',
+  B11: 'Improviso',
+  B12: 'Preparar o Refrão',
+  B13: 'Mudança de Tom',
+  B14: 'Pausa Dramática',
+  B15: 'Desafinar',
+  B16: 'Contracanto',
+  B17: 'Quebra de Ritmo',
+  B18: 'Nota Sustentada',
+  B19: 'Resposta Improvisada',
+  B20: 'Coda Defensiva',
+  BP01: 'Ouvido Absoluto',
+  BP02: 'Crescendo Natural',
+  BP03: 'Público Cativo',
+  BP04: 'Harmonia Defensiva',
+  BP05: 'Memória Musical',
+  BP06: 'Ritmo Sustentado',
+  BP07: 'Virtuose',
+  BP08: 'Canção Inesquecível',
+  BP09: 'Último Refrão',
+  BP10: 'Silêncio Antes do Aplauso',
+  BC01: 'Canção da Marcha',
+  BC02: 'Canção do Lamento',
+  BC03: 'Canção da Discórdia',
+  BC04: 'Tambor de Guerra',
+  BC05: 'Alaúde de Cristal',
+  BC06: 'Flauta de Prata',
+  BU01: 'Grande Finale',
+  BU02: 'Bis',
+  BU03: 'Silêncio da Plateia',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -284,6 +326,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   necromante: NOMES_DO_NECROMANTE,
   paladino: NOMES_DO_PALADINO,
   ladino: NOMES_DO_LADINO,
+  bardo: NOMES_DO_BARDO,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -305,6 +348,7 @@ describe('catálogo oficial', () => {
       'necromante',
       'paladino',
       'ladino',
+      'bardo',
     ]);
   });
 

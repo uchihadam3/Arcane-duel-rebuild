@@ -41,6 +41,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   necromante: ['N01', 'N02', 'N03', 'N04', 'N07', 'N14', 'N16', 'N17'],
   paladino: ['P01', 'P03', 'P05', 'P06', 'P10', 'P11', 'P15', 'P18'],
   ladino: ['L01', 'L02', 'L03', 'L06', 'L07', 'L11', 'L15', 'L16'],
+  bardo: ['B01', 'B02', 'B04', 'B08', 'B14', 'B18', 'B10', 'B09'],
 } as const;
 
 /*
@@ -81,6 +82,11 @@ const PADROES = {
     passivas: ['LP04', 'LP08', 'LP09', 'LP10'],
     cartasDeClasse: ['LC03', 'LC06'],
     ultimate: 'LU01',
+  },
+  bardo: {
+    passivas: ['BP05', 'BP07', 'BP08', 'BP10'],
+    cartasDeClasse: ['BC03', 'BC05'],
+    ultimate: 'BU02',
   },
 } as const;
 
@@ -263,6 +269,17 @@ export const comBrechas = (
 export const brechasDe = (partida: EstadoDaPartida, id: PlayerId): number => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'ladino' ? recurso.brechasNoAdversario : -1;
+};
+
+/** As Notas já executadas pelo Bardo neste turno. */
+export const notasDe = (partida: EstadoDaPartida, id: PlayerId): readonly string[] => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'bardo' ? recurso.sequenciaDeNotas : [];
+};
+
+export const cadenciasDe = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'bardo' ? recurso.cadenciasNoTurno : -1;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

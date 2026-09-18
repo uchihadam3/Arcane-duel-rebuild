@@ -959,17 +959,10 @@ export const registrarReacaoDoPaladino = (ctx: Contexto, alvo: AlvoDoEfeito): vo
 };
 
 /** O que o Paladino lê no começo do próprio turno e guarda para as cartas. */
-export const marcasDoInicioDoTurno = (
-  ctx: Contexto,
-  jogador: PlayerId,
-  reservaAntes: number,
-): void => {
+export const marcasDoInicioDoTurno = (ctx: Contexto, jogador: PlayerId): void => {
   const atual = jogadorDo(ctx, jogador);
   if (atual.recurso.classe !== 'paladino') return;
 
-  if (reservaAntes === 2) {
-    prometerAoProximoAtaque(ctx, jogador, id('P03'), CHAVE.comecouTurnoComReserva2, 1);
-  }
   if (atual.guarda >= REGRAS_UNIVERSAIS.guardaInicial) {
     prometerAoProximoAtaque(ctx, jogador, id('PP02'), CHAVE.comecouTurnoComGuardaCheia, 1);
   }

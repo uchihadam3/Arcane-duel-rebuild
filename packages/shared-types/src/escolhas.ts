@@ -1,6 +1,6 @@
 import type { CardId } from './ids.js';
 import type { CondicaoId } from './conditions.js';
-import type { FormaDoDruida } from './recursos-de-classe.js';
+import type { FormaDoDruida, Nota } from './recursos-de-classe.js';
 
 /*
  * Escolhas legais que acompanham uma Ação ou uma Resposta.
@@ -80,6 +80,15 @@ export interface EscolhasDaAcao {
    * quem decide fazê-la é o jogador.
    */
   readonly descerEstado?: boolean;
+  /**
+   * A Nota escolhida quando a carta manda escolher uma.
+   *
+   * Só duas cartas do Bardo pedem isso: o Improviso, que não imprime Nota, e o
+   * Afinar, que troca a Nota da próxima Ação para efeito de Cadência.
+   */
+  readonly nota?: Nota;
+  /** Passiva própria escolhida por um texto que mexe no estado dela. */
+  readonly passiva?: CardId;
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};

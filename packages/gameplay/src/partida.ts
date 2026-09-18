@@ -75,10 +75,12 @@ import {
 import { efeitoDeCartaDeClasse, efeitoDePassiva, efeitoJogavel } from './registro.js';
 import { descontoDaMarcha } from './efeitos/paladino.js';
 import { acaoTrancadaPelaFumaca, descontoDoPrimeiroAtaque } from './efeitos/ladino.js';
+import { descontoDoBardo } from './efeitos/bardo.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
   mecanicasDeClasseAoDeclarar,
   mecanicasDeClasseAntesDeResolver,
+  mecanicasDeClasseAoResolver,
   legalidadeDeClasse,
   mecanicasDeClasseAoFecharTurno,
   mecanicasDeClasseDepoisDaConversao,
@@ -505,9 +507,12 @@ const descontosDoEstado = (
   // custa 1 AP a menos, mínimo 1."
   const passos = perfil.valores !== null && descontoDoPrimeiroAtaque(jogador, ordem);
 
+  // O Bardo guarda descontos para "a próxima Ação", com ou sem Ataque.
+  const bardo = descontoDoBardo(jogador, perfil, ordem);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica || marcha || passos ? { ap: 1, apMinimo: 1 } : {}),
+    ...(prismatica || marcha || passos || bardo ? { ap: 1, apMinimo: 1 } : {}),
   };
 };
 
@@ -1286,6 +1291,7 @@ export const resolver = (
     valores !== null,
   );
 
+  mecanicasDeClasseAoResolver(ctx, alvo);
   despachar(ctx, alvo, 'apos-resolver', resumo);
 
   if (resumo.ruptura && promessas.momentumNaRuptura > 0) {

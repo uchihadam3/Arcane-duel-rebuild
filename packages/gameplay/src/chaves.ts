@@ -174,6 +174,26 @@ export const CHAVE = {
   primeiroAtaqueMaisBarato: 'turno:primeiro-ataque-mais-barato',
   /** Reações do adversário nesta rodada, para o Olho para Reações. */
   reacoesInimigasNaRodada: 'partida:reacoes-inimigas-na-rodada',
+
+  /* Bardo --------------------------------------------------------------- */
+  /** Nota que o Afinar impôs à próxima Ação. A Nota entra no sufixo da chave. */
+  notaSubstituta: 'turno:nota-substituta',
+  /** Desconto de AP guardado para a próxima Ação do turno. */
+  proximaAcaoDescontoAp: 'turno:proxima-acao-desconto-ap',
+  /** Desconto de AP guardado para a próxima Ação de Nota diferente. */
+  descontoSeNotaDiferente: 'turno:desconto-nota-diferente',
+  /** Desafinar: a próxima Reação inimiga reduz 1 D e 1 I a menos. */
+  desafinar: 'turno:desafinar',
+  /** Quantas vezes a Canção já foi Ativada na partida. */
+  ativacoesDaCancao: 'partida:ativacoes-da-cancao',
+  /** Quantas vezes o Instrumento já foi Ativado na partida. */
+  ativacoesDoInstrumento: 'partida:ativacoes-do-instrumento',
+  /** O Bardo preparou o Silêncio: uma Ação só e 2 de Reserva no fim do turno. */
+  preparouOSilencio: 'partida:preparou-o-silencio',
+  /** Bônus guardado para o primeiro Ataque do próximo turno do Bardo. */
+  primeiroAtaqueDoProximoTurnoImpacto: 'partida:primeiro-ataque-proximo-turno-impacto',
+  /** Desconto guardado para a primeira Ação do próximo turno. */
+  primeiraAcaoDoProximoTurnoMaisBarata: 'partida:primeira-acao-proximo-turno-barata',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];
