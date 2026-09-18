@@ -29,7 +29,7 @@ export type MoedaDeCusto = 'ap' | 'reserva';
  * estados que o texto exige, não moedas que o custo consome, e por isso não
  * aparecem nesta lista.
  */
-export type RecursoDeCusto = 'mana' | 'momentum' | 'alma';
+export type RecursoDeCusto = 'mana' | 'momentum' | 'alma' | 'brecha';
 
 /** Parcela fixa do custo paga com o recurso da classe. */
 export interface ParcelaDeRecurso {

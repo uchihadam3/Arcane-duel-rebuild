@@ -74,9 +74,11 @@ import {
 } from './pipeline.js';
 import { efeitoDeCartaDeClasse, efeitoDePassiva, efeitoJogavel } from './registro.js';
 import { descontoDaMarcha } from './efeitos/paladino.js';
+import { acaoTrancadaPelaFumaca, descontoDoPrimeiroAtaque } from './efeitos/ladino.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
   mecanicasDeClasseAoDeclarar,
+  mecanicasDeClasseAntesDeResolver,
   legalidadeDeClasse,
   mecanicasDeClasseAoFecharTurno,
   mecanicasDeClasseDepoisDaConversao,
@@ -499,9 +501,13 @@ const descontosDoEstado = (
   // 1 AP a menos, mínimo 1."
   const marcha = perfil.valores !== null && descontoDaMarcha(jogador, perfil.custo.valor);
 
+  // "Passos Invisíveis: no início do seu próximo turno, seu primeiro Ataque
+  // custa 1 AP a menos, mínimo 1."
+  const passos = perfil.valores !== null && descontoDoPrimeiroAtaque(jogador, ordem);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica || marcha ? { ap: 1, apMinimo: 1 } : {}),
+    ...(prismatica || marcha || passos ? { ap: 1, apMinimo: 1 } : {}),
   };
 };
 
@@ -614,7 +620,7 @@ export const declarar = (
   if (erro !== null) return falha(erro);
 
   const indice = (ordem - 1) as IndiceDeAcao;
-  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor);
+  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor, ordem);
   for (const uso of usos) {
     const comando =
       uso.modo === 'ativar'
@@ -906,6 +912,17 @@ export const usarCartaDeClasseNaAcao = (
     item.acoes.some((slot) => slot.indice === indice && slot.situacao === 'declarada'),
   );
   if (atacante === undefined) return falha({ tipo: 'acao-nao-declarada', indice });
+
+  // "Bomba de Fumaça: efeitos de Cartas de Classe inimigas não podem aumentar
+  // esta ação depois que ela resolver." Quem responde é o dono da Ação, e a
+  // trava vale para o outro lado.
+  if (jogador === atacante.id && acaoTrancadaPelaFumaca(atacante)) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta: uso.carta,
+      detalhe: 'a Bomba de Fumaça trancou as Cartas de Classe nesta ação',
+    });
+  }
 
   const slot = slotDe(atacante, indice);
   if (slot === undefined) return falha({ tipo: 'acao-nao-declarada', indice });
@@ -1238,6 +1255,7 @@ export const resolver = (
   const promessas = aplicarPromessasDoAtaque(ctx, alvo);
 
   despachar(ctx, alvo, 'antes-de-resolver');
+  mecanicasDeClasseAntesDeResolver(ctx, alvo);
   verificarRevelacoes(ctx, 'antes-de-resolver', alvo, null);
 
   // A contrafactual de Ruptura é medida agora, com tudo que já foi somado e sem

@@ -16,6 +16,7 @@ export const LIMITES_DE_RECURSO: Readonly<
   mana: { minimo: 0, maximo: 6 },
   momentum: { minimo: 0, maximo: 3 },
   alma: { minimo: 0, maximo: 4 },
+  brecha: { minimo: 0, maximo: 3 },
 };
 
 /** Quanto o jogador tem, ou `null` quando a classe dele não usa esse recurso. */
@@ -26,6 +27,9 @@ export const valorDoRecurso = (
   const atual = jogador.recurso;
   if (recurso === 'mana') return atual.classe === 'mago' ? atual.mana : null;
   if (recurso === 'alma') return atual.classe === 'necromante' ? atual.almasControladas : null;
+  // As Brechas ficam sobre o adversário, mas são do Ladino: quem as cria e quem
+  // as consome é ele, então o custo impresso lê o número aqui.
+  if (recurso === 'brecha') return atual.classe === 'ladino' ? atual.brechasNoAdversario : null;
   return atual.classe === 'guerreiro' ? atual.momentum : null;
 };
 
@@ -53,6 +57,9 @@ export const definirRecurso = (
   }
   if (recurso === 'momentum' && atual.classe === 'guerreiro') {
     return { ...jogador, recurso: { ...atual, momentum: limitado } };
+  }
+  if (recurso === 'brecha' && atual.classe === 'ladino') {
+    return { ...jogador, recurso: { ...atual, brechasNoAdversario: limitado } };
   }
   if (recurso === 'alma' && atual.classe === 'necromante') {
     // As quatro fichas de Alma são conservadas: gastar move a ficha para o
@@ -86,5 +93,6 @@ export const somarRecurso = (
 export const recursoDaClasse = (jogador: EstadoDeJogador): RecursoDeCusto | null => {
   if (jogador.recurso.classe === 'mago') return 'mana';
   if (jogador.recurso.classe === 'necromante') return 'alma';
+  if (jogador.recurso.classe === 'ladino') return 'brecha';
   return jogador.recurso.classe === 'guerreiro' ? 'momentum' : null;
 };

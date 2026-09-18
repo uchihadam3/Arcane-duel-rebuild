@@ -228,6 +228,48 @@ const NOMES_DO_PALADINO: Readonly<Record<string, string>> = {
   PU03: 'Cruzada Final',
 };
 
+const NOMES_DO_LADINO: Readonly<Record<string, string>> = {
+  L01: 'Corte Rápido',
+  L02: 'Finta',
+  L03: 'Corte Serrilhado',
+  L04: 'Golpe nos Rins',
+  L05: 'Estocada Sombria',
+  L06: 'Punhalada Oportunista',
+  L07: 'Corte de Tendão',
+  L08: 'Execução Precisa',
+  L09: 'Ataque de Desarme',
+  L10: 'Golpe Final',
+  L11: 'Preparar a Brecha',
+  L12: 'Marcar o Alvo',
+  L13: 'Sabotagem',
+  L14: 'Passo Falso',
+  L15: 'Esquiva',
+  L16: 'Adaga de Aparar',
+  L17: 'Bomba de Fumaça',
+  L18: 'Escapar pelas Sombras',
+  L19: 'Contra-ataque Sujo',
+  L20: 'Instinto de Sobrevivência',
+  LP01: 'Primeiro Sangue',
+  LP02: 'Passos Invisíveis',
+  LP03: 'Predador da Brecha',
+  LP04: 'Mãos Rápidas',
+  LP05: 'Sangue Frio',
+  LP06: 'Olho para Reações',
+  LP07: 'Ferida Aberta',
+  LP08: 'Improvisador',
+  LP09: 'Sem Testemunhas',
+  LP10: 'Plano de Fuga',
+  LC01: 'Método do Assassino',
+  LC02: 'Método do Duelista',
+  LC03: 'Método do Sabotador',
+  LC04: 'Lâminas Serrilhadas',
+  LC05: 'Frasco de Fumaça',
+  LC06: 'Fio Oculto',
+  LU01: 'Golpe Perfeito',
+  LU02: 'Mil Cortes',
+  LU03: 'Desaparecer',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -241,6 +283,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   clerigo: NOMES_DO_CLERIGO,
   necromante: NOMES_DO_NECROMANTE,
   paladino: NOMES_DO_PALADINO,
+  ladino: NOMES_DO_LADINO,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -261,6 +304,7 @@ describe('catálogo oficial', () => {
       'clerigo',
       'necromante',
       'paladino',
+      'ladino',
     ]);
   });
 

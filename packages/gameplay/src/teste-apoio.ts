@@ -40,6 +40,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   clerigo: ['C01', 'C02', 'C08', 'C12', 'C17', 'C05', 'C06', 'C09'],
   necromante: ['N01', 'N02', 'N03', 'N04', 'N07', 'N14', 'N16', 'N17'],
   paladino: ['P01', 'P03', 'P05', 'P06', 'P10', 'P11', 'P15', 'P18'],
+  ladino: ['L01', 'L02', 'L03', 'L06', 'L07', 'L11', 'L15', 'L16'],
 } as const;
 
 /*
@@ -75,6 +76,11 @@ const PADROES = {
     passivas: ['PP07', 'PP08', 'PP09', 'PP10'],
     cartasDeClasse: ['PC01', 'PC04'],
     ultimate: 'PU01',
+  },
+  ladino: {
+    passivas: ['LP04', 'LP08', 'LP09', 'LP10'],
+    cartasDeClasse: ['LC03', 'LC06'],
+    ultimate: 'LU01',
   },
 } as const;
 
@@ -242,6 +248,21 @@ export const comJuramento = (
 export const juramentoDe = (partida: EstadoDaPartida, id: PlayerId): EstadoDeJuramento | null => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'paladino' ? recurso.juramento : null;
+};
+
+/** Põe as Brechas do Ladino em um valor exato. */
+export const comBrechas = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  brechas: number,
+): EstadoDaPartida =>
+  jogador(partida, id).recurso.classe === 'ladino'
+    ? com(partida, id, { recurso: { classe: 'ladino', brechasNoAdversario: brechas } })
+    : partida;
+
+export const brechasDe = (partida: EstadoDaPartida, id: PlayerId): number => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'ladino' ? recurso.brechasNoAdversario : -1;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

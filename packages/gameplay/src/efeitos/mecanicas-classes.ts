@@ -17,6 +17,12 @@ import {
 } from '../recursos-classe.js';
 import { lerPromessa } from './comum.js';
 import {
+  brechaDoPassoFalso,
+  consumirDescontoDoPrimeiroAtaque,
+  marcaDeGolpeAntesDeResolver,
+  marcarTurnoSemDano,
+} from './ladino.js';
+import {
   consumirDescontoDaMarcha,
   travaDeTecnicaDoPaladino,
   cumprimentosAposResolver,
@@ -128,7 +134,13 @@ export const mecanicasDeClasseAposResolver = (
   colheitaDoTurnoInimigo(ctx, alvo, resumo.vidaPerdidaPeloDefensor > 0);
   ritoDeOssosNaRuptura(ctx, alvo, resumo.ruptura);
   cumprimentosAposResolver(ctx, alvo, resumo);
+  brechaDoPassoFalso(ctx, alvo, resumo.houveReacao);
   if (resumo.houveReacao) registrarReacaoDoPaladino(ctx, alvo);
+};
+
+/** O que as classes fazem logo antes de a Ação ser resolvida. */
+export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
+  marcaDeGolpeAntesDeResolver(ctx, alvo);
 };
 
 /**
@@ -149,8 +161,10 @@ export const mecanicasDeClasseAoDeclarar = (
   ctx: Contexto,
   jogador: PlayerId,
   perfil: { readonly custo: { readonly valor: number }; readonly valores: unknown },
+  ordem: number,
 ): void => {
   consumirDescontoDaMarcha(ctx, jogador, perfil.valores !== null, perfil.custo.valor);
+  consumirDescontoDoPrimeiroAtaque(ctx, jogador, ordem);
 };
 
 /**
@@ -184,6 +198,8 @@ export const mecanicasDeClasseAoAbrirTurno = (
 
 /** Tudo que as classes da etapa quatro fazem ao fechar o próprio turno. */
 export const mecanicasDeClasseAoFecharTurno = (ctx: Contexto, jogador: PlayerId): void => {
+  // Ladino: "quando o adversário terminar um turno sem causar Dano à sua Vida."
+  marcarTurnoSemDano(ctx, jogador);
   // "Ao fim do turno do Ladino, todas as Brechas não consumidas desaparecem."
   // Isso cobre também as Brechas criadas no turno inimigo, que duram até o fim
   // do turno seguinte dele.

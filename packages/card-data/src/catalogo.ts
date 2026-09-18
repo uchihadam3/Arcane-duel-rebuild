@@ -34,6 +34,13 @@ import {
   ULTIMATES_DO_PALADINO,
 } from './paladino/complemento.js';
 
+import { HABILIDADES_DO_LADINO } from './ladino/habilidades.js';
+import {
+  CARTAS_DE_CLASSE_DO_LADINO,
+  PASSIVAS_DO_LADINO,
+  ULTIMATES_DO_LADINO,
+} from './ladino/complemento.js';
+
 /*
  * O catálogo oficial.
  *
@@ -82,12 +89,20 @@ export const CARTAS_DO_PALADINO: readonly DefinicaoDeCarta[] = [
   ...ULTIMATES_DO_PALADINO,
 ];
 
+export const CARTAS_DO_LADINO: readonly DefinicaoDeCarta[] = [
+  ...HABILIDADES_DO_LADINO,
+  ...PASSIVAS_DO_LADINO,
+  ...CARTAS_DE_CLASSE_DO_LADINO,
+  ...ULTIMATES_DO_LADINO,
+];
+
 export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_GUERREIRO,
   ...CARTAS_DO_MAGO,
   ...CARTAS_DO_CLERIGO,
   ...CARTAS_DO_NECROMANTE,
   ...CARTAS_DO_PALADINO,
+  ...CARTAS_DO_LADINO,
 ]);
 
 /** Classes cujo catálogo já está implementado por inteiro, com testes. */
@@ -97,6 +112,7 @@ export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = [
   'clerigo',
   'necromante',
   'paladino',
+  'ladino',
 ];
 
 /** A definição impressa de uma carta, ou `undefined` se ela não existe. */
@@ -135,4 +151,8 @@ export {
   PASSIVAS_DO_PALADINO,
   CARTAS_DE_CLASSE_DO_PALADINO,
   ULTIMATES_DO_PALADINO,
+  HABILIDADES_DO_LADINO,
+  PASSIVAS_DO_LADINO,
+  CARTAS_DE_CLASSE_DO_LADINO,
+  ULTIMATES_DO_LADINO,
 };

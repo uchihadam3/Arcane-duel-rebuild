@@ -145,10 +145,38 @@ export const BASTIAO: BuildEquipada = {
   ultimate: cardId('PU02'), // Fortaleza Inquebrável
 };
 
+/** Ladino, Receita 1 — Assassino. */
+export const ASSASSINO: BuildEquipada = {
+  classe: 'ladino',
+  personagem: PERSONAGEM_DA_CLASSE.ladino,
+  habilidades: [
+    cardId('L01'), // Corte Rápido
+    cardId('L02'), // Finta
+    cardId('L05'), // Estocada Sombria
+    cardId('L06'), // Punhalada Oportunista
+    cardId('L11'), // Preparar a Brecha
+    cardId('L14'), // Passo Falso
+    cardId('L15'), // Esquiva
+    cardId('L17'), // Bomba de Fumaça
+  ],
+  passivas: [
+    cardId('LP01'), // Primeiro Sangue
+    cardId('LP03'), // Predador da Brecha
+    cardId('LP02'), // Passos Invisíveis
+    cardId('LP05'), // Sangue Frio
+  ],
+  cartasDeClasse: [
+    cardId('LC01'), // Método do Assassino
+    cardId('LC06'), // Fio Oculto
+  ],
+  ultimate: cardId('LU01'), // Golpe Perfeito
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
   clerigo: JULGAMENTO,
   necromante: OSSOMANTE,
   paladino: BASTIAO,
+  ladino: ASSASSINO,
 } as const;

@@ -158,6 +158,22 @@ export const CHAVE = {
   cruzadaFinalRestante: 'turno:cruzada-final-restante',
   /** A Cruzada Final cobra a descida de estado no fim do turno. */
   cruzadaFinalDesce: 'partida:cruzada-final-desce',
+
+  /* Ladino -------------------------------------------------------------- */
+  /** Marca de Golpe sobre o adversário. Só pode existir uma. */
+  marcaDeGolpe: 'partida:marca-de-golpe',
+  /** Brecha prometida para quando a Ação resolver sem Reação do adversário. */
+  brechaSeNaoHouverReacao: 'acao:brecha-sem-reacao',
+  /** Bomba de Fumaça trancou as Cartas de Classe inimigas nesta Ação. */
+  bombaDeFumaca: 'acao:bomba-de-fumaca',
+  /** O adversário terminou o turno sem causar Dano à Vida do dono. */
+  adversarioNaoCausouDano: 'partida:adversario-sem-dano',
+  /** Uma habilidade do dono voltou do cooldown à mão fora do momento normal. */
+  cartaVoltouCedo: 'turno:carta-voltou-cedo',
+  /** Desconto de AP guardado para o primeiro Ataque do turno. */
+  primeiroAtaqueMaisBarato: 'turno:primeiro-ataque-mais-barato',
+  /** Reações do adversário nesta rodada, para o Olho para Reações. */
+  reacoesInimigasNaRodada: 'partida:reacoes-inimigas-na-rodada',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];
