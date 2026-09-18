@@ -16,6 +16,7 @@ import type {
   ZonaDeCooldown,
 } from '@arcane-duel/shared-types';
 import { falha, sucesso, temTag, valorDaAnotacao } from '@arcane-duel/shared-types';
+import type { FormaDoDruida } from '@arcane-duel/shared-types';
 import type {
   BuildEquipada,
   DescontosDeCusto,
@@ -79,6 +80,7 @@ import { descontoDoBardo } from './efeitos/bardo.js';
 import { cobrarDisciplinaDoPasso, descontoDoMonge, disciplinaDoPasso } from './efeitos/monge.js';
 import { descontoDoPatrulheiro } from './efeitos/patrulheiro.js';
 import { descontoDoBarbaro } from './efeitos/barbaro.js';
+import { podeUsarMetamorfoseGratuita, transformar } from './efeitos/druida.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
   mecanicasDeClasseAoDeclarar,
@@ -1046,6 +1048,40 @@ export const anexarAlmaNoServo = (
     escopo: 'turno',
     valor: 1,
   });
+  return entregar(ctx);
+};
+
+/**
+ * Druida: a Metamorfose gratuita do início do próprio turno.
+ *
+ * "No início do próprio turno, antes da primeira Ação, **pode** usar
+ * Metamorfose gratuitamente." É decisão dele, uma vez por turno, e a janela é
+ * estreita de propósito.
+ */
+export const usarMetamorfose = (
+  partida: EstadoDaPartida,
+  jogador: PlayerId,
+  forma: FormaDoDruida,
+): Resposta => {
+  const ctx = criarContexto(partida);
+  const dono = ctx.partida.jogadores.find((item) => item.id === jogador);
+  if (dono === undefined) return falha({ tipo: 'jogador-desconhecido', jogador });
+  if (ctx.partida.turno?.jogadorAtivo !== jogador) return falha({ tipo: 'fora-do-turno', jogador });
+
+  if (!podeUsarMetamorfoseGratuita(dono)) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta: dono.personagem,
+      detalhe: 'a Metamorfose gratuita vale uma vez, antes da primeira Ação do turno',
+    });
+  }
+  if (!transformar(ctx, jogador, forma, true, dono.personagem)) {
+    return falha({
+      tipo: 'condicao-de-uso-nao-satisfeita',
+      carta: dono.personagem,
+      detalhe: 'você já está nessa Forma, ou a Forma Selvagem está trancada',
+    });
+  }
   return entregar(ctx);
 };
 

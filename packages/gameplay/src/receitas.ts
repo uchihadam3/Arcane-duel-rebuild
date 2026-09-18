@@ -280,6 +280,33 @@ export const BERSERKER: BuildEquipada = {
   ultimate: cardId('BAU02'), // Frenesi sem Freio
 };
 
+/** Druida, Receita 1 — Urso do Bosque. */
+export const URSO_DO_BOSQUE: BuildEquipada = {
+  classe: 'druida',
+  personagem: PERSONAGEM_DA_CLASSE.druida,
+  habilidades: [
+    cardId('D01'), // Chicote de Raízes
+    cardId('D04'), // Garra Selvagem
+    cardId('D06'), // Investida Bestial
+    cardId('D11'), // Crescimento Súbito
+    cardId('D13'), // Renovo Natural
+    cardId('D16'), // Casca Reflexa
+    cardId('D17'), // Instinto Feral
+    cardId('D12'), // Metamorfose Instintiva
+  ],
+  passivas: [
+    cardId('DP01'), // Duas Naturezas
+    cardId('DP06'), // Raízes Profundas
+    cardId('DP04'), // Pele Renovada
+    cardId('DP10'), // Equilíbrio Natural
+  ],
+  cartasDeClasse: [
+    cardId('DC01'), // Forma do Urso
+    cardId('DC04'), // Círculo do Bosque
+  ],
+  ultimate: cardId('DU03'), // Renascimento Primal
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
@@ -291,4 +318,5 @@ export const RECEITAS_INICIAIS = {
   monge: KATA_DO_TIGRE,
   patrulheiro: ATIRADOR,
   barbaro: BERSERKER,
+  druida: URSO_DO_BOSQUE,
 } as const;

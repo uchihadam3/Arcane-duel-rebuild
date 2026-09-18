@@ -18,6 +18,12 @@ import {
 } from '../recursos-classe.js';
 import { consumirPromessa, lerPromessa, prometerAoProximoAtaque } from './comum.js';
 import {
+  bonusDoDruida,
+  equilibrioNatural,
+  reforcoDaResposta,
+  registrarFormaDaAcao,
+} from './druida.js';
+import {
   aplicarGritoAmeacador,
   aplicarTotemDoUrso,
   bonusDoFrenesi,
@@ -184,6 +190,7 @@ export const mecanicasDeClasseAoResolver = (ctx: Contexto, alvo: AlvoDoEfeito): 
   registrarNotaDaAcao(ctx, alvo);
   // Monge: a etapa entra na sequência aqui, e com ela o Fluxo Interior e o Kata.
   registrarEtapaDoKata(ctx, alvo);
+  registrarFormaDaAcao(ctx, alvo);
 };
 
 /** O que as classes fazem logo antes de a Ação ser resolvida. */
@@ -195,6 +202,8 @@ export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfei
   bonusDoFrenesi(ctx, alvo);
   aplicarGritoAmeacador(ctx, alvo);
   aplicarTotemDoUrso(ctx, alvo);
+  bonusDoDruida(ctx, alvo);
+  reforcoDaResposta(ctx, alvo);
 };
 
 /**
@@ -318,4 +327,5 @@ export const mecanicasDeClasseAoFecharTurno = (ctx: Contexto, jogador: PlayerId)
 export const mecanicasDeClasseDepoisDaConversao = (ctx: Contexto, jogador: PlayerId): void => {
   fechoDoPaladino(ctx, jogador);
   fechoDoPatrulheiro(ctx, jogador);
+  equilibrioNatural(ctx, jogador);
 };

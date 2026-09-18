@@ -24,6 +24,7 @@ import {
 } from '../recursos-classe.js';
 import { lerPromessa } from './comum.js';
 import { defesaInataUsaResoluto } from './paladino.js';
+import { defesaInataReforcada } from './druida.js';
 
 /*
  * As doze Defesas Inatas.
@@ -267,8 +268,11 @@ export const aplicarDefesaInata = (
     case 'druida': {
       if (!marca()) return null;
       if (formaDe(defensor) === 'selvagem') {
-        if (reducao === 'impacto') reduzir(0, 2);
-        else reduzir(2, 0);
+        // "Sobrevivência Selvagem: a Defesa Inata Selvagem reduz 1 ponto
+        // adicional do tipo escolhido."
+        const pontos = defesaInataReforcada(defensor) ? 3 : 2;
+        if (reducao === 'impacto') reduzir(0, pontos);
+        else reduzir(pontos, 0);
       } else {
         reduzir(1, 1);
       }

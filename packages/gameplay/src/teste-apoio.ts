@@ -1,6 +1,7 @@
 import type {
   CardId,
   EstadoDeJuramento,
+  FormaDoDruida,
   EstagioDeDevocao,
   EstadoDaPartida,
   EstadoDeJogador,
@@ -45,6 +46,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   monge: ['MO01', 'MO04', 'MO07', 'MO11', 'MO13', 'MO17', 'MO02', 'MO05'],
   patrulheiro: ['R01', 'R03', 'R06', 'R10', 'R11', 'R12', 'R16', 'R17'],
   barbaro: ['BA01', 'BA04', 'BA07', 'BA08', 'BA11', 'BA16', 'BA05', 'BA06'],
+  druida: ['D01', 'D04', 'D09', 'D11', 'D13', 'D16', 'D17', 'D05'],
 } as const;
 
 /*
@@ -105,6 +107,11 @@ const PADROES = {
     passivas: ['BAP06', 'BAP08', 'BAP09', 'BAP10'],
     cartasDeClasse: ['BAC02', 'BAC05'],
     ultimate: 'BAU01',
+  },
+  druida: {
+    passivas: ['DP03', 'DP08', 'DP09', 'DP10'],
+    cartasDeClasse: ['DC02', 'DC05'],
+    ultimate: 'DU01',
   },
 } as const;
 
@@ -337,6 +344,23 @@ export const comMarca = (
 export const marcaDe = (partida: EstadoDaPartida, id: PlayerId): boolean => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'patrulheiro' ? recurso.marcaDaPresa : false;
+};
+
+/** Põe o Druida em uma Forma exata. */
+export const comForma = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  forma: FormaDoDruida,
+): EstadoDaPartida => {
+  const atual = jogador(partida, id);
+  return atual.recurso.classe === 'druida'
+    ? com(partida, id, { recurso: { ...atual.recurso, forma } })
+    : partida;
+};
+
+export const formaDe = (partida: EstadoDaPartida, id: PlayerId): FormaDoDruida | null => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'druida' ? recurso.forma : null;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

@@ -438,6 +438,48 @@ const NOMES_DO_BARBARO: Readonly<Record<string, string>> = {
   BAU03: 'Recusar a Morte',
 };
 
+const NOMES_DO_DRUIDA: Readonly<Record<string, string>> = {
+  D01: 'Chicote de Raízes',
+  D02: 'Espinhos Vivos',
+  D03: 'Raio da Tempestade',
+  D04: 'Garra Selvagem',
+  D05: 'Mordida Predatória',
+  D06: 'Investida Bestial',
+  D07: 'Garras Gêmeas',
+  D08: 'Golpe Totêmico',
+  D09: 'Fúria da Tempestade',
+  D10: 'Predador da Lua',
+  D11: 'Crescimento Súbito',
+  D12: 'Metamorfose Instintiva',
+  D13: 'Renovo Natural',
+  D14: 'Casca de Carvalho',
+  D15: 'Lua Crescente',
+  D16: 'Casca Reflexa',
+  D17: 'Instinto Feral',
+  D18: 'Raízes Protetoras',
+  D19: 'Salto da Fera',
+  D20: 'Mudar com o Golpe',
+  DP01: 'Duas Naturezas',
+  DP02: 'Sangue da Fera',
+  DP03: 'Sabedoria Ancestral',
+  DP04: 'Pele Renovada',
+  DP05: 'Instinto Predatório',
+  DP06: 'Raízes Profundas',
+  DP07: 'Olho da Tempestade',
+  DP08: 'Metamorfose Perfeita',
+  DP09: 'Sobrevivência Selvagem',
+  DP10: 'Equilíbrio Natural',
+  DC01: 'Forma do Urso',
+  DC02: 'Forma do Lobo',
+  DC03: 'Forma do Corvo',
+  DC04: 'Círculo do Bosque',
+  DC05: 'Círculo da Tempestade',
+  DC06: 'Círculo da Lua',
+  DU01: 'Avatar Selvagem',
+  DU02: 'Fúria da Natureza',
+  DU03: 'Renascimento Primal',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -456,6 +498,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   monge: NOMES_DO_MONGE,
   patrulheiro: NOMES_DO_PATRULHEIRO,
   barbaro: NOMES_DO_BARBARO,
+  druida: NOMES_DO_DRUIDA,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -481,6 +524,7 @@ describe('catálogo oficial', () => {
       'monge',
       'patrulheiro',
       'barbaro',
+      'druida',
     ]);
   });
 

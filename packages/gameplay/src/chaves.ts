@@ -263,6 +263,24 @@ export const CHAVE = {
    * resolve — senão a própria Ação que o criou o consumiria.
    */
   proximoAtaqueDanoAdiado: 'turno:proximo-ataque-dano-adiado',
+
+  /* Druida -------------------------------------------------------------- */
+  /** O Druida mudou de forma neste turno. */
+  mudouDeFormaNoTurno: 'turno:mudou-de-forma',
+  /** Ações já realizadas em cada Forma neste turno. */
+  acaoEmFormaHumana: 'turno:acao-em-forma-humana',
+  acaoEmFormaSelvagem: 'turno:acao-em-forma-selvagem',
+  /** O Druida não pode mais entrar em Forma Selvagem nesta partida. */
+  selvagemTrancada: 'partida:selvagem-trancada',
+  /** Bônus guardado para o próximo Ataque feito em Forma Selvagem. */
+  proximoAtaqueSelvagemDano: 'turno:proximo-ataque-selvagem-dano',
+  /** Casca de Carvalho reforça a primeira Resposta até o próximo turno. */
+  cascaDeCarvalho: 'partida:casca-de-carvalho',
+  /** Reforço do Círculo da Lua guardado para a ação seguinte à transformação. */
+  circuloDaLuaAtaque: 'turno:circulo-da-lua-ataque',
+  circuloDaLuaResposta: 'partida:circulo-da-lua-resposta',
+  /** O Druida pode mudar de forma de graça na próxima abertura de turno. */
+  metamorfoseExtra: 'partida:metamorfose-extra',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

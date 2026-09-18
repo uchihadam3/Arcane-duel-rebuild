@@ -30,7 +30,12 @@ export interface EscolhasDaAcao {
   readonly cartasEmCooldown?: readonly CardId[];
   /** Condição escolhida por um texto que manda remover ou aplicar uma. */
   readonly condicao?: CondicaoId;
-  /** Forma escolhida por uma Metamorfose. */
+  /**
+   * Forma escolhida por uma Metamorfose.
+   *
+   * Ausente quer dizer "não quero mudar": várias cartas do Druida dizem "você
+   * **pode** mudar de forma", e mudar é decisão de quem joga.
+   */
   readonly forma?: FormaDoDruida;
   /**
    * O Bruxo escolhe pagar o Preço Proibido nesta Ação.
