@@ -43,6 +43,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   ladino: ['L01', 'L02', 'L03', 'L06', 'L07', 'L11', 'L15', 'L16'],
   bardo: ['B01', 'B02', 'B04', 'B08', 'B14', 'B18', 'B10', 'B09'],
   monge: ['MO01', 'MO04', 'MO07', 'MO11', 'MO13', 'MO17', 'MO02', 'MO05'],
+  patrulheiro: ['R01', 'R03', 'R06', 'R10', 'R11', 'R12', 'R16', 'R17'],
 } as const;
 
 /*
@@ -93,6 +94,11 @@ const PADROES = {
     passivas: ['MOP05', 'MOP07', 'MOP08', 'MOP10'],
     cartasDeClasse: ['MOC03', 'MOC06'],
     ultimate: 'MOU01',
+  },
+  patrulheiro: {
+    passivas: ['RP05', 'RP06', 'RP07', 'RP08'],
+    cartasDeClasse: ['RC02', 'RC05'],
+    ultimate: 'RU02',
   },
 } as const;
 
@@ -310,6 +316,21 @@ export const chiDe = (partida: EstadoDaPartida, id: PlayerId): number => {
 export const kataDe = (partida: EstadoDaPartida, id: PlayerId): readonly string[] => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'monge' ? recurso.sequenciaDeKata : [];
+};
+
+/** Põe (ou tira) a Marca da Presa do Patrulheiro. */
+export const comMarca = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  marcada: boolean,
+): EstadoDaPartida =>
+  jogador(partida, id).recurso.classe === 'patrulheiro'
+    ? com(partida, id, { recurso: { classe: 'patrulheiro', marcaDaPresa: marcada } })
+    : partida;
+
+export const marcaDe = (partida: EstadoDaPartida, id: PlayerId): boolean => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'patrulheiro' ? recurso.marcaDaPresa : false;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

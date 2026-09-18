@@ -98,6 +98,13 @@ export interface EscolhasDaAcao {
   readonly disciplinaDoPasso?: boolean;
   /** Etapa de Kata escolhida por um texto que manda escolher uma. */
   readonly passoDeKata?: PassoDeKata;
+  /**
+   * O Patrulheiro escolhe Explorar a Marca da Presa nesta jogada.
+   *
+   * Várias cartas dizem "**pode** Explorar a Marca para receber +2 D": a Marca
+   * é uma só, e gastá-la é decisão de quem joga.
+   */
+  readonly explorarMarca?: boolean;
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};

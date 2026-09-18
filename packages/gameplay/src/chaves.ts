@@ -216,6 +216,31 @@ export const CHAVE = {
   disciplinaDoPassoUsada: 'turno:disciplina-do-passo',
   /** A Postura do Rio já corrigiu uma sequência na partida. */
   posturaDoRioUsada: 'partida:postura-do-rio',
+
+  /* Patrulheiro --------------------------------------------------------- */
+  /** Quantas Marcas o Patrulheiro já aplicou na partida. */
+  marcasAplicadas: 'partida:marcas-aplicadas',
+  /** Quantas vezes a Marca já foi Explorada na partida. */
+  marcasExploradas: 'partida:marcas-exploradas',
+  /** A Marca foi Explorada neste turno. */
+  explorouMarcaNoTurno: 'turno:explorou-marca',
+  /** A Marca atravessou um turno inteiro sem ser Explorada. */
+  marcaMantidaPorUmTurno: 'partida:marca-mantida',
+  /** Ataque reservado pela Emboscada para a terceira Ação do próximo turno. */
+  ataqueEmboscado: 'partida:ataque-emboscado',
+  /** O Ataque em curso foi o preparado pela Emboscada. */
+  usouAtaqueEmboscado: 'turno:usou-ataque-emboscado',
+  /** Bônus guardado para o próximo Ataque contra alvo Marcado. */
+  proximoAtaqueMarcadoDano: 'turno:proximo-ataque-marcado-dano',
+  proximoAtaqueMarcadoImpacto: 'turno:proximo-ataque-marcado-impacto',
+  /** Quantas vezes a Armadilha já foi Ativada na partida. */
+  ativacoesDaArmadilha: 'partida:ativacoes-da-armadilha',
+  /** Ataques que o adversário já concluiu neste turno. */
+  ataquesInimigosNoTurno: 'turno:ataques-inimigos',
+  /** A Marca foi aplicada nesta Ação, para o bônus da Pista Fresca. */
+  marcaAplicadaNaAcao: 'acao:marca-aplicada',
+  /** Paciência do Caçador prometeu o desconto, se a Marca sobreviver ao turno. */
+  pacienciaDoCacador: 'turno:paciencia-do-cacador',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

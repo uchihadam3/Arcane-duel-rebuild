@@ -9,6 +9,7 @@ import * as paladino from './efeitos/paladino.js';
 import * as ladino from './efeitos/ladino.js';
 import * as bardo from './efeitos/bardo.js';
 import * as monge from './efeitos/monge.js';
+import * as patrulheiro from './efeitos/patrulheiro.js';
 
 /*
  * Onde mora o comportamento de cada carta.
@@ -48,6 +49,8 @@ export const EFEITOS_JOGAVEIS: ReadonlyMap<CardId, EfeitoDeCarta> = juntar(
   bardo.ULTIMATES,
   monge.HABILIDADES,
   monge.ULTIMATES,
+  patrulheiro.HABILIDADES,
+  patrulheiro.ULTIMATES,
 );
 
 export const EFEITOS_DE_PASSIVA: ReadonlyMap<CardId, EfeitoDePassiva> = juntar(
@@ -59,6 +62,7 @@ export const EFEITOS_DE_PASSIVA: ReadonlyMap<CardId, EfeitoDePassiva> = juntar(
   ladino.PASSIVAS,
   bardo.PASSIVAS,
   monge.PASSIVAS,
+  patrulheiro.PASSIVAS,
 );
 
 export const EFEITOS_DE_CARTA_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClasse> = juntar(
@@ -70,6 +74,7 @@ export const EFEITOS_DE_CARTA_DE_CLASSE: ReadonlyMap<CardId, EfeitoDeCartaDeClas
   ladino.CARTAS_DE_CLASSE,
   bardo.CARTAS_DE_CLASSE,
   monge.CARTAS_DE_CLASSE,
+  patrulheiro.CARTAS_DE_CLASSE,
 );
 
 export const efeitoJogavel = (carta: CardId): EfeitoDeCarta => EFEITOS_JOGAVEIS.get(carta) ?? {};

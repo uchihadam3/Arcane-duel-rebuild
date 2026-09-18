@@ -1,4 +1,5 @@
-import type { PassoDeKata, PlayerId } from '@arcane-duel/shared-types';
+import type { CardId, EstadoDeJogador, PassoDeKata, PlayerId } from '@arcane-duel/shared-types';
+import { valorDaAnotacao } from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
 
 import { CHAVE, ORIGEM_DO_TURNO } from '../chaves.js';
@@ -15,19 +16,24 @@ import {
   reiniciarPrecoProibido,
   reiniciarReducaoVoluntaria,
 } from '../recursos-classe.js';
-import { lerPromessa, prometerAoProximoAtaque } from './comum.js';
+import { consumirPromessa, lerPromessa, prometerAoProximoAtaque } from './comum.js';
+import {
+  aplicarBonusDeMarca,
+  consumirDescontoDoPatrulheiro,
+  contarArmadilhas,
+  fechoDoPatrulheiro,
+} from './patrulheiro.js';
 import {
   aplicarBonusDeEtapa,
   consumirDescontoDoMonge,
-  marcasDoMongeNoInicioDoTurno,
   registrarEtapaDoKata,
   respiracaoProfundaNoInicioDoTurno,
 } from './monge.js';
 import {
   aplicarDesafinar,
+  bonusDoSilencio,
   consumirDescontoDoBardo,
   contarAtivacoesDoBardo,
-  marcasDoBardoNoInicioDoTurno,
   registrarNotaDaAcao,
 } from './bardo.js';
 import {
@@ -150,6 +156,7 @@ export const mecanicasDeClasseAposResolver = (
   cumprimentosAposResolver(ctx, alvo, resumo);
   brechaDoPassoFalso(ctx, alvo, resumo.houveReacao);
   contarAtivacoesDoBardo(ctx, alvo);
+  contarArmadilhas(ctx, alvo);
   if (resumo.houveReacao) registrarReacaoDoPaladino(ctx, alvo);
 };
 
@@ -172,6 +179,7 @@ export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfei
   marcaDeGolpeAntesDeResolver(ctx, alvo);
   aplicarDesafinar(ctx, alvo);
   aplicarBonusDeEtapa(ctx, alvo);
+  aplicarBonusDeMarca(ctx, alvo);
 };
 
 /**
@@ -183,6 +191,39 @@ export const legalidadeDeClasse = (consulta: ConsultaDeLegalidade): string | nul
   travaDeTecnicaDoPaladino(consulta.jogador, consulta.perfil.tipo === 'tecnica');
 
 /**
+ * Descontos de AP que qualquer classe pode guardar para a próxima Ação.
+ *
+ * Eles não pertencem a uma classe: o que muda de classe para classe é a carta
+ * que os cria. Ler todos no mesmo lugar evita que cada classe reimplemente a
+ * mesma promessa.
+ */
+export const descontoGuardado = (jogador: EstadoDeJogador, ordem: number): boolean =>
+  valorDaAnotacao(jogador.anotacoes, CHAVE.proximaAcaoDescontoAp) > 0 ||
+  (ordem === 1 &&
+    valorDaAnotacao(jogador.anotacoes, CHAVE.primeiraAcaoDoProximoTurnoMaisBarata) > 0);
+
+/**
+ * Bônus guardados para "o primeiro Ataque do próximo turno" viram bônus deste
+ * turno quando o turno vira.
+ */
+const converterPromessasDoProximoTurno = (ctx: Contexto, jogador: PlayerId): void => {
+  const impacto = consumirPromessa(ctx, jogador, CHAVE.primeiroAtaqueDoProximoTurnoImpacto);
+  if (impacto > 0) {
+    prometerAoProximoAtaque(ctx, jogador, ORIGEM_DO_TURNO, CHAVE.proximoAtaqueImpacto, impacto);
+  }
+  const dano = consumirPromessa(ctx, jogador, CHAVE.primeiroAtaqueDoProximoTurnoDano);
+  if (dano > 0) {
+    prometerAoProximoAtaque(
+      ctx,
+      jogador,
+      ORIGEM_DO_TURNO,
+      CHAVE.proximoAtaqueDano,
+      bonusDoSilencio(ctx, jogador, dano),
+    );
+  }
+};
+
+/**
  * Descontos de classe que se gastam ao serem usados.
  *
  * Roda logo depois de o custo ser pago: o desconto guardado para "o próximo
@@ -192,6 +233,7 @@ export const mecanicasDeClasseAoDeclarar = (
   ctx: Contexto,
   jogador: PlayerId,
   perfil: {
+    readonly carta: CardId;
     readonly custo: { readonly valor: number };
     readonly valores: unknown;
     readonly kata?: PassoDeKata;
@@ -200,8 +242,11 @@ export const mecanicasDeClasseAoDeclarar = (
 ): void => {
   consumirDescontoDaMarcha(ctx, jogador, perfil.valores !== null, perfil.custo.valor);
   consumirDescontoDoPrimeiroAtaque(ctx, jogador, ordem);
-  consumirDescontoDoBardo(ctx, jogador, ordem);
+  consumirDescontoDoBardo(ctx, jogador);
+  consumirPromessa(ctx, jogador, CHAVE.proximaAcaoDescontoAp);
+  if (ordem === 1) consumirPromessa(ctx, jogador, CHAVE.primeiraAcaoDoProximoTurnoMaisBarata);
   consumirDescontoDoMonge(ctx, jogador, perfil);
+  consumirDescontoDoPatrulheiro(ctx, jogador, perfil.carta);
 };
 
 /**
@@ -225,9 +270,8 @@ export const mecanicasDeClasseAoAbrirTurno = (
     prometerAoProximoAtaque(ctx, jogador, ORIGEM_DO_TURNO, CHAVE.comecouTurnoComReserva2, 1);
   }
   marcasDoInicioDoTurno(ctx, jogador);
-  marcasDoBardoNoInicioDoTurno(ctx, jogador);
-  marcasDoMongeNoInicioDoTurno(ctx, jogador);
   respiracaoProfundaNoInicioDoTurno(ctx, jogador);
+  converterPromessasDoProximoTurno(ctx, jogador);
   // Bardo: a sequência de Notas e as Cadências são do turno, e o turno é novo.
   reiniciarNotas(ctx, jogador);
   // Monge: o Kata recomeça — Abertura, Fluxo e Finalização valem dentro do turno.
@@ -258,4 +302,5 @@ export const mecanicasDeClasseAoFecharTurno = (ctx: Contexto, jogador: PlayerId)
  */
 export const mecanicasDeClasseDepoisDaConversao = (ctx: Contexto, jogador: PlayerId): void => {
   fechoDoPaladino(ctx, jogador);
+  fechoDoPatrulheiro(ctx, jogador);
 };

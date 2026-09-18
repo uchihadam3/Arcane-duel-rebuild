@@ -1002,50 +1002,24 @@ export const aplicarDesafinar = (ctx: Contexto, alvo: AlvoDoEfeito): void => {
 export const descontoDoBardo = (
   jogador: EstadoDeJogador,
   perfil: { readonly nota?: Nota },
-  ordem: number,
 ): boolean => {
   if (jogador.recurso.classe !== 'bardo') return false;
-  if (valorDaAnotacao(jogador.anotacoes, CHAVE.proximaAcaoDescontoAp) > 0) return true;
-  if (
-    ordem === 1 &&
-    valorDaAnotacao(jogador.anotacoes, CHAVE.primeiraAcaoDoProximoTurnoMaisBarata) > 0
-  ) {
-    return true;
-  }
   // "A próxima Ação com Nota diferente custa 1 AP a menos."
   if (valorDaAnotacao(jogador.anotacoes, CHAVE.descontoSeNotaDiferente) === 0) return false;
   const anterior = notaAnterior(jogador);
   return anterior !== null && perfil.nota !== undefined && perfil.nota !== anterior;
 };
 
-export const consumirDescontoDoBardo = (ctx: Contexto, jogador: PlayerId, ordem: number): void => {
+export const consumirDescontoDoBardo = (ctx: Contexto, jogador: PlayerId): void => {
   if (jogadorDo(ctx, jogador).recurso.classe !== 'bardo') return;
-  consumirPromessa(ctx, jogador, CHAVE.proximaAcaoDescontoAp);
   consumirPromessa(ctx, jogador, CHAVE.descontoSeNotaDiferente);
-  if (ordem === 1) consumirPromessa(ctx, jogador, CHAVE.primeiraAcaoDoProximoTurnoMaisBarata);
 };
 
 /** Bônus guardados para o primeiro Ataque do próximo turno do Bardo. */
-export const marcasDoBardoNoInicioDoTurno = (ctx: Contexto, jogador: PlayerId): void => {
-  const atual = jogadorDo(ctx, jogador);
-  if (atual.recurso.classe !== 'bardo') return;
-
-  const impacto = consumirPromessa(ctx, jogador, CHAVE.primeiroAtaqueDoProximoTurnoImpacto);
-  if (impacto > 0) {
-    prometerAoProximoAtaque(ctx, jogador, id('B17'), CHAVE.proximoAtaqueImpacto, impacto);
-  }
-  const dano = consumirPromessa(ctx, jogador, CHAVE.primeiroAtaqueDoProximoTurnoDano);
-  if (dano > 0) {
-    // "Depois disso, quando repetir a preparação, recebe +1 D em vez de +2."
-    const repetiu = lerPromessa(ctx, jogador, CHAVE.preparouOSilencio) > 0;
-    prometerAoProximoAtaque(
-      ctx,
-      jogador,
-      id('BP10'),
-      CHAVE.proximoAtaqueDano,
-      repetiu ? Math.min(dano, 1) : dano,
-    );
-  }
+/** "Quando repetir a preparação, recebe +1 D em vez de +2." (BP10) */
+export const bonusDoSilencio = (ctx: Contexto, jogador: PlayerId, dano: number): number => {
+  if (jogadorDo(ctx, jogador).recurso.classe !== 'bardo') return dano;
+  return lerPromessa(ctx, jogador, CHAVE.preparouOSilencio) > 0 ? Math.min(dano, 1) : dano;
 };
 
 /** Contagem de Ativações de Canção e Instrumento, para o Virtuose. */

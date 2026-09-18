@@ -77,9 +77,11 @@ import { descontoDaMarcha } from './efeitos/paladino.js';
 import { acaoTrancadaPelaFumaca, descontoDoPrimeiroAtaque } from './efeitos/ladino.js';
 import { descontoDoBardo } from './efeitos/bardo.js';
 import { cobrarDisciplinaDoPasso, descontoDoMonge, disciplinaDoPasso } from './efeitos/monge.js';
+import { descontoDoPatrulheiro } from './efeitos/patrulheiro.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
   mecanicasDeClasseAoDeclarar,
+  descontoGuardado,
   mecanicasDeClasseAntesDeResolver,
   mecanicasDeClasseAoResolver,
   legalidadeDeClasse,
@@ -510,14 +512,23 @@ const descontosDoEstado = (
   const passos = perfil.valores !== null && descontoDoPrimeiroAtaque(jogador, ordem);
 
   // O Bardo guarda descontos para "a próxima Ação", com ou sem Ataque.
-  const bardo = descontoDoBardo(jogador, perfil, ordem);
+  const bardo = descontoDoBardo(jogador, perfil);
 
   // O Monge guarda descontos por etapa de Kata.
   const monge = descontoDoMonge(jogador, perfil, escolhas);
 
+  // O Patrulheiro guarda desconto para o Ataque emboscado e para o primeiro
+  // Ataque depois de um turno inteiro de Marca mantida.
+  const patrulheiro = descontoDoPatrulheiro(jogador, perfil);
+
+  // Descontos guardados para "a próxima Ação", sem dono de classe.
+  const guardado = descontoGuardado(jogador, ordem);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica || marcha || passos || bardo || monge ? { ap: 1, apMinimo: 1 } : {}),
+    ...(prismatica || marcha || passos || bardo || monge || patrulheiro || guardado
+      ? { ap: 1, apMinimo: 1 }
+      : {}),
   };
 };
 

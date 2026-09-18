@@ -939,11 +939,3 @@ export const respiracaoProfundaNoInicioDoTurno = (ctx: Contexto, jogador: Player
   if (!passivaRevelada(atual, id('MOP07')) || chiProntas(atual) > 0) return;
   recuperar(ctx, jogador, 1);
 };
-
-/** Bônus guardado para o primeiro Ataque do próximo turno do Monge. */
-export const marcasDoMongeNoInicioDoTurno = (ctx: Contexto, jogador: PlayerId): void => {
-  const atual = jogadorDo(ctx, jogador);
-  if (atual.recurso.classe !== 'monge') return;
-  const dano = consumirPromessa(ctx, jogador, CHAVE.primeiroAtaqueDoProximoTurnoDano);
-  if (dano > 0) prometerAoProximoAtaque(ctx, jogador, id('MO10'), CHAVE.proximoAtaqueDano, dano);
-};

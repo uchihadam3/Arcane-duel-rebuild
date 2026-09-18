@@ -354,6 +354,48 @@ const NOMES_DO_MONGE: Readonly<Record<string, string>> = {
   MOU03: 'Três Portões',
 };
 
+const NOMES_DO_PATRULHEIRO: Readonly<Record<string, string>> = {
+  R01: 'Flecha de Sondagem',
+  R02: 'Tiro Preciso',
+  R03: 'Flecha de Caça',
+  R04: 'Tiro Rompe-Guarda',
+  R05: 'Disparo Serrilhado',
+  R06: 'Disparo em Movimento',
+  R07: 'Flecha de Impacto',
+  R08: 'Tiro de Execução',
+  R09: 'Disparo de Cobertura',
+  R10: 'Flecha Rápida',
+  R11: 'Marcar a Presa',
+  R12: 'Ajustar a Mira',
+  R13: 'Preparar Emboscada',
+  R14: 'Reposicionar Armadilha',
+  R15: 'Paciência do Caçador',
+  R16: 'Esquiva Lateral',
+  R17: 'Aparar com o Arco',
+  R18: 'Retirada Calculada',
+  R19: 'Disparo de Reação',
+  R20: 'Instinto de Caça',
+  RP01: 'Predador Paciente',
+  RP02: 'Olho Firme',
+  RP03: 'Pista Fresca',
+  RP04: 'Sem Escapatória',
+  RP05: 'Mestre das Armadilhas',
+  RP06: 'Respiração Controlada',
+  RP07: 'Caçador Incansável',
+  RP08: 'Flecha Guardada',
+  RP09: 'Sobrevivente do Ermo',
+  RP10: 'Última Caçada',
+  RC01: 'Estilo do Atirador',
+  RC02: 'Estilo do Rastreador',
+  RC03: 'Estilo do Emboscador',
+  RC04: 'Laço de Caça',
+  RC05: 'Estacas Ocultas',
+  RC06: 'Fio de Tropeço',
+  RU01: 'Olho do Predador',
+  RU02: 'Chuva de Flechas',
+  RU03: 'Caçada sem Saída',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -370,6 +412,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   ladino: NOMES_DO_LADINO,
   bardo: NOMES_DO_BARDO,
   monge: NOMES_DO_MONGE,
+  patrulheiro: NOMES_DO_PATRULHEIRO,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -393,6 +436,7 @@ describe('catálogo oficial', () => {
       'ladino',
       'bardo',
       'monge',
+      'patrulheiro',
     ]);
   });
 

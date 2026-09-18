@@ -226,6 +226,33 @@ export const KATA_DO_TIGRE: BuildEquipada = {
   ultimate: cardId('MOU01'), // Punho dos Cem Ecos
 };
 
+/** Patrulheiro, Receita 1 — Atirador. */
+export const ATIRADOR: BuildEquipada = {
+  classe: 'patrulheiro',
+  personagem: PERSONAGEM_DA_CLASSE.patrulheiro,
+  habilidades: [
+    cardId('R01'), // Flecha de Sondagem
+    cardId('R02'), // Tiro Preciso
+    cardId('R03'), // Flecha de Caça
+    cardId('R04'), // Tiro Rompe-Guarda
+    cardId('R11'), // Marcar a Presa
+    cardId('R12'), // Ajustar a Mira
+    cardId('R16'), // Esquiva Lateral
+    cardId('R17'), // Aparar com o Arco
+  ],
+  passivas: [
+    cardId('RP01'), // Predador Paciente
+    cardId('RP03'), // Pista Fresca
+    cardId('RP04'), // Sem Escapatória
+    cardId('RP10'), // Última Caçada
+  ],
+  cartasDeClasse: [
+    cardId('RC01'), // Estilo do Atirador
+    cardId('RC06'), // Fio de Tropeço
+  ],
+  ultimate: cardId('RU01'), // Olho do Predador
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
@@ -235,4 +262,5 @@ export const RECEITAS_INICIAIS = {
   ladino: ASSASSINO,
   bardo: CRESCENDO,
   monge: KATA_DO_TIGRE,
+  patrulheiro: ATIRADOR,
 } as const;

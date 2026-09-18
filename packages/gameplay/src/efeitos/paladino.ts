@@ -966,12 +966,6 @@ export const marcasDoInicioDoTurno = (ctx: Contexto, jogador: PlayerId): void =>
   if (atual.guarda >= REGRAS_UNIVERSAIS.guardaInicial) {
     prometerAoProximoAtaque(ctx, jogador, id('PP02'), CHAVE.comecouTurnoComGuardaCheia, 1);
   }
-
-  // O bônus e o degrau guardados para "o próximo turno" são deste turno agora.
-  const bonus = consumirPromessa(ctx, jogador, CHAVE.primeiroAtaqueDoProximoTurnoDano);
-  if (bonus > 0) {
-    prometerAoProximoAtaque(ctx, jogador, id('P19'), CHAVE.proximoAtaqueDano, bonus);
-  }
 };
 
 /**
