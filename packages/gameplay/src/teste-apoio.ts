@@ -47,6 +47,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   patrulheiro: ['R01', 'R03', 'R06', 'R10', 'R11', 'R12', 'R16', 'R17'],
   barbaro: ['BA01', 'BA04', 'BA07', 'BA08', 'BA11', 'BA16', 'BA05', 'BA06'],
   druida: ['D01', 'D04', 'D09', 'D11', 'D13', 'D16', 'D17', 'D05'],
+  bruxo: ['BR01', 'BR04', 'BR07', 'BR09', 'BR11', 'BR14', 'BR16', 'BR17'],
 } as const;
 
 /*
@@ -112,6 +113,11 @@ const PADROES = {
     passivas: ['DP03', 'DP08', 'DP09', 'DP10'],
     cartasDeClasse: ['DC02', 'DC05'],
     ultimate: 'DU01',
+  },
+  bruxo: {
+    passivas: ['BRP03', 'BRP04', 'BRP05', 'BRP09'],
+    cartasDeClasse: ['BRC01', 'BRC04'],
+    ultimate: 'BRU01',
   },
 } as const;
 
@@ -361,6 +367,12 @@ export const comForma = (
 export const formaDe = (partida: EstadoDaPartida, id: PlayerId): FormaDoDruida | null => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'druida' ? recurso.forma : null;
+};
+
+/** O Preço Proibido do Bruxo ainda está disponível neste turno? */
+export const precoProibidoDe = (partida: EstadoDaPartida, id: PlayerId): boolean => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'bruxo' ? !recurso.precoProibidoUsadoNoTurno : false;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

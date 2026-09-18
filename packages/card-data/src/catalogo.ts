@@ -76,6 +76,13 @@ import {
   ULTIMATES_DO_DRUIDA,
 } from './druida/complemento.js';
 
+import { HABILIDADES_DO_BRUXO } from './bruxo/habilidades.js';
+import {
+  CARTAS_DE_CLASSE_DO_BRUXO,
+  PASSIVAS_DO_BRUXO,
+  ULTIMATES_DO_BRUXO,
+} from './bruxo/complemento.js';
+
 /*
  * O catálogo oficial.
  *
@@ -166,6 +173,13 @@ export const CARTAS_DO_DRUIDA: readonly DefinicaoDeCarta[] = [
   ...ULTIMATES_DO_DRUIDA,
 ];
 
+export const CARTAS_DO_BRUXO: readonly DefinicaoDeCarta[] = [
+  ...HABILIDADES_DO_BRUXO,
+  ...PASSIVAS_DO_BRUXO,
+  ...CARTAS_DE_CLASSE_DO_BRUXO,
+  ...ULTIMATES_DO_BRUXO,
+];
+
 export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_GUERREIRO,
   ...CARTAS_DO_MAGO,
@@ -178,6 +192,7 @@ export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_PATRULHEIRO,
   ...CARTAS_DO_BARBARO,
   ...CARTAS_DO_DRUIDA,
+  ...CARTAS_DO_BRUXO,
 ]);
 
 /** Classes cujo catálogo já está implementado por inteiro, com testes. */
@@ -193,6 +208,7 @@ export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = [
   'patrulheiro',
   'barbaro',
   'druida',
+  'bruxo',
 ];
 
 /** A definição impressa de uma carta, ou `undefined` se ela não existe. */
@@ -255,4 +271,8 @@ export {
   PASSIVAS_DO_DRUIDA,
   CARTAS_DE_CLASSE_DO_DRUIDA,
   ULTIMATES_DO_DRUIDA,
+  HABILIDADES_DO_BRUXO,
+  PASSIVAS_DO_BRUXO,
+  CARTAS_DE_CLASSE_DO_BRUXO,
+  ULTIMATES_DO_BRUXO,
 };

@@ -307,6 +307,33 @@ export const URSO_DO_BOSQUE: BuildEquipada = {
   ultimate: cardId('DU03'), // Renascimento Primal
 };
 
+/** Bruxo, Receita 1 — Sangue. */
+export const SANGUE: BuildEquipada = {
+  classe: 'bruxo',
+  personagem: PERSONAGEM_DA_CLASSE.bruxo,
+  habilidades: [
+    cardId('BR01'), // Seta Sombria
+    cardId('BR02'), // Chama Profana
+    cardId('BR04'), // Dreno Vital
+    cardId('BR05'), // Lança Profana
+    cardId('BR11'), // Assinar com Sangue
+    cardId('BR14'), // Roubar Fôlego
+    cardId('BR16'), // Escudo Sombrio
+    cardId('BR17'), // Correntes Defensivas
+  ],
+  passivas: [
+    cardId('BRP01'), // Sangue por Poder
+    cardId('BRP02'), // Dor Familiar
+    cardId('BRP06'), // Cicatriz do Abismo
+    cardId('BRP05'), // Tudo Tem um Preço
+  ],
+  cartasDeClasse: [
+    cardId('BRC01'), // Pacto de Sangue
+    cardId('BRC04'), // Maldição da Fragilidade
+  ],
+  ultimate: cardId('BRU01'), // Condenação
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
@@ -319,4 +346,5 @@ export const RECEITAS_INICIAIS = {
   patrulheiro: ATIRADOR,
   barbaro: BERSERKER,
   druida: URSO_DO_BOSQUE,
+  bruxo: SANGUE,
 } as const;

@@ -5,6 +5,7 @@ import type {
   PlayerId,
   RecursoDeCusto,
 } from '@arcane-duel/shared-types';
+import { cardId } from '@arcane-duel/shared-types';
 import type { AjusteDeResolucao } from '@arcane-duel/rules-engine';
 import {
   LIMITE_DE_CONDICAO,
@@ -28,6 +29,7 @@ import {
 import { CHAVE } from './chaves.js';
 import type { Contexto } from './contexto.js';
 import {
+  adversarioDo,
   aplicarObrigatorio,
   contador,
   emitir,
@@ -192,13 +194,39 @@ export const abrirAcaoExtra = (ctx: Contexto, jogador: PlayerId, origem: CardId)
  * O valor efetivo é o que os gatilhos leem: quem está com 29 e restaura 3
  * restaurou 1, e "quando restaurar Vida" precisa ver 1.
  */
+const MALDICAO_DA_FOME = cardId('BRC05');
+
+/**
+ * "Maldição da Fome: quando o adversário restaurar Vida, reduza a restauração."
+ *
+ * A Maldição é a única carta do catálogo que mexe na cura **alheia**, venha ela
+ * de qual classe vier, então ela é lida aqui — no único funil por onde toda
+ * restauração de Vida passa — e não dentro do módulo do Bruxo.
+ */
+const fomeDoAdversario = (
+  ctx: Contexto,
+  jogador: PlayerId,
+): { readonly reducao: number; readonly cobra: boolean } => {
+  const inimigo = adversarioDo(ctx, jogador);
+  if (inimigo.removidas.includes(MALDICAO_DA_FOME)) return { reducao: 4, cobra: true };
+  const ativada = inimigo.cartasDeClasse.some(
+    (item) => item.carta === MALDICAO_DA_FOME && item.estado === 'ativada',
+  );
+  return ativada ? { reducao: 1, cobra: false } : { reducao: 0, cobra: false };
+};
+
 export const restaurarVidaEm = (
   ctx: Contexto,
   jogador: PlayerId,
   quantidade: number,
   origem: CardId,
 ): number => {
-  const resultado = restaurarVida(jogadorDo(ctx, jogador), quantidade);
+  const fome = fomeDoAdversario(ctx, jogador);
+  if (fome.cobra) perderVidaDireta(ctx, jogador, 1, MALDICAO_DA_FOME);
+  const pedida = Math.max(0, quantidade - fome.reducao);
+  if (pedida === 0) return 0;
+
+  const resultado = restaurarVida(jogadorDo(ctx, jogador), pedida);
   if (resultado.restaurado === 0) return 0;
 
   gravarJogador(ctx, resultado.jogador);
@@ -239,6 +267,30 @@ export const pagarComVida = (
     origem,
     escopo: 'turno',
     valor: 1,
+  });
+  // "Se já perdeu pelo menos 2 Vida por efeitos próprios neste turno" pergunta
+  // por pontos, não por vezes: o total do turno mora em chave própria.
+  registrarAnotacao(ctx, jogador, {
+    chave: CHAVE.vidaPerdidaComoCusto,
+    origem,
+    escopo: 'turno',
+    valor: resultado.perdido,
+  });
+  // "Quando usar 2 custos diferentes de Vida no mesmo turno": uma marca por
+  // origem, para que o mesmo preço pago duas vezes continue sendo um só custo.
+  registrarAnotacao(ctx, jogador, {
+    chave: `${CHAVE.custoDeVidaPorCarta}:${origem}`,
+    origem,
+    escopo: 'turno',
+    valor: 1,
+  });
+  // "Quando perder Vida por efeito próprio **durante** uma ação ofensiva": o
+  // Pacto de Sangue precisa saber que o preço saiu dentro desta Ação.
+  registrarAnotacao(ctx, jogador, {
+    chave: CHAVE.vidaPagaNaAcao,
+    origem,
+    escopo: 'acao',
+    valor: resultado.perdido,
   });
   emitir(ctx, {
     tipo: 'vida-paga-como-custo',

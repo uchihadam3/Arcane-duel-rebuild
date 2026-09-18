@@ -45,6 +45,28 @@ export interface EscolhasDaAcao {
    */
   readonly precoProibido?: boolean;
   /**
+   * Quanta Vida o Bruxo oferece ao preço **opcional** impresso na carta.
+   *
+   * "Pode perder 1 Vida para receber +2 D", "pode perder até 3 Vida": o teto é
+   * da carta, e oferecer zero — ou não informar nada — é jogar sem o preço.
+   * Este campo nunca cobre o Preço Proibido, que tem escolha própria.
+   */
+  readonly vidaOferecida?: number;
+  /**
+   * O Bruxo aceita o preço em Vida que uma **Passiva** oferece nesta jogada.
+   *
+   * "Não Há Retorno" deixa perder 1 Vida adicional ao declarar um Ataque; como
+   * a carta jogada pode ter um preço próprio, a decisão da Passiva é separada.
+   */
+  readonly precoDaPassiva?: boolean;
+  /**
+   * Qual metade do "ou" da Boca do Abismo o Bruxo escolhe na Ruptura.
+   *
+   * O texto imprime "restaure 1 Vida **ou** deixe Pronta sua Maldição
+   * Ativada": a lista é fechada e quem escolhe é quem joga.
+   */
+  readonly escolhaDoAbismo?: 'vida' | 'maldicao';
+  /**
    * Quanto da própria Guarda o Bárbaro reduz voluntariamente nesta Ação.
    *
    * Reduzir a própria Guarda como custo nunca provoca Ruptura (regra congelada

@@ -480,6 +480,48 @@ const NOMES_DO_DRUIDA: Readonly<Record<string, string>> = {
   DU03: 'Renascimento Primal',
 };
 
+const NOMES_DO_BRUXO: Readonly<Record<string, string>> = {
+  BR01: 'Seta Sombria',
+  BR02: 'Chama Profana',
+  BR03: 'Correntes do Abismo',
+  BR04: 'Dreno Vital',
+  BR05: 'Lança Profana',
+  BR06: 'Fogo Infernal',
+  BR07: 'Marca Dolorosa',
+  BR08: 'Ruptura do Pacto',
+  BR09: 'Cobrar o Preço',
+  BR10: 'Boca do Abismo',
+  BR11: 'Assinar com Sangue',
+  BR12: 'Invocar o Pacto',
+  BR13: 'Apertar a Maldição',
+  BR14: 'Roubar Fôlego',
+  BR15: 'Pacto Apressado',
+  BR16: 'Escudo Sombrio',
+  BR17: 'Correntes Defensivas',
+  BR18: 'Transferir a Dor',
+  BR19: 'Pele do Abismo',
+  BR20: 'Sobreviver ao Preço',
+  BRP01: 'Sangue por Poder',
+  BRP02: 'Dor Familiar',
+  BRP03: 'Pacto Profundo',
+  BRP04: 'Maldição Persistente',
+  BRP05: 'Tudo Tem um Preço',
+  BRP06: 'Cicatriz do Abismo',
+  BRP07: 'Não Há Retorno',
+  BRP08: 'Dor Compartilhada',
+  BRP09: 'Mestre das Barganhas',
+  BRP10: 'Último Contrato',
+  BRC01: 'Pacto de Sangue',
+  BRC02: 'Pacto das Sombras',
+  BRC03: 'Pacto do Abismo',
+  BRC04: 'Maldição da Fragilidade',
+  BRC05: 'Maldição da Fome',
+  BRC06: 'Maldição da Agonia',
+  BRU01: 'Condenação',
+  BRU02: 'Contrato Final',
+  BRU03: 'O Preço Não é Meu',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -499,6 +541,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   patrulheiro: NOMES_DO_PATRULHEIRO,
   barbaro: NOMES_DO_BARBARO,
   druida: NOMES_DO_DRUIDA,
+  bruxo: NOMES_DO_BRUXO,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -525,6 +568,7 @@ describe('catálogo oficial', () => {
       'patrulheiro',
       'barbaro',
       'druida',
+      'bruxo',
     ]);
   });
 

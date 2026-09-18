@@ -281,6 +281,35 @@ export const CHAVE = {
   circuloDaLuaResposta: 'partida:circulo-da-lua-resposta',
   /** O Druida pode mudar de forma de graça na próxima abertura de turno. */
   metamorfoseExtra: 'partida:metamorfose-extra',
+
+  /* Bruxo --------------------------------------------------------------- */
+  /** Pontos de Vida que o dono perdeu como preço próprio neste turno. */
+  vidaPerdidaComoCusto: 'turno:vida-perdida-como-custo',
+  /** Prefixo por carta: "este preço em Vida veio desta origem neste turno". */
+  custoDeVidaPorCarta: 'turno:custo-de-vida-por-carta',
+  /** O dono pagou Vida como preço dentro da Ação em andamento. */
+  vidaPagaNaAcao: 'acao:vida-paga',
+  /** O Preço Proibido pagou o desconto desta Ação. */
+  precoProibidoNaAcao: 'acao:preco-proibido',
+  /** O Preço Proibido já foi usado alguma vez nesta partida. */
+  usosDoPrecoProibido: 'partida:usos-do-preco-proibido',
+  /** O Preço Proibido foi usado neste turno. */
+  usouPrecoProibidoNoTurno: 'turno:usou-preco-proibido',
+  /** Usos extras do Preço Proibido concedidos por carta neste turno. */
+  precoProibidoExtra: 'turno:preco-proibido-extra',
+  /** Ativações de Pacto e de Maldição contadas ao longo da partida. */
+  ativacoesDoPacto: 'partida:ativacoes-do-pacto',
+  ativacoesDaMaldicao: 'partida:ativacoes-da-maldicao',
+  /** Uma Maldição foi Ativada neste turno. */
+  maldicaoAtivadaNoTurno: 'turno:maldicao-ativada',
+  /** Transferir a Dor fez os dois personagens perderem Vida neste turno. */
+  transferiuADor: 'turno:transferiu-a-dor',
+  /** O dono começou este turno com 5 de Vida ou menos. */
+  comecouTurnoComVida5: 'turno:comecou-turno-vida-5',
+  /** O Contrato Final ainda deve prontificar uma Carta de Classe Ativada. */
+  contratoFinalProntifica: 'turno:contrato-final-prontifica',
+  /** A Maldição da Agonia Exaurida ainda cobra a terceira Ação inimiga. */
+  agoniaTerceiraAcao: 'turno:agonia-terceira-acao',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

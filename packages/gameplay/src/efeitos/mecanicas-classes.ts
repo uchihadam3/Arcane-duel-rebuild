@@ -1,4 +1,9 @@
-import type { CardId, EstadoDeJogador, PassoDeKata, PlayerId } from '@arcane-duel/shared-types';
+import type {
+  EscolhasDaAcao,
+  EstadoDeJogador,
+  PerfilDeHabilidade,
+  PlayerId,
+} from '@arcane-duel/shared-types';
 import { valorDaAnotacao } from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
 
@@ -23,6 +28,15 @@ import {
   reforcoDaResposta,
   registrarFormaDaAcao,
 } from './druida.js';
+import {
+  agoniaAposAcaoInimiga,
+  cobrarPrecoProibido,
+  contarAtivacoesDoBruxo,
+  contratoFinalAposResolver,
+  legalidadeDoBruxo,
+  marcarInicioDoBruxo,
+  tudoTemUmPreco,
+} from './bruxo.js';
 import {
   aplicarGritoAmeacador,
   aplicarTotemDoUrso,
@@ -168,7 +182,10 @@ export const mecanicasDeClasseAposResolver = (
   cumprimentosAposResolver(ctx, alvo, resumo);
   brechaDoPassoFalso(ctx, alvo, resumo.houveReacao);
   contarAtivacoesDoBardo(ctx, alvo);
+  contarAtivacoesDoBruxo(ctx, alvo);
   contarArmadilhas(ctx, alvo);
+  contratoFinalAposResolver(ctx, alvo);
+  agoniaAposAcaoInimiga(ctx, alvo, resumo.vidaPerdidaPeloDefensor > 0, resumo.houveReacao);
   frenesiAposResolver(ctx, alvo, resumo.houveAtaque);
   // O bônus adiado vira bônus do próximo Ataque agora que a Ação acabou.
   const adiado = consumirPromessa(ctx, alvo.atacante, CHAVE.proximoAtaqueDanoAdiado);
@@ -212,7 +229,8 @@ export const mecanicasDeClasseAntesDeResolver = (ctx: Contexto, alvo: AlvoDoEfei
  * Devolve o motivo da recusa, ou `null` quando a jogada pode seguir.
  */
 export const legalidadeDeClasse = (consulta: ConsultaDeLegalidade): string | null =>
-  travaDeTecnicaDoPaladino(consulta.jogador, consulta.perfil.tipo === 'tecnica');
+  travaDeTecnicaDoPaladino(consulta.jogador, consulta.perfil.tipo === 'tecnica') ??
+  legalidadeDoBruxo(consulta);
 
 /**
  * Descontos de AP que qualquer classe pode guardar para a próxima Ação.
@@ -256,14 +274,13 @@ const converterPromessasDoProximoTurno = (ctx: Contexto, jogador: PlayerId): voi
 export const mecanicasDeClasseAoDeclarar = (
   ctx: Contexto,
   jogador: PlayerId,
-  perfil: {
-    readonly carta: CardId;
-    readonly custo: { readonly valor: number };
-    readonly valores: unknown;
-    readonly kata?: PassoDeKata;
-  },
+  perfil: PerfilDeHabilidade,
   ordem: number,
+  escolhas: EscolhasDaAcao = {},
 ): void => {
+  // Bruxo: o preço em Vida sai agora, depois de o AP descontado ter sido pago
+  // e antes de qualquer texto de carta ler "já perdeu Vida neste turno".
+  cobrarPrecoProibido(ctx, jogador, perfil, escolhas);
   consumirDescontoDaMarcha(ctx, jogador, perfil.valores !== null, perfil.custo.valor);
   consumirDescontoDoPrimeiroAtaque(ctx, jogador, ordem);
   consumirDescontoDoBardo(ctx, jogador);
@@ -306,6 +323,8 @@ export const mecanicasDeClasseAoAbrirTurno = (
   reiniciarMetamorfose(ctx, jogador);
   // Bruxo: o Preço Proibido vale uma vez em cada próprio turno.
   reiniciarPrecoProibido(ctx, jogador);
+  // "Último Contrato: enquanto começar o turno com 5 de Vida ou menos."
+  marcarInicioDoBruxo(ctx, jogador);
 };
 
 /** Tudo que as classes da etapa quatro fazem ao fechar o próprio turno. */
@@ -328,4 +347,5 @@ export const mecanicasDeClasseDepoisDaConversao = (ctx: Contexto, jogador: Playe
   fechoDoPaladino(ctx, jogador);
   fechoDoPatrulheiro(ctx, jogador);
   equilibrioNatural(ctx, jogador);
+  tudoTemUmPreco(ctx, jogador);
 };

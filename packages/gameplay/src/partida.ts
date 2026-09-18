@@ -80,6 +80,7 @@ import { descontoDoBardo } from './efeitos/bardo.js';
 import { cobrarDisciplinaDoPasso, descontoDoMonge, disciplinaDoPasso } from './efeitos/monge.js';
 import { descontoDoPatrulheiro } from './efeitos/patrulheiro.js';
 import { descontoDoBarbaro } from './efeitos/barbaro.js';
+import { descontoDoPrecoProibido } from './efeitos/bruxo.js';
 import { podeUsarMetamorfoseGratuita, transformar } from './efeitos/druida.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
@@ -530,9 +531,20 @@ const descontosDoEstado = (
   // Bárbaro: o Frenesi sem Freio barateia os dois Ataques seguintes.
   const barbaro = descontoDoBarbaro(jogador, perfil);
 
+  // Bruxo: o Preço Proibido troca 1 de Vida por 1 AP, e só quando pedido.
+  const bruxo = descontoDoPrecoProibido(jogador, perfil, escolhas);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica || marcha || passos || bardo || monge || patrulheiro || guardado || barbaro
+    ...(prismatica ||
+    marcha ||
+    passos ||
+    bardo ||
+    monge ||
+    patrulheiro ||
+    guardado ||
+    barbaro ||
+    bruxo
       ? { ap: 1, apMinimo: 1 }
       : {}),
   };
@@ -656,7 +668,7 @@ export const declarar = (
     gastarChi(ctx, jogador, ignorado);
     cobrarDisciplinaDoPasso(ctx, jogador, true);
   }
-  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor, ordem);
+  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor, ordem, escolhas);
   for (const uso of usos) {
     const comando =
       uso.modo === 'ativar'
