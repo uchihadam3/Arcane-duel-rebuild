@@ -10,4 +10,8 @@ export * from './simulador/politica.js';
 export * from './simulador/motor.js';
 export * from './simulador/lote.js';
 export { RUNAS, ehRuna, runasAtivadas, runasProntas } from './efeitos/mago.js';
-export { defesaInataJaUsada, nomeDaDefesaInata, podeUsarDefesaInata } from './efeitos/mecanicas.js';
+export {
+  defesaInataJaUsada,
+  nomeDaDefesaInata,
+  motivoParaNaoUsarDefesaInata,
+} from './efeitos/mecanicas.js';

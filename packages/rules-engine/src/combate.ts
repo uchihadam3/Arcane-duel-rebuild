@@ -32,6 +32,12 @@ export interface OpcoesDeResolucao {
   readonly bonusDeRupturaSubstituto?: number | null;
   /** Dano final fixado por carta. É a última palavra da conta. */
   readonly danoFinalDefinido?: number | null;
+  /**
+   * Impacto final fixado por carta. Entra depois da redução da Resposta e
+   * antes de a Guarda ser tocada, então um Impacto fixado em 0 também impede
+   * a Ruptura — não há Impacto para levar a Guarda a zero.
+   */
+  readonly impactoFinalDefinido?: number | null;
 }
 
 export interface ResolucaoDeAtaque {
@@ -98,7 +104,11 @@ export const resolverAtaque = (
   opcoes: OpcoesDeResolucao = {},
 ): ResolucaoDeAtaque => {
   const reducao = opcoes.reducaoDaResposta ?? SEM_REDUCAO;
-  const impacto = impactoFinal(valores, modificadores, reducao);
+  const impactoFixado = opcoes.impactoFinalDefinido;
+  const impacto =
+    impactoFixado === null || impactoFixado === undefined
+      ? impactoFinal(valores, modificadores, reducao)
+      : semNegativo(impactoFixado);
   const guardaAntes = alvo.guarda;
   const guardaDepois = semNegativo(guardaAntes - impacto);
 

@@ -2,6 +2,8 @@ import type {
   CardId,
   ClassId,
   CustoDeCarta,
+  Nota,
+  PassoDeKata,
   PerfilDeHabilidade,
   TagDeCarta,
   TipoDeCarta,
@@ -33,6 +35,10 @@ export interface DefinicaoDeCarta {
    */
   readonly comportaComo?: TipoDeHabilidade;
   readonly tags: readonly TagDeCarta[];
+  /** A Nota impressa na carta. Só o Bardo imprime Nota. */
+  readonly nota?: Nota;
+  /** O passo de Kata impresso na carta. Só o Monge imprime Kata. */
+  readonly kata?: PassoDeKata;
   readonly custo?: CustoDeCarta;
   readonly valores?: ValoresDeAtaque;
   /** Ausente quando a carta não vai para cooldown: Passiva, Carta de Classe, Ultimate. */
@@ -90,6 +96,8 @@ export const perfilDaDefinicao = (definicao: DefinicaoDeCarta): PerfilDeHabilida
     carta: definicao.id,
     tipo,
     tags: definicao.tags,
+    ...(definicao.nota === undefined ? {} : { nota: definicao.nota }),
+    ...(definicao.kata === undefined ? {} : { kata: definicao.kata }),
     custo,
     // A Ultimate é consumida e sai da partida: ela não tem zona de cooldown.
     cooldown: definicao.cooldown ?? null,

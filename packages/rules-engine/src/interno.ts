@@ -44,6 +44,7 @@ export const slotVazio = (
   modificadores: { dano: 0, impacto: 0 },
   reducaoDaResposta: { dano: 0, impacto: 0 },
   danoFinalDefinido: null,
+  impactoFinalDefinido: null,
   impedirRuptura: false,
   bonusDeRupturaSubstituto: null,
   bonusAposReducao: 0,

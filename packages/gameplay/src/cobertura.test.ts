@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { CATALOGO } from '@arcane-duel/card-data';
+import { CATALOGO, CLASSES_IMPLEMENTADAS } from '@arcane-duel/card-data';
 
 /*
  * Toda carta precisa de pelo menos um teste de comportamento.
@@ -31,7 +31,7 @@ describe('cobertura de cartas', () => {
     expect(semTeste).toEqual([]);
   });
 
-  it('cobre as 78 cartas jogáveis das duas classes', () => {
-    expect(CATALOGO.todas).toHaveLength(78);
+  it('cobre as 39 cartas de cada classe implementada', () => {
+    expect(CATALOGO.todas).toHaveLength(CLASSES_IMPLEMENTADAS.length * 39);
   });
 });

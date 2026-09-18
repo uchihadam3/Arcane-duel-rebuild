@@ -383,7 +383,7 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
       // "Quando o adversário jogar uma Técnica, cancele o texto dela. Custos e
       // espaço de Ação continuam gastos."
       legalidade: (consulta) =>
-        consulta.perfil.tipo === 'tecnica' ? null : 'só responde a uma Técnica',
+        consulta.acaoRespondida?.tipo === 'tecnica' ? null : 'só responde a uma Técnica',
       aoResponder: (ctx, alvo) => {
         ajustar(ctx, alvo.atacante, alvo.indice, { cancelarTexto: true });
       },

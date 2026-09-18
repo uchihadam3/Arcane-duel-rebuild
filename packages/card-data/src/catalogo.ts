@@ -14,14 +14,19 @@ import {
   PASSIVAS_DO_MAGO,
   ULTIMATES_DO_MAGO,
 } from './mago/complemento.js';
+import { HABILIDADES_DO_CLERIGO } from './clerigo/habilidades.js';
+import {
+  CARTAS_DE_CLASSE_DO_CLERIGO,
+  PASSIVAS_DO_CLERIGO,
+  ULTIMATES_DO_CLERIGO,
+} from './clerigo/complemento.js';
 
 /*
  * O catálogo oficial.
  *
- * Duas classes completas entram aqui: Guerreiro e Mago, com 39 cartas cada —
- * 20 habilidades, 10 Passivas, 6 Cartas de Classe e 3 Ultimates. As outras dez
- * classes são a etapa quatro do roadmap e entram cada uma com os seus testes:
- * não há dado sem comportamento verificado neste arquivo.
+ * Cada classe entra com 39 cartas — 20 habilidades, 10 Passivas, 6 Cartas de
+ * Classe e 3 Ultimates — e só entra acompanhada dos testes de comportamento
+ * dela: não há dado sem comportamento verificado neste arquivo.
  *
  * Cartas de Personagem **não** entram aqui. O CARD_CATALOG.md não fornece os
  * dados delas, e inventar custo, valores ou texto para preencher a lacuna seria
@@ -43,10 +48,21 @@ export const CARTAS_DO_MAGO: readonly DefinicaoDeCarta[] = [
   ...ULTIMATES_DO_MAGO,
 ];
 
-export const CATALOGO = criarCatalogo([...CARTAS_DO_GUERREIRO, ...CARTAS_DO_MAGO]);
+export const CARTAS_DO_CLERIGO: readonly DefinicaoDeCarta[] = [
+  ...HABILIDADES_DO_CLERIGO,
+  ...PASSIVAS_DO_CLERIGO,
+  ...CARTAS_DE_CLASSE_DO_CLERIGO,
+  ...ULTIMATES_DO_CLERIGO,
+];
+
+export const CATALOGO = criarCatalogo([
+  ...CARTAS_DO_GUERREIRO,
+  ...CARTAS_DO_MAGO,
+  ...CARTAS_DO_CLERIGO,
+]);
 
 /** Classes cujo catálogo já está implementado por inteiro, com testes. */
-export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = ['guerreiro', 'mago'];
+export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = ['guerreiro', 'mago', 'clerigo'];
 
 /** A definição impressa de uma carta, ou `undefined` se ela não existe. */
 export const definicaoDe = (id: CardId): DefinicaoDeCarta | undefined => CATALOGO.porId(id);
@@ -72,4 +88,8 @@ export {
   PASSIVAS_DO_MAGO,
   CARTAS_DE_CLASSE_DO_MAGO,
   ULTIMATES_DO_MAGO,
+  HABILIDADES_DO_CLERIGO,
+  PASSIVAS_DO_CLERIGO,
+  CARTAS_DE_CLASSE_DO_CLERIGO,
+  ULTIMATES_DO_CLERIGO,
 };

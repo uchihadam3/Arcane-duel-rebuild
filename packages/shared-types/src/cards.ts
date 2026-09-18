@@ -1,4 +1,5 @@
 import type { CardId } from './ids.js';
+import type { Nota, PassoDeKata } from './recursos-de-classe.js';
 
 /** Tipos visuais e mecânicos de carta (FULL_GAME_SPEC.md §27). */
 export type TipoDeCarta =
@@ -85,6 +86,15 @@ export interface PerfilDeHabilidade {
   readonly carta: CardId;
   readonly tipo: TipoDeHabilidade;
   readonly tags: readonly TagDeCarta[];
+  /**
+   * A Nota impressa na carta, quando a classe usa Notas.
+   *
+   * É dado impresso como qualquer outro: o Bardo verifica a Nota da Ação
+   * anterior, e quem responde por ela é o catálogo, não quem joga.
+   */
+  readonly nota?: Nota;
+  /** O passo de Kata impresso na carta, quando a classe usa Kata. */
+  readonly kata?: PassoDeKata;
   readonly custo: CustoDeCarta;
   /**
    * Zona para onde a carta vai depois de usada, ou `null` quando ela não vai

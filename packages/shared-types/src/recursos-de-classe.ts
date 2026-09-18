@@ -1,4 +1,4 @@
-import type { ClassId } from './ids.js';
+import type { CardId, ClassId } from './ids.js';
 
 /*
  * Componentes próprios de classe.
@@ -75,6 +75,15 @@ export interface RecursoDoNecromante {
   readonly almasControladas: number;
   /** As demais ficam no Cemitério de Almas e precisam ser colhidas de novo. */
   readonly almasNoCemiterio: number;
+  /**
+   * Servos que estão com uma Alma anexada.
+   *
+   * "Uma Alma anexada permanece até ser usada por aquele Servo ou até o Servo
+   * ser Exaurido." A Alma anexada não está controlada nem no Cemitério: ela
+   * está sobre a carta, e é por isso que precisa de um lugar próprio. A
+   * conservação das quatro fichas é `controladas + cemitério + anexadas`.
+   */
+  readonly almasAnexadas: readonly CardId[];
 }
 
 export interface RecursoDoPaladino {
@@ -95,8 +104,19 @@ export interface RecursoDoLadino {
 
 export interface RecursoDoBardo {
   readonly classe: 'bardo';
-  /** Notas executadas, na ordem. A sequência é o recurso. */
+  /**
+   * Notas executadas neste turno, na ordem. A sequência é o recurso: o Bardo
+   * não tem número nenhum para gastar.
+   */
   readonly sequenciaDeNotas: readonly Nota[];
+  /**
+   * Cadências produzidas neste turno.
+   *
+   * "Quando duas Ações consecutivas do Bardo possuem Notas diferentes, ocorre
+   * Cadência." Várias cartas perguntam se houve uma ou duas, então a contagem
+   * é guardada em vez de recalculada a cada consulta.
+   */
+  readonly cadenciasNoTurno: number;
 }
 
 export interface RecursoDoMonge {

@@ -3,16 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import { CLASSES, PERSONAGEM_DA_CLASSE, ehPersonagem } from './classes.js';
 import {
-  CARTAS_DE_CLASSE_DO_GUERREIRO,
-  CARTAS_DE_CLASSE_DO_MAGO,
   CATALOGO,
   CLASSES_IMPLEMENTADAS,
   HABILIDADES_DO_GUERREIRO,
   HABILIDADES_DO_MAGO,
-  PASSIVAS_DO_GUERREIRO,
-  PASSIVAS_DO_MAGO,
-  ULTIMATES_DO_GUERREIRO,
-  ULTIMATES_DO_MAGO,
   perfilDaCarta,
 } from './catalogo.js';
 
@@ -108,15 +102,81 @@ const NOMES_DO_MAGO: Readonly<Record<string, string>> = {
   MU03: 'Sobrecarga Temporal',
 };
 
+const NOMES_DO_CLERIGO: Readonly<Record<string, string>> = {
+  C01: 'Golpe Consagrado',
+  C02: 'Martelo do Julgamento',
+  C03: 'Luz Punitiva',
+  C04: 'Veredito Solar',
+  C05: 'Lança da Aurora',
+  C06: 'Julgamento Maior',
+  C07: 'Cinzas do Pecado',
+  C08: 'Oração Silenciosa',
+  C09: 'Prece Restauradora',
+  C10: 'Imposição das Mãos',
+  C11: 'Bênção da Coragem',
+  C12: 'Vigília',
+  C13: 'Purificação',
+  C14: 'Escudo da Fé',
+  C15: 'Âncora Sagrada',
+  C16: 'Intercessão',
+  C17: 'Martírio',
+  C18: 'Luz Refletida',
+  C19: 'Absolvição',
+  C20: 'Última Prece',
+  CP01: 'Coração Misericordioso',
+  CP02: 'Olho do Julgamento',
+  CP03: 'Devoção Imóvel',
+  CP04: 'Mártir Voluntário',
+  CP05: 'Pureza Interior',
+  CP06: 'Milagre Guardado',
+  CP07: 'Liturgia Contínua',
+  CP08: 'Escudo dos Fiéis',
+  CP09: 'Justiça Restauradora',
+  CP10: 'Segunda Luz',
+  CC01: 'Doutrina da Misericórdia',
+  CC02: 'Doutrina do Julgamento',
+  CC03: 'Doutrina do Martírio',
+  CC04: 'Incensário da Aurora',
+  CC05: 'Sino do Santuário',
+  CC06: 'Relicário dos Santos',
+  CU01: 'Julgamento Celeste',
+  CU02: 'Milagre da Aurora',
+  CU03: 'Intercessão Divina',
+};
+
+/**
+ * A tabela de identificadores, uma entrada por classe implementada.
+ *
+ * Ela é transcrita de docs/CARD_CATALOG.md à mão, de propósito: é uma segunda
+ * leitura do mesmo documento, e por isso consegue discordar dos arquivos de
+ * dados quando um deles errar um nome ou trocar um código.
+ */
+const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  guerreiro: NOMES_DO_GUERREIRO,
+  mago: NOMES_DO_MAGO,
+  clerigo: NOMES_DO_CLERIGO,
+};
+
+/** Composição fixa do catálogo de qualquer classe (§3 e §27). */
+const COMPOSICAO = [
+  { tipo: 'ataque', minimo: 1 },
+  { tipo: 'passiva', quantidade: 10 },
+  { tipo: 'carta-de-classe', quantidade: 6 },
+  { tipo: 'ultimate', quantidade: 3 },
+] as const;
+
+const CARTAS_POR_CLASSE = 39;
+
 describe('catálogo oficial', () => {
-  it('implementa exatamente Guerreiro e Mago nesta etapa', () => {
-    expect([...CLASSES_IMPLEMENTADAS]).toEqual(['guerreiro', 'mago']);
+  it('implementa Guerreiro, Mago e Clérigo nesta etapa', () => {
+    expect([...CLASSES_IMPLEMENTADAS]).toEqual(['guerreiro', 'mago', 'clerigo']);
   });
 
-  it('tem 78 cartas jogáveis, 39 por classe', () => {
-    expect(CATALOGO.todas).toHaveLength(78);
-    expect(CATALOGO.porClasse('guerreiro')).toHaveLength(39);
-    expect(CATALOGO.porClasse('mago')).toHaveLength(39);
+  it('tem 39 cartas jogáveis por classe implementada e nada além disso', () => {
+    expect(CATALOGO.todas).toHaveLength(CLASSES_IMPLEMENTADAS.length * CARTAS_POR_CLASSE);
+    for (const classe of CLASSES_IMPLEMENTADAS) {
+      expect(CATALOGO.porClasse(classe), classe).toHaveLength(CARTAS_POR_CLASSE);
+    }
   });
 
   it('não contém carta de Personagem: o documento não fornece os dados delas', () => {
@@ -139,27 +199,45 @@ describe('catálogo oficial', () => {
   });
 
   it('tem 20 habilidades, 10 Passivas, 6 Cartas de Classe e 3 Ultimates por classe', () => {
-    expect(HABILIDADES_DO_GUERREIRO).toHaveLength(20);
-    expect(PASSIVAS_DO_GUERREIRO).toHaveLength(10);
-    expect(CARTAS_DE_CLASSE_DO_GUERREIRO).toHaveLength(6);
-    expect(ULTIMATES_DO_GUERREIRO).toHaveLength(3);
-
-    expect(HABILIDADES_DO_MAGO).toHaveLength(20);
-    expect(PASSIVAS_DO_MAGO).toHaveLength(10);
-    expect(CARTAS_DE_CLASSE_DO_MAGO).toHaveLength(6);
-    expect(ULTIMATES_DO_MAGO).toHaveLength(3);
+    for (const classe of CLASSES_IMPLEMENTADAS) {
+      const jogaveis = CATALOGO.porClasse(classe).filter((carta) =>
+        ['ataque', 'tecnica', 'reacao'].includes(carta.tipo),
+      );
+      expect(jogaveis, classe).toHaveLength(20);
+      for (const parte of COMPOSICAO) {
+        if (!('quantidade' in parte)) continue;
+        expect(CATALOGO.porClasseETipo(classe, parte.tipo), `${classe}/${parte.tipo}`).toHaveLength(
+          parte.quantidade,
+        );
+      }
+    }
   });
 
   it('prende cada identificador ao nome impresso da carta', () => {
-    for (const [codigo, nome] of Object.entries({ ...NOMES_DO_GUERREIRO, ...NOMES_DO_MAGO })) {
-      expect(CATALOGO.porId(cardId(codigo))?.nome, codigo).toBe(nome);
+    for (const classe of CLASSES_IMPLEMENTADAS) {
+      const nomes = NOMES_POR_CLASSE[classe];
+      expect(nomes, classe).toBeDefined();
+      for (const [codigo, nome] of Object.entries(nomes ?? {})) {
+        expect(CATALOGO.porId(cardId(codigo))?.nome, codigo).toBe(nome);
+      }
+      expect(Object.keys(nomes ?? {}), classe).toHaveLength(CARTAS_POR_CLASSE);
     }
   });
 
   it('não tem carta fora da tabela de identificadores', () => {
-    const conhecidos = new Set([...Object.keys(NOMES_DO_GUERREIRO), ...Object.keys(NOMES_DO_MAGO)]);
+    const conhecidos = new Set(
+      CLASSES_IMPLEMENTADAS.flatMap((classe) => Object.keys(NOMES_POR_CLASSE[classe] ?? {})),
+    );
     for (const carta of CATALOGO.todas) {
       expect(conhecidos.has(carta.id), carta.id).toBe(true);
+    }
+  });
+
+  it('não repete identificador entre classes', () => {
+    const vistos = new Set<string>();
+    for (const carta of CATALOGO.todas) {
+      expect(vistos.has(carta.id), carta.id).toBe(false);
+      vistos.add(carta.id);
     }
   });
 
@@ -174,43 +252,45 @@ describe('catálogo oficial', () => {
   });
 
   it('nenhuma Ultimate volta por cooldown', () => {
-    for (const carta of [...ULTIMATES_DO_GUERREIRO, ...ULTIMATES_DO_MAGO]) {
-      expect(carta.cooldown, carta.id).toBeUndefined();
-      expect(perfilDaCarta(carta.id)?.cooldown, carta.id).toBeNull();
+    for (const classe of CLASSES_IMPLEMENTADAS) {
+      for (const carta of CATALOGO.porClasseETipo(classe, 'ultimate')) {
+        expect(carta.cooldown, carta.id).toBeUndefined();
+        expect(perfilDaCarta(carta.id)?.cooldown, carta.id).toBeNull();
+      }
     }
   });
 
   it('toda habilidade imprime custo e zona de cooldown', () => {
-    for (const carta of [...HABILIDADES_DO_GUERREIRO, ...HABILIDADES_DO_MAGO]) {
+    for (const carta of CATALOGO.todas) {
+      if (!['ataque', 'tecnica', 'reacao'].includes(carta.tipo)) continue;
       expect(carta.custo, carta.id).toBeDefined();
       expect(carta.cooldown, carta.id).toBeDefined();
     }
   });
 
   it('Reação se paga com Reserva e o resto com pontos de Ação', () => {
-    for (const carta of [...HABILIDADES_DO_GUERREIRO, ...HABILIDADES_DO_MAGO]) {
-      const esperada = carta.tipo === 'reacao' ? 'reserva' : 'ap';
+    for (const carta of CATALOGO.todas) {
+      const comporta = carta.comportaComo ?? carta.tipo;
+      if (!['ataque', 'tecnica', 'reacao'].includes(comporta)) continue;
+      const esperada = comporta === 'reacao' ? 'reserva' : 'ap';
       expect(carta.custo?.moeda, carta.id).toBe(esperada);
     }
   });
 
   it('Passiva e Carta de Classe não são jogadas da mão', () => {
-    const naoJogaveis = [
-      ...PASSIVAS_DO_GUERREIRO,
-      ...PASSIVAS_DO_MAGO,
-      ...CARTAS_DE_CLASSE_DO_GUERREIRO,
-      ...CARTAS_DE_CLASSE_DO_MAGO,
-    ];
-    for (const carta of naoJogaveis) {
+    for (const carta of CATALOGO.todas) {
+      if (carta.tipo !== 'passiva' && carta.tipo !== 'carta-de-classe') continue;
       expect(perfilDaCarta(carta.id), carta.id).toBeUndefined();
     }
   });
 
   it('toda Carta de Classe imprime os dois efeitos, Ativar e Exaurir', () => {
-    for (const carta of [...CARTAS_DE_CLASSE_DO_GUERREIRO, ...CARTAS_DE_CLASSE_DO_MAGO]) {
-      expect(carta.textoAtivar, carta.id).toBeTruthy();
-      expect(carta.textoExaurir, carta.id).toBeTruthy();
-      expect(carta.textoAtivar, carta.id).not.toBe(carta.textoExaurir);
+    for (const classe of CLASSES_IMPLEMENTADAS) {
+      for (const carta of CATALOGO.porClasseETipo(classe, 'carta-de-classe')) {
+        expect(carta.textoAtivar, carta.id).toBeTruthy();
+        expect(carta.textoExaurir, carta.id).toBeTruthy();
+        expect(carta.textoAtivar, carta.id).not.toBe(carta.textoExaurir);
+      }
     }
   });
 });

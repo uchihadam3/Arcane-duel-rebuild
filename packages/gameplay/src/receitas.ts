@@ -64,7 +64,35 @@ export const PIROMANTE: BuildEquipada = {
   ultimate: cardId('MU01'), // Meteoro
 };
 
+/** Clérigo, Receita 1 — Julgamento. */
+export const JULGAMENTO: BuildEquipada = {
+  classe: 'clerigo',
+  personagem: PERSONAGEM_DA_CLASSE.clerigo,
+  habilidades: [
+    cardId('C01'), // Golpe Consagrado
+    cardId('C02'), // Martelo do Julgamento
+    cardId('C04'), // Veredito Solar
+    cardId('C03'), // Luz Punitiva
+    cardId('C11'), // Bênção da Coragem
+    cardId('C14'), // Escudo da Fé
+    cardId('C15'), // Âncora Sagrada
+    cardId('C13'), // Purificação
+  ],
+  passivas: [
+    cardId('CP02'), // Olho do Julgamento
+    cardId('CP09'), // Justiça Restauradora
+    cardId('CP06'), // Milagre Guardado
+    cardId('CP07'), // Liturgia Contínua
+  ],
+  cartasDeClasse: [
+    cardId('CC02'), // Doutrina do Julgamento
+    cardId('CC04'), // Incensário da Aurora
+  ],
+  ultimate: cardId('CU01'), // Julgamento Celeste
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
+  clerigo: JULGAMENTO,
 } as const;

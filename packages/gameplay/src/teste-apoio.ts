@@ -1,5 +1,6 @@
 import type {
   CardId,
+  EstagioDeDevocao,
   EstadoDaPartida,
   EstadoDeJogador,
   IndiceDeAcao,
@@ -35,6 +36,7 @@ export const B: PlayerId = playerId('jogador-b');
 const HABILIDADES_DE_ENCHIMENTO = {
   guerreiro: ['W01', 'W02', 'W03', 'W04', 'W05', 'W06', 'W07', 'W08'],
   mago: ['M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07', 'M08'],
+  clerigo: ['C01', 'C02', 'C08', 'C12', 'C17', 'C05', 'C06', 'C09'],
 } as const;
 
 /*
@@ -56,6 +58,11 @@ const PADROES = {
     cartasDeClasse: ['MC01', 'MC02'],
     ultimate: 'MU01',
   },
+  clerigo: {
+    passivas: ['CP03', 'CP06', 'CP07', 'CP10'],
+    cartasDeClasse: ['CC01', 'CC04'],
+    ultimate: 'CU01',
+  },
 } as const;
 
 export interface OpcoesDeBuild {
@@ -71,7 +78,9 @@ export interface OpcoesDeBuild {
  * As habilidades informadas entram primeiro; o resto é completado com cartas da
  * própria classe até as oito exigidas pela composição (§3).
  */
-export const build = (classe: 'guerreiro' | 'mago', opcoes: OpcoesDeBuild = {}): BuildEquipada => {
+export type ClasseDeTeste = keyof typeof HABILIDADES_DE_ENCHIMENTO;
+
+export const build = (classe: ClasseDeTeste, opcoes: OpcoesDeBuild = {}): BuildEquipada => {
   const pedidas = opcoes.habilidades ?? [];
   const enchimento = HABILIDADES_DE_ENCHIMENTO[classe].filter(
     (codigo) => !pedidas.includes(codigo),
@@ -162,6 +171,21 @@ export const comRecurso = (
     return com(partida, id, { recurso: { classe: 'mago', mana: valor } });
   }
   return partida;
+};
+
+/** Põe a Devoção do Clérigo em um estágio exato. */
+export const comDevocao = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  devocao: EstagioDeDevocao,
+): EstadoDaPartida =>
+  jogador(partida, id).recurso.classe === 'clerigo'
+    ? com(partida, id, { recurso: { classe: 'clerigo', devocao } })
+    : partida;
+
+export const devocaoDe = (partida: EstadoDaPartida, id: PlayerId): EstagioDeDevocao | null => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'clerigo' ? recurso.devocao : null;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

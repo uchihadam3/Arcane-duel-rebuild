@@ -100,6 +100,14 @@ export interface ConsultaDeCusto {
   readonly cartasDeClasse: readonly UsoDeCartaDeClasseNaAcao[];
   /** Quanto de recurso de classe esta jogada vai gastar, com a parcela variável. */
   readonly recursoPrevisto: number;
+  /**
+   * A Ação a que esta jogada responde, quando ela é uma Resposta.
+   *
+   * É `null` numa declaração comum. Numa Resposta, `perfil` é a carta de
+   * Reação e este campo é o Ataque ou a Técnica que ela está enfrentando —
+   * várias Reações impõem condição sobre um ou sobre o outro.
+   */
+  readonly acaoRespondida: PerfilDeHabilidade | null;
 }
 
 /** Tudo que uma checagem de legalidade pode consultar. */
@@ -169,9 +177,9 @@ export interface ContextoDeRevelacao {
  */
 export interface AtivacaoDePassiva {
   /** As condições impressas para a Ativação valerem alguma coisa agora. */
-  readonly podeAtivar: (ctx: Contexto, alvo: AlvoDoEfeito) => boolean;
+  readonly podeAtivar: (ctx: Contexto, alvo: AlvoDoEfeito, escolhas: EscolhasDaAcao) => boolean;
   /** O que a Ativação faz, já com o custo dela. */
-  readonly aplicar: (ctx: Contexto, alvo: AlvoDoEfeito) => void;
+  readonly aplicar: (ctx: Contexto, alvo: AlvoDoEfeito, escolhas: EscolhasDaAcao) => void;
 }
 
 export interface EfeitoDePassiva extends EfeitoDeCarta {

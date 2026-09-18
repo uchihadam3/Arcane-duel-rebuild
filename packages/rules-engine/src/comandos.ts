@@ -153,6 +153,7 @@ export interface AjusteDeResolucao {
   readonly reducaoDeImpacto?: number;
   readonly bonusAposReducao?: number;
   readonly danoFinal?: number;
+  readonly impactoFinal?: number;
   readonly impedirRuptura?: boolean;
   readonly bonusDeRupturaSubstituto?: number;
   readonly cancelarTexto?: boolean;
@@ -195,6 +196,9 @@ export const ajustarResolucao = (
   if (ajuste.danoFinal !== undefined) {
     eventos.push({ tipo: 'dano-final-definido', indice, valor: ajuste.danoFinal });
   }
+  if (ajuste.impactoFinal !== undefined) {
+    eventos.push({ tipo: 'impacto-final-definido', indice, valor: ajuste.impactoFinal });
+  }
   if (ajuste.impedirRuptura === true) {
     eventos.push({ tipo: 'ruptura-impedida', alvo: adversarioDe(partida, atacante).id });
   }
@@ -210,6 +214,7 @@ export const ajustarResolucao = (
     },
     bonusAposReducao: slot.bonusAposReducao + (ajuste.bonusAposReducao ?? 0),
     danoFinalDefinido: ajuste.danoFinal ?? slot.danoFinalDefinido,
+    impactoFinalDefinido: ajuste.impactoFinal ?? slot.impactoFinalDefinido,
     impedirRuptura: slot.impedirRuptura || ajuste.impedirRuptura === true,
     bonusDeRupturaSubstituto: ajuste.bonusDeRupturaSubstituto ?? slot.bonusDeRupturaSubstituto,
     textoCancelado: slot.textoCancelado || ajuste.cancelarTexto === true,
@@ -394,6 +399,7 @@ export const resolverAcao = (
       impedirRuptura: slot.impedirRuptura,
       bonusDeRupturaSubstituto: slot.bonusDeRupturaSubstituto,
       danoFinalDefinido: slot.danoFinalDefinido,
+      impactoFinalDefinido: slot.impactoFinalDefinido,
     });
     defensor = resolucao.alvo;
 
@@ -472,8 +478,6 @@ export const resolverAcao = (
   }
 
   atacante = substituirSlot(atacante, { ...slot, situacao: 'resolvida' });
-  atacante = { ...atacante, anotacoes: expirarAnotacoes(atacante.anotacoes, 'acao') };
-  defensor = { ...defensor, anotacoes: expirarAnotacoes(defensor.anotacoes, 'acao') };
   eventos.push({ tipo: 'acao-resolvida', indice });
 
   const comAmbos = substituirJogador(substituirJogador(partida, defensor), atacante);
@@ -482,3 +486,26 @@ export const resolverAcao = (
   const fim = encerrarSeVidaZerou(comAmbos);
   return sucesso({ partida: fim.partida, eventos: [...eventos, ...fim.eventos] });
 };
+
+/**
+ * Apaga as anotações de escopo de Ação dos dois jogadores.
+ *
+ * Uma Ação só termina depois que o texto pós-resolução dela rodou: "Condições
+ * que esta ação aplicaria a você não são aplicadas" precisa continuar de pé
+ * enquanto a própria ação ainda está aplicando Condições. Por isso a expiração
+ * é um passo explícito, dado por quem orquestra as janelas, e não um efeito
+ * colateral do cálculo de combate.
+ */
+export const expirarAnotacoesDaAcao = (partida: EstadoDaPartida): EstadoDaPartida => ({
+  ...partida,
+  jogadores: [
+    {
+      ...partida.jogadores[0],
+      anotacoes: expirarAnotacoes(partida.jogadores[0].anotacoes, 'acao'),
+    },
+    {
+      ...partida.jogadores[1],
+      anotacoes: expirarAnotacoes(partida.jogadores[1].anotacoes, 'acao'),
+    },
+  ],
+});

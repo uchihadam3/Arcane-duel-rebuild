@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CARD_DATA_VERSION, CATALOGO } from '@arcane-duel/card-data';
+import { CARD_DATA_VERSION, CATALOGO, CLASSES_IMPLEMENTADAS } from '@arcane-duel/card-data';
 import { RULES_VERSION } from '@arcane-duel/rules-engine';
 import { MANIFESTO_DE_ASSETS } from '@arcane-duel/ui';
 import { render, screen, within } from '@testing-library/react';
@@ -52,6 +52,6 @@ describe('tela de fundação', () => {
     // Guerreiro e Mago completos: 20 habilidades, 10 Passivas, 6 Cartas de
     // Classe e 3 Ultimates de cada um.
     expect(linhaDeCartas.nextElementSibling?.textContent).toBe(String(CATALOGO.todas.length));
-    expect(CATALOGO.todas).toHaveLength(78);
+    expect(CATALOGO.todas).toHaveLength(CLASSES_IMPLEMENTADAS.length * 39);
   });
 });

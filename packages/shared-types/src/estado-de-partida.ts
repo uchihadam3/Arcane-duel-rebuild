@@ -126,6 +126,8 @@ export interface SlotDeAcao {
    * fixa o resultado, e fixar o resultado é o último passo da conta.
    */
   readonly danoFinalDefinido: number | null;
+  /** Impacto final fixado por carta ("o Impacto final daquela ação se torna 0"). */
+  readonly impactoFinalDefinido: number | null;
   /** Uma carta impediu a Ruptura desta Ação (Postura da Fortaleza Exaurida). */
   readonly impedirRuptura: boolean;
   /** Bônus de Ruptura desta Ação, quando uma carta substitui o valor universal. */

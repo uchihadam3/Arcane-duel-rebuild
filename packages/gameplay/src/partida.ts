@@ -32,6 +32,7 @@ import {
   consumirUltimate,
   devolverCartaAMao,
   encerrarSeVidaZerou,
+  expirarAnotacoesDaAcao,
   criarPartida,
   declararAcao,
   encerrarTurno,
@@ -41,7 +42,6 @@ import {
   preverRuptura,
   registrarResposta,
   resolverAcao,
-  valorDoRecurso,
 } from '@arcane-duel/rules-engine';
 import {
   CARD_DATA_VERSION,
@@ -71,7 +71,13 @@ import {
   recusaDeLegalidade,
   verificarRevelacoes,
 } from './pipeline.js';
-import { efeitoDeCartaDeClasse, efeitoDePassiva } from './registro.js';
+import { efeitoDeCartaDeClasse, efeitoDePassiva, efeitoJogavel } from './registro.js';
+import {
+  mecanicasDeClasseAoAbrirTurno,
+  mecanicasDeClasseAoFecharTurno,
+  mecanicasDeClasseAposResolver,
+} from './efeitos/mecanicas-classes.js';
+import { avancarDevocao } from './recursos-classe.js';
 import {
   aplicarPromessasDoAtaque,
   definirPromessa,
@@ -85,7 +91,8 @@ import {
   momentumNoFimDoTurno,
   momentumPorAnularDano,
   momentumPorRemoverGuarda,
-  podeUsarDefesaInata,
+  escolhaExigidaPelaDefesaInata,
+  motivoParaNaoUsarDefesaInata,
   registrarPegadaDoTurno,
   reporManaNoInicioDoTurno,
 } from './efeitos/mecanicas.js';
@@ -330,6 +337,7 @@ export const abrirTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respost
   if (erro !== null) return falha(erro);
 
   reporManaNoInicioDoTurno(ctx, jogador);
+  mecanicasDeClasseAoAbrirTurno(ctx, jogador);
   verificarRevelacoes(ctx, 'inicio-do-turno', null, null);
   return entregar(ctx);
 };
@@ -342,6 +350,7 @@ export const fecharTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respos
   const ctx = criarContexto(partida);
 
   momentumNoFimDoTurno(ctx, jogador);
+  mecanicasDeClasseAoFecharTurno(ctx, jogador);
   resolverCinzasExaurida(ctx, jogador);
 
   const erro = aplicar(ctx, encerrarTurno(ctx.partida, jogador));
@@ -356,6 +365,12 @@ export const fecharTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respos
   const prometido = lerPromessa(ctx, jogador, CHAVE.momentumSeTerminarComReserva2);
   if (prometido > 0 && jogadorDo(ctx, jogador).reserva === 2) {
     ganharRecurso(ctx, jogador, 'momentum', prometido);
+  }
+
+  // "Vigília: se terminar com 2 de Reserva, avance 1 estágio de Devoção."
+  const devocaoPrometida = lerPromessa(ctx, jogador, CHAVE.devocaoSeTerminarComReserva2);
+  if (devocaoPrometida > 0 && jogadorDo(ctx, jogador).reserva === 2) {
+    avancarDevocao(ctx, jogador, devocaoPrometida);
   }
 
   verificarRevelacoes(ctx, 'fim-do-turno', null, null);
@@ -456,7 +471,9 @@ const descontosDoEstado = (
   perfil: PerfilDeHabilidade,
   ordem: number,
 ): DescontosDeCusto => {
-  const encarecida = valorDaAnotacao(jogador.anotacoes, `${CHAVE.ecoEncarece}:${perfil.carta}`) > 0;
+  const encarecida =
+    valorDaAnotacao(jogador.anotacoes, `${CHAVE.ecoEncarece}:${perfil.carta}`) > 0 ||
+    valorDaAnotacao(jogador.anotacoes, `${CHAVE.relicarioEncarece}:${perfil.carta}`) > 0;
   const prismatica =
     ordem === 3 &&
     temTag(perfil, 'feitico') &&
@@ -536,6 +553,7 @@ export const declarar = (
     escolhas,
     cartasDeClasse: usos,
     recursoPrevisto: recursoPrevistoDe(perfil.valor, escolhas),
+    acaoRespondida: null,
   };
 
   const recusa = recusaDeLegalidade(consulta, usos);
@@ -660,30 +678,21 @@ export const responder = (
 
   if (pedido.tipo === 'defesa-inata') {
     if (defesaInataJaUsada(ctx, defensor)) return falha({ tipo: 'defesa-inata-ja-usada' });
-    if (!podeUsarDefesaInata(ctx, defensor)) {
-      // A Barreira Arcana do Mago cobra 1 Mana: sem Mana, a Defesa Inata não é
-      // "já usada", é impagável — e o erro precisa dizer isso.
-      return falha({
-        tipo: 'recurso-insuficiente',
-        recurso: 'mana',
-        necessario: 1,
-        disponivel: valorDoRecurso(doDefensor, 'mana') ?? 0,
-      });
-    }
+    // Cada classe cobra um preço diferente pela Defesa Inata — Mana, Alma,
+    // Chi, Guarda, Vida, ou um estado exigido. Uma Defesa impagável não é
+    // "já usada": é recusada com o motivo impresso dela.
+    const impedimento = motivoParaNaoUsarDefesaInata(ctx, defensor);
+    if (impedimento !== null) return falha(impedimento);
 
     const usosDaDefesa = pedido.cartasDeClasse ?? [];
     const problemaDaDefesa = conferirCartasDeClasse(doDefensor, usosDaDefesa);
     if (problemaDaDefesa !== null) return falha(problemaDaDefesa);
 
-    // "Guarda Marcial: reduza 1 D ou 1 I." O "ou" é do jogador, e o motor não
-    // decide por ele. A Barreira Arcana do Mago reduz os dois e não pergunta.
-    if (doDefensor.classe === 'guerreiro' && pedido.reducao === undefined) {
-      return falha({
-        tipo: 'escolha-obrigatoria',
-        carta: doDefensor.personagem,
-        detalhe: 'Guarda Marcial reduz 1 D ou 1 I: informe qual',
-      });
-    }
+    // Duas Defesas Inatas oferecem escolha — "1 D **ou** 1 I" do Guerreiro e
+    // "2 D **ou** 2 I" do Druida Selvagem. O "ou" é do jogador, e o motor não
+    // decide por ele; as outras dez reduzem o que está impresso e não perguntam.
+    const faltaEscolha = escolhaExigidaPelaDefesaInata(ctx, defensor, pedido.reducao);
+    if (faltaEscolha !== null) return falha(faltaEscolha);
 
     const escolhasDaDefesa = pedido.escolhas ?? {};
     const consultaDaDefesa: ConsultaDeCusto = {
@@ -695,6 +704,7 @@ export const responder = (
       escolhas: escolhasDaDefesa,
       cartasDeClasse: usosDaDefesa,
       recursoPrevisto: 0,
+      acaoRespondida: perfilDaAcao,
     };
     const faltaNaDefesa = recusaDeEscolhas(consultaDaDefesa, usosDaDefesa);
     if (faltaNaDefesa !== null) return falha(faltaNaDefesa);
@@ -757,6 +767,7 @@ export const responder = (
     escolhas: escolhasDaResposta,
     cartasDeClasse: usos,
     recursoPrevisto: recursoPrevistoDe(perfil.valor, escolhasDaResposta),
+    acaoRespondida: perfilDaAcao,
   };
 
   // Último Bastião só responde a um Ataque que causaria Ruptura, e isso depende
@@ -776,14 +787,21 @@ export const responder = (
     }
   }
 
+  const consultaDaReacao: ConsultaDeCusto = {
+    ...consulta,
+    perfil: perfil.valor,
+    acaoRespondida: perfilDaAcao,
+  };
   const recusaDaReacao = recusaDeLegalidade({ ...consulta, perfil: perfilDaAcao }, usos);
-  const recusaPropria = efeitoDaReacao(pedido.carta, consulta);
-  const recusa = recusaPropria ?? recusaDaReacao;
+  // A condição impressa na própria carta de Reação — "Requer Graça ou mais",
+  // "só pode ser usada com 10 de Vida ou menos" — é avaliada com o perfil dela,
+  // não com o da Ação que ela enfrenta.
+  const recusaDaCarta = efeitoJogavel(pedido.carta).legalidade?.(consultaDaReacao) ?? null;
+  const recusa = recusaDaCarta ?? recusaDaReacao;
   if (recusa !== null) {
     return falha({ tipo: 'condicao-de-uso-nao-satisfeita', carta: pedido.carta, detalhe: recusa });
   }
 
-  const consultaDaReacao: ConsultaDeCusto = { ...consulta, perfil: perfil.valor };
   const faltaNaResposta = recusaDeEscolhas(consultaDaReacao, usos);
   if (faltaNaResposta !== null) return falha(faltaNaResposta);
 
@@ -841,14 +859,6 @@ export const responder = (
 };
 
 const ULTIMO_BASTIAO: CardId = 'W20' as CardId;
-
-/** Recusa própria da carta de Reação, avaliada contra a Ação a que ela responde. */
-const efeitoDaReacao = (carta: CardId, consulta: ConsultaDeCusto): string | null => {
-  if (carta === ('M19' as CardId)) {
-    return consulta.perfil.tipo === 'tecnica' ? null : 'só responde a uma Técnica';
-  }
-  return null;
-};
 
 /**
  * Usa uma Carta de Classe sobre uma Ação já declarada.
@@ -919,6 +929,7 @@ export const ativarPassivaNaAcao = (
   jogador: PlayerId,
   indice: IndiceDeAcao,
   carta: CardId,
+  escolhas: EscolhasDaAcao = {},
 ): Resposta => {
   const ctx = criarContexto(partida);
   const dono = ctx.partida.jogadores.find((item) => item.id === jogador);
@@ -962,7 +973,7 @@ export const ativarPassivaNaAcao = (
   const erro = aplicar(ctx, ativarPassiva(ctx.partida, jogador, carta));
   if (erro !== null) return falha(erro);
 
-  if (!ativacao.podeAtivar(ctx, alvo)) {
+  if (!ativacao.podeAtivar(ctx, alvo, escolhas)) {
     return falha({
       tipo: 'condicao-de-uso-nao-satisfeita',
       carta,
@@ -970,7 +981,7 @@ export const ativarPassivaNaAcao = (
     });
   }
 
-  ativacao.aplicar(ctx, alvo);
+  ativacao.aplicar(ctx, alvo, escolhas);
   return entregar(ctx);
 };
 
@@ -1174,10 +1185,15 @@ export const resolver = (
 
   momentumPorRemoverGuarda(ctx, alvo, resumo);
   momentumPorAnularDano(ctx, alvo, resumo);
+  mecanicasDeClasseAposResolver(ctx, alvo, resumo);
   registrarPegadaDoTurno(ctx, alvo, resumo);
   atualizarTrilhaDoTurno(ctx, alvo, resumo);
 
   verificarRevelacoes(ctx, 'apos-resolver', alvo, resumo);
+
+  // Só agora a Ação acabou de verdade: as anotações de escopo de Ação saem
+  // depois que todo o texto pós-resolução dela já rodou.
+  ctx.partida = expirarAnotacoesDaAcao(ctx.partida);
 
   // Agora, e só agora, a regra de vitória é aplicada — uma vez, pela mesma
   // função do motor que a define. Morte simultânea continua encerrando com

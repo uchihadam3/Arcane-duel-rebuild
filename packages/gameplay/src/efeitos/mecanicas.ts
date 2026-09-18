@@ -1,13 +1,7 @@
-import type {
-  CardId,
-  EstadoDeJogador,
-  PlayerId,
-  ReforcoEscolhido,
-} from '@arcane-duel/shared-types';
+import type { PlayerId } from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
-import { valorDoRecurso } from '@arcane-duel/rules-engine';
 
-import { ganharRecurso, reduzirNaResposta } from '../apoio.js';
+import { ganharRecurso } from '../apoio.js';
 import { CHAVE } from '../chaves.js';
 import type { Contexto } from '../contexto.js';
 import { consumirLimitePorTurno, jogadorDo } from '../contexto.js';
@@ -23,9 +17,6 @@ import { lerPromessa, prometerAoProximoAtaque } from './comum.js';
 
 const ORIGEM_MOMENTUM = cardId('sistema:momentum');
 const ORIGEM_MANA = cardId('sistema:mana');
-const ORIGEM_GUARDA_MARCIAL = cardId('sistema:guarda-marcial');
-const ORIGEM_BARREIRA_ARCANA = cardId('sistema:barreira-arcana');
-const POSTURA_DA_FORTALEZA = cardId('WC01');
 
 /**
  * Mago, início do próprio turno: "recupere 2 Mana, até o máximo".
@@ -117,69 +108,14 @@ export const momentumNoFimDoTurno = (ctx: Contexto, jogador: PlayerId): void => 
   ganharRecurso(ctx, jogador, 'momentum', -1);
 };
 
-/** A Defesa Inata da classe do jogador, se ela existir. */
-export const nomeDaDefesaInata = (jogador: EstadoDeJogador): string | null => {
-  if (jogador.classe === 'guerreiro') return 'Guarda Marcial';
-  return jogador.classe === 'mago' ? 'Barreira Arcana' : null;
-};
+export {
+  ORIGEM_BARREIRA_ARCANA,
+  ORIGEM_GUARDA_MARCIAL,
+  aplicarDefesaInata,
+  defesaInataJaUsada,
+  escolhaExigidaPelaDefesaInata,
+  motivoParaNaoUsarDefesaInata,
+  nomeDaDefesaInata,
+} from './defesas-inatas.js';
 
-/** A Defesa Inata já foi usada neste turno? */
-export const defesaInataJaUsada = (ctx: Contexto, jogador: PlayerId): boolean =>
-  lerPromessa(ctx, jogador, CHAVE.defesaInataUsada) > 0;
-
-/** O jogador consegue pagar a Defesa Inata dele agora? */
-export const podeUsarDefesaInata = (ctx: Contexto, jogador: PlayerId): boolean => {
-  const atual = jogadorDo(ctx, jogador);
-  if (defesaInataJaUsada(ctx, jogador)) return false;
-  if (atual.classe === 'guerreiro') return true;
-  if (atual.classe === 'mago') return (valorDoRecurso(atual, 'mana') ?? 0) >= 1;
-  return false;
-};
-
-/**
- * Resolve a Defesa Inata escolhida como Resposta.
- *
- * Guarda Marcial: "uma vez por turno inimigo, reduza 1 D ou 1 I."
- * Barreira Arcana: "uma vez por turno inimigo, gaste 1 Mana para reduzir 1 D e
- * 1 I."
- */
-export const aplicarDefesaInata = (
-  ctx: Contexto,
-  alvo: AlvoDoEfeito,
-  reducao: ReforcoEscolhido,
-): CardId | null => {
-  const defensor = jogadorDo(ctx, alvo.defensor);
-  if (!consumirLimitePorTurno(ctx, alvo.defensor, CHAVE.defesaInataUsada, ORIGEM_GUARDA_MARCIAL)) {
-    return null;
-  }
-
-  if (defensor.classe === 'guerreiro') {
-    // "Postura da Fortaleza — Ativar: quando estiver recebendo um Ataque,
-    // Guarda Marcial reduz 1 D e 1 I nesta ação." A carta não soma uma redução
-    // própria: ela troca o "ou" da Defesa Inata por um "e".
-    const fortalezaAtivada = defensor.cartasDeClasse.some(
-      (item) => item.carta === POSTURA_DA_FORTALEZA && item.estado === 'ativada',
-    );
-    reduzirNaResposta(
-      ctx,
-      alvo.atacante,
-      alvo.indice,
-      fortalezaAtivada
-        ? { dano: 1, impacto: 1 }
-        : reducao === 'impacto'
-          ? { impacto: 1 }
-          : { dano: 1 },
-    );
-    return ORIGEM_GUARDA_MARCIAL;
-  }
-
-  if (defensor.classe === 'mago') {
-    ganharRecurso(ctx, alvo.defensor, 'mana', -1);
-    reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { dano: 1, impacto: 1 });
-    return ORIGEM_BARREIRA_ARCANA;
-  }
-
-  return null;
-};
-
-export { ORIGEM_MANA, ORIGEM_MOMENTUM, ORIGEM_GUARDA_MARCIAL, ORIGEM_BARREIRA_ARCANA };
+export { ORIGEM_MANA, ORIGEM_MOMENTUM };

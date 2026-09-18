@@ -20,10 +20,15 @@ const POR_CLASSE: Construtores = {
   guerreiro: () => ({ classe: 'guerreiro', momentum: 0 }),
   mago: () => ({ classe: 'mago', mana: 4 }),
   clerigo: () => ({ classe: 'clerigo', devocao: 'vigilia' }),
-  necromante: () => ({ classe: 'necromante', almasControladas: 2, almasNoCemiterio: 2 }),
+  necromante: () => ({
+    classe: 'necromante',
+    almasControladas: 2,
+    almasNoCemiterio: 2,
+    almasAnexadas: [],
+  }),
   paladino: () => ({ classe: 'paladino', juramento: 'resoluto' }),
   ladino: () => ({ classe: 'ladino', brechasNoAdversario: 0 }),
-  bardo: () => ({ classe: 'bardo', sequenciaDeNotas: [] }),
+  bardo: () => ({ classe: 'bardo', sequenciaDeNotas: [], cadenciasNoTurno: 0 }),
   monge: () => ({
     classe: 'monge',
     chi: ['pronta', 'pronta', 'pronta'],

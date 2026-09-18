@@ -179,3 +179,101 @@ export const liberarAcaoExtra = (jogador: EstadoDeJogador): EstadoDeJogador => (
       : jogador.acoes[3],
   ],
 });
+
+/*
+ * Vida: quatro coisas diferentes que não são sinônimos.
+ *
+ * - **Dano** é o que um Ataque aplica. Passa por Resposta, por modificadores e
+ *   pela Ruptura, e é o único que responde a "receber um Ataque".
+ * - **Perda direta de Vida** é o que uma carta faz fora de um Ataque ("o
+ *   adversário perde 2 de Vida"). Não abre Resposta e não é Dano.
+ * - **Perda de Vida como custo** é o preço que o próprio jogador paga para
+ *   jogar algo. Não é Dano, não pode ser reduzida e não dispara efeitos que
+ *   exigem ter recebido um Ataque.
+ * - **Restauração** devolve Vida, até o máximo.
+ *
+ * Cada uma tem função e evento próprios para que nenhuma carta precise
+ * comparar texto para saber com qual está lidando.
+ */
+
+export interface RestauracaoDeVida {
+  readonly jogador: EstadoDeJogador;
+  /** Quanto o texto mandou restaurar. */
+  readonly pedido: number;
+  /** Quanto entrou de fato, depois do teto. É este que os gatilhos leem. */
+  readonly restaurado: number;
+}
+
+/**
+ * Restaura Vida até o máximo documentado.
+ *
+ * O valor **efetivo** é o que vale: um jogador com 29 de Vida que restaura 3
+ * restaurou 1, e um gatilho que pergunte "quando restaurar Vida" precisa ver 1,
+ * não 3.
+ */
+export const restaurarVida = (jogador: EstadoDeJogador, quantidade: number): RestauracaoDeVida => {
+  const pedido = semNegativo(quantidade);
+  const teto = REGRAS_UNIVERSAIS.vidaInicial;
+  const restaurado = Math.max(Math.min(pedido, teto - jogador.vida), 0);
+  return {
+    jogador: restaurado === 0 ? jogador : { ...jogador, vida: jogador.vida + restaurado },
+    pedido,
+    restaurado,
+  };
+};
+
+export interface PerdaDeVidaComoCusto {
+  readonly jogador: EstadoDeJogador;
+  readonly perdido: number;
+}
+
+/**
+ * Perde Vida como preço de uma jogada.
+ *
+ * Não é Dano e não pode ser reduzida. Quem paga é sempre o próprio jogador, e o
+ * pagamento é conferido antes por quem monta o custo: chegar aqui significa que
+ * a Vida já foi verificada.
+ */
+export const perderVidaComoCusto = (
+  jogador: EstadoDeJogador,
+  quantidade: number,
+): PerdaDeVidaComoCusto => {
+  const perdido = semNegativo(quantidade);
+  return { jogador: { ...jogador, vida: jogador.vida - perdido }, perdido };
+};
+
+/** O jogador consegue pagar este preço em Vida e continuar de pé? */
+export const podePagarComVida = (jogador: EstadoDeJogador, quantidade: number): boolean =>
+  jogador.vida > semNegativo(quantidade);
+
+export interface ReducaoVoluntariaDeGuarda {
+  readonly jogador: EstadoDeJogador;
+  readonly reduzido: number;
+}
+
+/**
+ * Reduz a própria Guarda como custo.
+ *
+ * Nunca provoca Ruptura — a regra está congelada desde a Etapa 2. O que a
+ * redução faz é deixar a Guarda mais baixa, e um Ataque inimigo posterior que
+ * leve o que sobrou a zero provoca Ruptura normalmente.
+ */
+export const reduzirGuardaComoCusto = (
+  jogador: EstadoDeJogador,
+  quantidade: number,
+): ReducaoVoluntariaDeGuarda => {
+  const reduzido = Math.min(semNegativo(quantidade), jogador.guarda);
+  return { jogador: { ...jogador, guarda: jogador.guarda - reduzido }, reduzido };
+};
+
+/** As Condições que um texto chama de "negativas" — as quatro do jogo-base. */
+export const CONDICOES_NEGATIVAS: readonly CondicaoId[] = [
+  'queimadura',
+  'lento',
+  'murchar',
+  'sangramento',
+];
+
+/** As Condições negativas que o jogador tem acumuladas agora. */
+export const condicoesAtivas = (jogador: EstadoDeJogador): readonly CondicaoId[] =>
+  CONDICOES_NEGATIVAS.filter((condicao) => jogador.condicoes[condicao] > 0);

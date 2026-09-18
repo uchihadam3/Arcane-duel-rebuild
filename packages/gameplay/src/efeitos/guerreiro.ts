@@ -295,8 +295,11 @@ export const HABILIDADES: ReadonlyMap<CardId, EfeitoDeCarta> = new Map<CardId, E
     id('W20'),
     {
       // "Só contra um Ataque que causaria Ruptura. Reduza 1 D e 3 I."
+      // A condição é sobre a Ação enfrentada, não sobre a própria carta.
       legalidade: (consulta) =>
-        consulta.perfil.valores !== null ? null : 'só responde a um Ataque',
+        consulta.acaoRespondida !== null && consulta.acaoRespondida.valores !== null
+          ? null
+          : 'só responde a um Ataque',
       aoResponder: (ctx, alvo) => {
         reduzirNaResposta(ctx, alvo.atacante, alvo.indice, { dano: 1, impacto: 3 });
       },

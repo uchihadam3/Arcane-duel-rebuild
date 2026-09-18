@@ -81,6 +81,28 @@ export const CHAVE = {
   rupturaSemResposta: 'acao:ruptura-sem-resposta',
   /** O Ataque em resolução causaria Ruptura com tudo que já foi somado. */
   rupturaPrevista: 'acao:ruptura-prevista',
+  /** A Defesa Inata foi usada nesta Ação — escopo de Ação, não de turno. */
+  defesaInataNestaAcao: 'acao:defesa-inata',
+  /** Condições que esta Ação aplicaria ao dono não são aplicadas (Absolvição). */
+  imunidadeACondicoes: 'acao:imunidade-a-condicoes',
+
+  /* Clérigo ------------------------------------------------------------ */
+  /** O avanço de Devoção do próprio turno já aconteceu. */
+  devocaoAvancouNoProprioTurno: 'turno:devocao-avancou-proprio',
+  /** O avanço de Devoção do turno inimigo já aconteceu. */
+  devocaoAvancouNoTurnoInimigo: 'turno:devocao-avancou-inimigo',
+  /** O dono restaurou Vida neste turno. */
+  restaurouVidaNoTurno: 'turno:restaurou-vida',
+  /** O dono perdeu Vida por efeito próprio neste turno. */
+  perdeuVidaPorEfeitoProprio: 'turno:perdeu-vida-efeito-proprio',
+  /** Cura adicional prometida à próxima restauração de Vida do turno. */
+  curaAdicional: 'turno:cura-adicional',
+  /** Cartas devolvidas pelo Relicário custam +1 AP se voltarem neste turno. */
+  relicarioEncarece: 'turno:relicario-encarece',
+  /** Vigília promete avançar a Devoção se o turno terminar com 2 de Reserva. */
+  devocaoSeTerminarComReserva2: 'turno:devocao-se-reserva-2',
+  /** O inimigo já estava com Guarda 0 quando esta Ação foi resolver. */
+  guardaInimigaJaEraZero: 'acao:guarda-inimiga-zero',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

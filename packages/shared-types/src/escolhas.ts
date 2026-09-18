@@ -1,4 +1,6 @@
 import type { CardId } from './ids.js';
+import type { CondicaoId } from './conditions.js';
+import type { FormaDoDruida } from './recursos-de-classe.js';
 
 /*
  * Escolhas legais que acompanham uma Ação ou uma Resposta.
@@ -26,6 +28,34 @@ export interface EscolhasDaAcao {
   readonly cartaEmCooldown?: CardId;
   /** Mais de uma carta de cooldown, quando o texto permite ("até duas"). */
   readonly cartasEmCooldown?: readonly CardId[];
+  /** Condição escolhida por um texto que manda remover ou aplicar uma. */
+  readonly condicao?: CondicaoId;
+  /** Forma escolhida por uma Metamorfose. */
+  readonly forma?: FormaDoDruida;
+  /**
+   * O Bruxo escolhe pagar o Preço Proibido nesta Ação.
+   *
+   * O texto diz "**pode** perder 1 Vida para reduzir o custo": é decisão dele,
+   * e o motor não a toma por conta própria.
+   */
+  readonly precoProibido?: boolean;
+  /**
+   * Quanto da própria Guarda o Bárbaro reduz voluntariamente nesta Ação.
+   *
+   * Reduzir a própria Guarda como custo nunca provoca Ruptura (regra congelada
+   * na Etapa 2).
+   */
+  readonly guardaReduzida?: number;
+  /** Servo que recebe a Alma que o Necromante está anexando. */
+  readonly servo?: CardId;
+  /**
+   * Qual dos três bônus do Milagre Guardado o Clérigo quer nesta jogada.
+   *
+   * O texto imprime "+1 D, +1 I ou +1 de cura, conforme o que fizer": a lista
+   * é fechada, o que a carta faz restringe as opções válidas, e dentro do que
+   * sobra quem escolhe é o jogador.
+   */
+  readonly bonusDoMilagre?: 'dano' | 'impacto' | 'cura';
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};
