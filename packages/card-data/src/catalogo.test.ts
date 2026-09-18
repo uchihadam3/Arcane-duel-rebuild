@@ -186,6 +186,48 @@ const NOMES_DO_NECROMANTE: Readonly<Record<string, string>> = {
   NU03: 'Morte Negada',
 };
 
+const NOMES_DO_PALADINO: Readonly<Record<string, string>> = {
+  P01: 'Pancada de Escudo',
+  P02: 'Corte Radiante',
+  P03: 'Martelo do Juramento',
+  P04: 'Golpe Consagrado',
+  P05: 'Reprimenda',
+  P06: 'Investida do Bastião',
+  P07: 'Sentença Sagrada',
+  P08: 'Golpe de Retaliação',
+  P09: 'Romper a Linha',
+  P10: 'Lâmina da Aurora',
+  P11: 'Preparar o Bastião',
+  P12: 'Consagrar Arma',
+  P13: 'Renovar o Juramento',
+  P14: 'Marcha Implacável',
+  P15: 'Bloqueio de Torre',
+  P16: 'Égide Sagrada',
+  P17: 'Repreensão Divina',
+  P18: 'Permanecer de Pé',
+  P19: 'Escudo e Espada',
+  P20: 'Não Passará',
+  PP01: 'Muralha Viva',
+  PP02: 'Fé no Aço',
+  PP03: 'Justiça Imediata',
+  PP04: 'Escudo do Justo',
+  PP05: 'Convicção Ardente',
+  PP06: 'Avanço Sagrado',
+  PP07: 'Sem Recuo',
+  PP08: 'Voto Cumprido',
+  PP09: 'Guardião da Luz',
+  PP10: 'Peso da Sentença',
+  PC01: 'Juramento da Proteção',
+  PC02: 'Juramento da Retribuição',
+  PC03: 'Juramento da Conquista',
+  PC04: 'Aura do Santuário',
+  PC05: 'Aura da Coragem',
+  PC06: 'Aura do Julgamento',
+  PU01: 'Veredito do Sol',
+  PU02: 'Fortaleza Inquebrável',
+  PU03: 'Cruzada Final',
+};
+
 /**
  * A tabela de identificadores, uma entrada por classe implementada.
  *
@@ -198,6 +240,7 @@ const NOMES_POR_CLASSE: Readonly<Record<string, Readonly<Record<string, string>>
   mago: NOMES_DO_MAGO,
   clerigo: NOMES_DO_CLERIGO,
   necromante: NOMES_DO_NECROMANTE,
+  paladino: NOMES_DO_PALADINO,
 };
 
 /** Composição fixa do catálogo de qualquer classe (§3 e §27). */
@@ -212,7 +255,13 @@ const CARTAS_POR_CLASSE = 39;
 
 describe('catálogo oficial', () => {
   it('implementa, nesta etapa, exatamente as classes com catálogo e testes', () => {
-    expect([...CLASSES_IMPLEMENTADAS]).toEqual(['guerreiro', 'mago', 'clerigo', 'necromante']);
+    expect([...CLASSES_IMPLEMENTADAS]).toEqual([
+      'guerreiro',
+      'mago',
+      'clerigo',
+      'necromante',
+      'paladino',
+    ]);
   });
 
   it('tem 39 cartas jogáveis por classe implementada e nada além disso', () => {

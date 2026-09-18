@@ -73,6 +73,13 @@ export interface EscolhasDaAcao {
   readonly cartaAdversariaEmCooldown?: CardId;
   /** Outra carta da própria mão, escolhida por um texto que a manda para o cooldown. */
   readonly cartaDaMao?: CardId;
+  /**
+   * O Paladino escolhe descer um estado de Convicção nesta jogada.
+   *
+   * O texto diz "você **pode** descer 1 estado para receber +2 D": é troca, e
+   * quem decide fazê-la é o jogador.
+   */
+  readonly descerEstado?: boolean;
 }
 
 export const SEM_ESCOLHAS: EscolhasDaAcao = {};

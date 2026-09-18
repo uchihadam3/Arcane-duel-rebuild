@@ -27,6 +27,13 @@ import {
   ULTIMATES_DO_CLERIGO,
 } from './clerigo/complemento.js';
 
+import { HABILIDADES_DO_PALADINO } from './paladino/habilidades.js';
+import {
+  CARTAS_DE_CLASSE_DO_PALADINO,
+  PASSIVAS_DO_PALADINO,
+  ULTIMATES_DO_PALADINO,
+} from './paladino/complemento.js';
+
 /*
  * O catálogo oficial.
  *
@@ -68,11 +75,19 @@ export const CARTAS_DO_NECROMANTE: readonly DefinicaoDeCarta[] = [
   ...ULTIMATES_DO_NECROMANTE,
 ];
 
+export const CARTAS_DO_PALADINO: readonly DefinicaoDeCarta[] = [
+  ...HABILIDADES_DO_PALADINO,
+  ...PASSIVAS_DO_PALADINO,
+  ...CARTAS_DE_CLASSE_DO_PALADINO,
+  ...ULTIMATES_DO_PALADINO,
+];
+
 export const CATALOGO = criarCatalogo([
   ...CARTAS_DO_GUERREIRO,
   ...CARTAS_DO_MAGO,
   ...CARTAS_DO_CLERIGO,
   ...CARTAS_DO_NECROMANTE,
+  ...CARTAS_DO_PALADINO,
 ]);
 
 /** Classes cujo catálogo já está implementado por inteiro, com testes. */
@@ -81,6 +96,7 @@ export const CLASSES_IMPLEMENTADAS: readonly ClassId[] = [
   'mago',
   'clerigo',
   'necromante',
+  'paladino',
 ];
 
 /** A definição impressa de uma carta, ou `undefined` se ela não existe. */
@@ -115,4 +131,8 @@ export {
   PASSIVAS_DO_NECROMANTE,
   CARTAS_DE_CLASSE_DO_NECROMANTE,
   ULTIMATES_DO_NECROMANTE,
+  HABILIDADES_DO_PALADINO,
+  PASSIVAS_DO_PALADINO,
+  CARTAS_DE_CLASSE_DO_PALADINO,
+  ULTIMATES_DO_PALADINO,
 };

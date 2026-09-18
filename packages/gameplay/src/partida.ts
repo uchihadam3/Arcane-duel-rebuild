@@ -73,9 +73,13 @@ import {
   verificarRevelacoes,
 } from './pipeline.js';
 import { efeitoDeCartaDeClasse, efeitoDePassiva, efeitoJogavel } from './registro.js';
+import { descontoDaMarcha } from './efeitos/paladino.js';
 import {
   mecanicasDeClasseAoAbrirTurno,
+  mecanicasDeClasseAoDeclarar,
+  legalidadeDeClasse,
   mecanicasDeClasseAoFecharTurno,
+  mecanicasDeClasseDepoisDaConversao,
   mecanicasDeClasseAposResolver,
 } from './efeitos/mecanicas-classes.js';
 import { anexarAlma, avancarDevocao } from './recursos-classe.js';
@@ -334,6 +338,7 @@ export const iniciar = (partida: EstadoDaPartida, primeiro: PlayerId): Resposta 
 /** Abre o turno: rotina universal, reposição de recurso de classe e Passivas. */
 export const abrirTurno = (partida: EstadoDaPartida, jogador: PlayerId): Resposta => {
   const ctx = criarContexto(partida);
+  const reservaAntes = jogadorDo(ctx, jogador).reserva;
   const erro = aplicar(ctx, iniciarTurno(ctx.partida, jogador));
   if (erro !== null) return falha(erro);
 
@@ -345,7 +350,7 @@ export const abrirTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respost
         : total,
     0,
   );
-  mecanicasDeClasseAoAbrirTurno(ctx, jogador, voltaram);
+  mecanicasDeClasseAoAbrirTurno(ctx, jogador, voltaram, reservaAntes);
   verificarRevelacoes(ctx, 'inicio-do-turno', null, null);
   return entregar(ctx);
 };
@@ -380,6 +385,8 @@ export const fecharTurno = (partida: EstadoDaPartida, jogador: PlayerId): Respos
   if (devocaoPrometida > 0 && jogadorDo(ctx, jogador).reserva === 2) {
     avancarDevocao(ctx, jogador, devocaoPrometida);
   }
+
+  mecanicasDeClasseDepoisDaConversao(ctx, jogador);
 
   verificarRevelacoes(ctx, 'fim-do-turno', null, null);
   return entregar(ctx);
@@ -488,9 +495,13 @@ const descontosDoEstado = (
     temTag(perfil, 'feitico') &&
     valorDaAnotacao(jogador.anotacoes, CHAVE.prismaticaDesconto) > 0;
 
+  // "Marcha Implacável: seu próximo Ataque de custo impresso 2 AP ou mais custa
+  // 1 AP a menos, mínimo 1."
+  const marcha = perfil.valores !== null && descontoDaMarcha(jogador, perfil.custo.valor);
+
   return {
     ...(encarecida ? { apAdicional: 1 } : {}),
-    ...(prismatica ? { ap: 1, apMinimo: 1 } : {}),
+    ...(prismatica || marcha ? { ap: 1, apMinimo: 1 } : {}),
   };
 };
 
@@ -565,7 +576,7 @@ export const declarar = (
     acaoRespondida: null,
   };
 
-  const recusa = recusaDeLegalidade(consulta, usos);
+  const recusa = legalidadeDeClasse(consulta) ?? recusaDeLegalidade(consulta, usos);
   if (recusa !== null) {
     return falha({ tipo: 'condicao-de-uso-nao-satisfeita', carta: pedido.carta, detalhe: recusa });
   }
@@ -603,6 +614,7 @@ export const declarar = (
   if (erro !== null) return falha(erro);
 
   const indice = (ordem - 1) as IndiceDeAcao;
+  mecanicasDeClasseAoDeclarar(ctx, jogador, perfil.valor);
   for (const uso of usos) {
     const comando =
       uso.modo === 'ativar'

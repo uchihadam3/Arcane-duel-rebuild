@@ -23,6 +23,7 @@ import {
   juramentoDe,
 } from '../recursos-classe.js';
 import { lerPromessa } from './comum.js';
+import { defesaInataUsaResoluto } from './paladino.js';
 
 /*
  * As doze Defesas Inatas.
@@ -217,8 +218,12 @@ export const aplicarDefesaInata = (
     case 'paladino': {
       if (!marca()) return null;
       const estado = juramentoDe(defensor);
-      if (estado === 'inabalavel') reduzir(1, 2);
-      else if (estado === 'resoluto') reduzir(1, 1);
+      // "Guardião da Luz: sua Defesa Inata usa o valor de Resoluto mesmo se
+      // você estiver Vacilante."
+      const efetivo =
+        estado === 'vacilante' && defesaInataUsaResoluto(defensor) ? 'resoluto' : estado;
+      if (efetivo === 'inabalavel') reduzir(1, 2);
+      else if (efetivo === 'resoluto') reduzir(1, 1);
       else reduzir(0, 1);
       return ORIGEM_ESCUDO_CONSAGRADO;
     }

@@ -1,5 +1,6 @@
 import type {
   CardId,
+  EstadoDeJuramento,
   EstagioDeDevocao,
   EstadoDaPartida,
   EstadoDeJogador,
@@ -38,6 +39,7 @@ const HABILIDADES_DE_ENCHIMENTO = {
   mago: ['M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07', 'M08'],
   clerigo: ['C01', 'C02', 'C08', 'C12', 'C17', 'C05', 'C06', 'C09'],
   necromante: ['N01', 'N02', 'N03', 'N04', 'N07', 'N14', 'N16', 'N17'],
+  paladino: ['P01', 'P03', 'P05', 'P06', 'P10', 'P11', 'P15', 'P18'],
 } as const;
 
 /*
@@ -68,6 +70,11 @@ const PADROES = {
     passivas: ['NP07', 'NP08', 'NP09', 'NP10'],
     cartasDeClasse: ['NC01', 'NC06'],
     ultimate: 'NU01',
+  },
+  paladino: {
+    passivas: ['PP07', 'PP08', 'PP09', 'PP10'],
+    cartasDeClasse: ['PC01', 'PC04'],
+    ultimate: 'PU01',
   },
 } as const;
 
@@ -220,6 +227,21 @@ export const almasDe = (partida: EstadoDaPartida, id: PlayerId): number => {
 export const almasNoCemiterio = (partida: EstadoDaPartida, id: PlayerId): number => {
   const recurso = jogador(partida, id).recurso;
   return recurso.classe === 'necromante' ? recurso.almasNoCemiterio : -1;
+};
+
+/** Põe a Convicção do Paladino em um estado exato. */
+export const comJuramento = (
+  partida: EstadoDaPartida,
+  id: PlayerId,
+  juramento: EstadoDeJuramento,
+): EstadoDaPartida =>
+  jogador(partida, id).recurso.classe === 'paladino'
+    ? com(partida, id, { recurso: { classe: 'paladino', juramento } })
+    : partida;
+
+export const juramentoDe = (partida: EstadoDaPartida, id: PlayerId): EstadoDeJuramento | null => {
+  const recurso = jogador(partida, id).recurso;
+  return recurso.classe === 'paladino' ? recurso.juramento : null;
 };
 
 export const momentumDe = (partida: EstadoDaPartida, id: PlayerId): number => {

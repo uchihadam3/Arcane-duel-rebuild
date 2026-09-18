@@ -118,9 +118,37 @@ export const OSSOMANTE: BuildEquipada = {
   ultimate: cardId('NU01'), // Ceifador de Almas
 };
 
+/** Paladino, Receita 1 — Bastião. */
+export const BASTIAO: BuildEquipada = {
+  classe: 'paladino',
+  personagem: PERSONAGEM_DA_CLASSE.paladino,
+  habilidades: [
+    cardId('P01'), // Pancada de Escudo
+    cardId('P03'), // Martelo do Juramento
+    cardId('P06'), // Investida do Bastião
+    cardId('P11'), // Preparar o Bastião
+    cardId('P15'), // Bloqueio de Torre
+    cardId('P16'), // Égide Sagrada
+    cardId('P18'), // Permanecer de Pé
+    cardId('P19'), // Escudo e Espada
+  ],
+  passivas: [
+    cardId('PP01'), // Muralha Viva
+    cardId('PP02'), // Fé no Aço
+    cardId('PP04'), // Escudo do Justo
+    cardId('PP09'), // Guardião da Luz
+  ],
+  cartasDeClasse: [
+    cardId('PC01'), // Juramento da Proteção
+    cardId('PC04'), // Aura do Santuário
+  ],
+  ultimate: cardId('PU02'), // Fortaleza Inquebrável
+};
+
 export const RECEITAS_INICIAIS = {
   guerreiro: QUEBRA_MURALHAS,
   mago: PIROMANTE,
   clerigo: JULGAMENTO,
   necromante: OSSOMANTE,
+  paladino: BASTIAO,
 } as const;

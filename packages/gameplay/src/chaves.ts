@@ -125,6 +125,39 @@ export const CHAVE = {
   servosExauridos: 'partida:servos-exauridos',
   /** Cartas devolvidas pelo Rito da Segunda Morte custam +1 AP neste turno. */
   ritoEncarece: 'turno:rito-encarece',
+
+  /* Paladino ------------------------------------------------------------ */
+  /** O dono começou este turno com 2 de Reserva. */
+  comecouTurnoComReserva2: 'turno:comecou-com-reserva-2',
+  /** O dono começou este turno com a Guarda cheia. */
+  comecouTurnoComGuardaCheia: 'turno:comecou-com-guarda-cheia',
+  /**
+   * O dono usou uma carta de Reação desde o fim do próprio último turno.
+   *
+   * Escopo de partida, e não de turno: a pergunta atravessa a fronteira do
+   * turno de propósito, e quem apaga a marca é o fim do próprio turno.
+   */
+  usouReacaoNoTurnoInimigo: 'partida:reacao-desde-ultimo-turno',
+  /** O dono perdeu Vida de um Ataque desde o fim do próprio último turno. */
+  perdeuVidaDeAtaqueDesdeUltimoTurno: 'partida:perdeu-vida-desde-ultimo-turno',
+  /** Renovar o Juramento tranca as demais Técnicas do turno. */
+  tecnicaBloqueada: 'turno:tecnica-bloqueada',
+  /** Desconto de AP guardado para o próximo Ataque do turno. */
+  proximoAtaqueDescontoAp: 'turno:proximo-ataque-desconto-ap',
+  /** O dono desceu voluntariamente de estado neste turno. */
+  desceuVoluntariamenteNoTurno: 'turno:desceu-voluntariamente',
+  /** Rodada em que o Cumprimento do Juramento foi satisfeito pela última vez. */
+  cumprimentoNaRodada: 'partida:cumprimento-na-rodada',
+  /** Quantas vezes o Cumprimento do Juramento já foi satisfeito na partida. */
+  cumprimentosDoJuramento: 'partida:cumprimentos-do-juramento',
+  /** Bônus guardado para o primeiro Ataque do **próximo** turno do dono. */
+  primeiroAtaqueDoProximoTurnoDano: 'partida:primeiro-ataque-proximo-turno-dano',
+  /** Degrau emprestado ao primeiro Ataque do próximo turno (Justiça Imediata). */
+  degrauNoProximoTurno: 'partida:degrau-no-proximo-turno',
+  /** Ataques que ainda devolvem 1 AP pela Cruzada Final neste turno. */
+  cruzadaFinalRestante: 'turno:cruzada-final-restante',
+  /** A Cruzada Final cobra a descida de estado no fim do turno. */
+  cruzadaFinalDesce: 'partida:cruzada-final-desce',
 } as const;
 
 export type ChaveDeAnotacao = (typeof CHAVE)[keyof typeof CHAVE];

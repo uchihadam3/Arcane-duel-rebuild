@@ -4,7 +4,7 @@ import { cardId } from '@arcane-duel/shared-types';
 import { CHAVE } from '../chaves.js';
 import type { Contexto } from '../contexto.js';
 import { consumirLimitePorTurno, jogadorDo, slotDe } from '../contexto.js';
-import type { AlvoDoEfeito, ResumoDaResolucao } from '../ganchos.js';
+import type { AlvoDoEfeito, ConsultaDeLegalidade, ResumoDaResolucao } from '../ganchos.js';
 import {
   avancarDevocao,
   criarBrechas,
@@ -16,6 +16,14 @@ import {
   reiniciarReducaoVoluntaria,
 } from '../recursos-classe.js';
 import { lerPromessa } from './comum.js';
+import {
+  consumirDescontoDaMarcha,
+  travaDeTecnicaDoPaladino,
+  cumprimentosAposResolver,
+  fechoDoPaladino,
+  marcasDoInicioDoTurno,
+  registrarReacaoDoPaladino,
+} from './paladino.js';
 import {
   colheitaDoProprioTurno,
   colheitaDoTurnoInimigo,
@@ -119,6 +127,30 @@ export const mecanicasDeClasseAposResolver = (
   colheitaDoProprioTurno(ctx, alvo, resumo.dano > 0);
   colheitaDoTurnoInimigo(ctx, alvo, resumo.vidaPerdidaPeloDefensor > 0);
   ritoDeOssosNaRuptura(ctx, alvo, resumo.ruptura);
+  cumprimentosAposResolver(ctx, alvo, resumo);
+  if (resumo.houveReacao) registrarReacaoDoPaladino(ctx, alvo);
+};
+
+/**
+ * Recusas que não pertencem a nenhuma carta, e sim à classe de quem joga.
+ *
+ * Devolve o motivo da recusa, ou `null` quando a jogada pode seguir.
+ */
+export const legalidadeDeClasse = (consulta: ConsultaDeLegalidade): string | null =>
+  travaDeTecnicaDoPaladino(consulta.jogador, consulta.perfil.tipo === 'tecnica');
+
+/**
+ * Descontos de classe que se gastam ao serem usados.
+ *
+ * Roda logo depois de o custo ser pago: o desconto guardado para "o próximo
+ * Ataque" existe uma vez só, e quem o usou já o usou.
+ */
+export const mecanicasDeClasseAoDeclarar = (
+  ctx: Contexto,
+  jogador: PlayerId,
+  perfil: { readonly custo: { readonly valor: number }; readonly valores: unknown },
+): void => {
+  consumirDescontoDaMarcha(ctx, jogador, perfil.valores !== null, perfil.custo.valor);
 };
 
 /**
@@ -131,10 +163,13 @@ export const mecanicasDeClasseAoAbrirTurno = (
   ctx: Contexto,
   jogador: PlayerId,
   cartasQueVoltaram = 0,
+  reservaAntes = 0,
 ): void => {
   // Necromante: "quando uma carta voltar normalmente de CD1 para sua mão,
   // colha 1 Alma." O avanço do cooldown acabou de acontecer.
   ecoDoCemiterioNoInicioDoTurno(ctx, jogador, cartasQueVoltaram);
+  // Paladino: o que ele leu no começo do turno vira marca para as cartas dele.
+  marcasDoInicioDoTurno(ctx, jogador, reservaAntes);
   // Bardo: a sequência de Notas e as Cadências são do turno, e o turno é novo.
   reiniciarNotas(ctx, jogador);
   // Monge: o Kata recomeça — Abertura, Fluxo e Finalização valem dentro do turno.
@@ -153,4 +188,14 @@ export const mecanicasDeClasseAoFecharTurno = (ctx: Contexto, jogador: PlayerId)
   // Isso cobre também as Brechas criadas no turno inimigo, que duram até o fim
   // do turno seguinte dele.
   limparBrechas(ctx, jogador);
+};
+
+/**
+ * O que as classes fazem **depois** da conversão de Reserva do fim do turno.
+ *
+ * "Quando terminar seu turno com 2 de Reserva" só pode ser conferido aqui: a
+ * Reserva do fim do turno é a que a conversão deixou.
+ */
+export const mecanicasDeClasseDepoisDaConversao = (ctx: Contexto, jogador: PlayerId): void => {
+  fechoDoPaladino(ctx, jogador);
 };
