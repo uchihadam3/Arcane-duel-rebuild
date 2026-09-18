@@ -505,6 +505,67 @@ continua sendo impresso, para diagnóstico.
 
 O relatório da linha de base está em `SIMULATION_STAGE3_BASELINE.md`.
 
+## O protótipo local jogável (Etapa 5)
+
+A partida local roda inteira no cliente, e isso é uma escolha da **etapa**, não
+da arquitetura. Os dois jogadores estão no mesmo aparelho e não há rede no
+meio; no PvP da Etapa 10 quem guarda o estado canônico e executa comandos é o
+servidor. A fronteira não muda: a interface fala por comandos e lê projeções,
+então trocar o controlador local por um cliente de rede não mexe em componente
+nenhum.
+
+### Camadas
+
+| Camada                               | Responsabilidade                                                |
+| ------------------------------------ | --------------------------------------------------------------- |
+| `gameplay` (`partida.ts`)            | regra e comandos — a única autoridade                           |
+| `gameplay` (`interacao.ts`)          | o que a interface **pode perguntar** ao motor                   |
+| `apps/web/partida/controlador.ts`    | host do protótipo: ordem do fluxo e de quem é a vez do aparelho |
+| `apps/web/telas`, `apps/web/batalha` | apresentação e estado de apresentação                           |
+| `packages/ui/jogo`                   | componentes visuais reutilizáveis, sem regra                    |
+
+### A interface não é um segundo motor
+
+Existe uma tentação óbvia ao escrever a tela de partida: reimplementar, em
+React, "esta carta pode ser jogada?" e "esta carta pede qual escolha?". Isso
+seria um segundo motor de regras, e dois motores divergem no dia seguinte.
+
+`packages/gameplay/src/interacao.ts` resolve isso sem duplicar nada: como os
+comandos são funções puras de estado, a pergunta é feita **executando o comando
+de verdade** sobre uma cópia e jogando o resultado fora. Custa microssegundos e
+não pode divergir, porque é o mesmo código que decide quando o jogador confirma.
+
+A camada só conhece a _forma_ dos dados — quais campos de escolha existem
+(`keyof EscolhasDaAcao`, exaustivo por tipo) e de onde saem os valores
+candidatos de cada um (a mão, o cooldown, a trilha, sempre o estado
+autoritativo). Qual campo a carta quer, e qual valor ela aceita, quem responde
+é o motor: a sondagem oferece candidatos e observa qual deles a recusa deixa de
+mencionar. Não existe, em lugar nenhum da interface, um `if carta === 'R13'`.
+
+### Privacidade em hot-seat
+
+Os dois jogadores usam o mesmo aparelho, então informação escondida precisa
+continuar escondida. A fronteira de apresentação é `projetarParaJogador`, e a
+tela de troca não é um véu por cima do campo: enquanto ninguém confirmou estar
+com o aparelho, a projeção **não é calculada** e o campo não é renderizado.
+Não é `opacity`, não é `display: none` e não é um campo escondido atrás de uma
+flag — é ausência de dado.
+
+### Estado de apresentação
+
+Carta em foco, painel aberto, confirmação pendente, banner de turno e erro
+exibido são estado da **tela**, e vivem nos componentes. Nada disso entra em
+`EstadoDaPartida`: o estado do jogo continua sendo só o que o motor precisa
+para resolver e para reconstruir o replay.
+
+### Atualização do cliente durante a partida
+
+`SituacaoDoCliente` deixou de ser sempre `sem-partida`: `App` informa
+`partida-ativa` enquanto a batalha está montada. Uma versão nova encontrada no
+meio de um duelo é baixada e fica pendente; a troca acontece quando a partida
+termina, o jogador abandona ou volta ao menu. Recarregar no meio de um duelo é
+perder o duelo.
+
 ## Ferramentas
 
 | Ferramenta                 | Papel                                                              |

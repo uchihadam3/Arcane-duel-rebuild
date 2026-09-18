@@ -3,7 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import type { EstadoDaAtualizacao } from '../pwa/atualizacao.js';
 import { criarCoordenadorDeAtualizacao } from '../pwa/atualizacao.js';
-import { situacaoAtualDoCliente } from '../pwa/politica-de-atualizacao.js';
+import type { SituacaoDoCliente } from '../pwa/politica-de-atualizacao.js';
 
 /*
  * A ponte entre o service worker e o coordenador de atualização.
@@ -20,9 +20,20 @@ export interface AtualizacaoDoCliente {
   readonly aplicarAgora: () => void;
 }
 
-export const useAtualizacaoDoCliente = (): AtualizacaoDoCliente => {
+export const useAtualizacaoDoCliente = (
+  situacao: SituacaoDoCliente = 'sem-partida',
+): AtualizacaoDoCliente => {
   const [estado, setEstado] = useState<EstadoDaAtualizacao>('em-dia');
   const registro = useRef<ServiceWorkerRegistration | null>(null);
+  /*
+   * A situação é lida por referência, e não capturada.
+   *
+   * O coordenador é criado uma vez e vive a sessão inteira; se ele guardasse
+   * o valor de agora, a partida que começa depois nunca seguraria uma
+   * atualização. A caixa abaixo é o que mantém a leitura sempre atual.
+   */
+  const situacaoAtual = useRef<SituacaoDoCliente>(situacao);
+  situacaoAtual.current = situacao;
 
   const {
     needRefresh: [precisaAtualizar],
@@ -45,7 +56,7 @@ export const useAtualizacaoDoCliente = (): AtualizacaoDoCliente => {
       aplicar: async () => {
         await updateServiceWorker(true);
       },
-      situacaoDoCliente: situacaoAtualDoCliente,
+      situacaoDoCliente: () => situacaoAtual.current,
       aoMudarEstado: setEstado,
       janela: window,
       documento: document,
@@ -59,6 +70,16 @@ export const useAtualizacaoDoCliente = (): AtualizacaoDoCliente => {
   );
 
   useEffect(() => coordenador.current.iniciar(), []);
+
+  /*
+   * A partida acabou e havia uma versão esperando? Aplica agora.
+   *
+   * Sem isto a atualização ficaria pendente até a próxima verificação
+   * periódica — o jogador voltaria ao menu e continuaria na build velha.
+   */
+  useEffect(() => {
+    if (situacao === 'sem-partida') coordenador.current.aplicarPendente();
+  }, [situacao]);
 
   useEffect(() => {
     if (precisaAtualizar) coordenador.current.aoEncontrarAtualizacao();

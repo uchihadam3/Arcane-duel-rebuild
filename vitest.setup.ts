@@ -26,6 +26,10 @@ if (typeof window !== 'undefined') {
 
   // Sem `globals: true`, a limpeza automática da Testing Library não é
   // registrada; sem ela o DOM de um teste vaza para o seguinte.
-  const { cleanup } = await import('@testing-library/react');
+  const { cleanup, configure } = await import('@testing-library/react');
   afterEach(cleanup);
+
+  // A interface marca seus pontos de teste com `data-teste`, em português,
+  // como todo o resto do projeto. Isto faz `getByTestId` falar a mesma língua.
+  configure({ testIdAttribute: 'data-teste' });
 }

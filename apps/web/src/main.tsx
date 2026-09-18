@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import './styles/global.css';
 import './styles/app.css';
+import './styles/jogo.css';
 
 const raiz = document.getElementById('raiz');
 if (raiz === null) {

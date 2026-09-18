@@ -18,6 +18,8 @@ export default defineConfig({
       // O caminho direto existe para o cliente ler as Receitas sem arrastar o
       // registro de efeitos inteiro para dentro do bundle.
       '@arcane-duel/gameplay/receitas': fromRoot('./packages/gameplay/src/receitas.ts'),
+      // A superfície da batalha, sem o simulador junto.
+      '@arcane-duel/gameplay/jogo': fromRoot('./packages/gameplay/src/jogo.ts'),
       '@arcane-duel/gameplay': fromRoot('./packages/gameplay/src/index.ts'),
       '@arcane-duel/ai': fromRoot('./packages/ai/src/index.ts'),
       '@arcane-duel/audio': fromRoot('./packages/audio/src/index.ts'),

@@ -1,5 +1,6 @@
 import type { BuildEquipada } from '@arcane-duel/rules-engine';
 import { PERSONAGEM_DA_CLASSE } from '@arcane-duel/card-data';
+import type { ClassId } from '@arcane-duel/shared-types';
 import { cardId } from '@arcane-duel/shared-types';
 
 /*
@@ -332,6 +333,27 @@ export const SANGUE: BuildEquipada = {
     cardId('BRC04'), // Maldição da Fragilidade
   ],
   ultimate: cardId('BRU01'), // Condenação
+};
+
+/**
+ * O nome de cada Receita 1, transcrito de docs/PRESET_BUILDS.md.
+ *
+ * A interface mostra o nome da Receita ao escolher a classe; ele já estava
+ * neste arquivo, em comentário, e aqui só passa a ser legível por código.
+ */
+export const NOME_DA_RECEITA_INICIAL: Readonly<Record<ClassId, string>> = {
+  guerreiro: 'Quebra-Muralhas',
+  mago: 'Piromante',
+  clerigo: 'Julgamento',
+  necromante: 'Ossomante',
+  paladino: 'Bastião',
+  ladino: 'Assassino',
+  bardo: 'Crescendo',
+  monge: 'Kata do Tigre',
+  patrulheiro: 'Atirador',
+  barbaro: 'Berserker',
+  druida: 'Urso do Bosque',
+  bruxo: 'Sangue',
 };
 
 export const RECEITAS_INICIAIS = {

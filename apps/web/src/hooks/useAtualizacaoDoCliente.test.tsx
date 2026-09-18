@@ -31,8 +31,12 @@ vi.mock('virtual:pwa-register/react', () => ({
 
 const { useAtualizacaoDoCliente } = await import('./useAtualizacaoDoCliente.js');
 
-const Sonda = (): React.JSX.Element => {
-  const atualizacao = useAtualizacaoDoCliente();
+const Sonda = ({
+  situacao = 'sem-partida',
+}: {
+  readonly situacao?: 'sem-partida' | 'partida-ativa';
+}): React.JSX.Element => {
+  const atualizacao = useAtualizacaoDoCliente(situacao);
   return (
     <button
       type="button"
@@ -92,6 +96,84 @@ describe('ligação com o service worker', () => {
   it('o botão de emergência força a troca', () => {
     render(<Sonda />);
     screen.getByRole('button').click();
+    expect(trocarComRecarga).toHaveBeenCalledWith(true);
+  });
+});
+
+/*
+ * A atualização durante a partida.
+ *
+ * Recarregar o cliente no meio de um duelo é perder o duelo. A versão nova é
+ * baixada e fica em espera; a troca acontece quando a partida acaba.
+ */
+describe('atualização enquanto a partida está no ar', () => {
+  beforeEach(() => {
+    precisaAtualizar = false;
+    registro.update.mockClear();
+    trocarComRecarga.mockClear();
+  });
+
+  it('não recarrega o cliente durante a partida', () => {
+    precisaAtualizar = true;
+    render(<Sonda situacao="partida-ativa" />);
+
+    expect(trocarComRecarga).not.toHaveBeenCalled();
+    expect(screen.getByRole('button').getAttribute('data-estado')).toBe('pendente');
+  });
+
+  it('aplica a versão que ficou pendente assim que a partida termina', () => {
+    precisaAtualizar = true;
+    const { rerender } = render(<Sonda situacao="partida-ativa" />);
+    expect(trocarComRecarga).not.toHaveBeenCalled();
+
+    rerender(<Sonda situacao="sem-partida" />);
+    expect(trocarComRecarga).toHaveBeenCalledWith(true);
+  });
+
+  it('fora da partida a troca continua automática', () => {
+    precisaAtualizar = true;
+    render(<Sonda situacao="sem-partida" />);
+    expect(trocarComRecarga).toHaveBeenCalledWith(true);
+  });
+});
+
+/*
+ * O aplicativo inteiro, e a partida segurando a atualização.
+ *
+ * O teste acima prova o hook. Este prova o fio até a tela: entrar na batalha
+ * faz o cliente declarar `partida-ativa`, e sair dela libera a troca.
+ */
+describe('a partida segura a atualização no aplicativo', () => {
+  beforeEach(() => {
+    precisaAtualizar = true;
+    registro.update.mockClear();
+    trocarComRecarga.mockClear();
+  });
+
+  it('não recarrega enquanto a batalha está no ar, e aplica ao sair', async () => {
+    const { App } = await import('../App.js');
+    const { fireEvent } = await import('@testing-library/react');
+
+    render(<App />);
+    // Fora da partida a troca é automática.
+    expect(trocarComRecarga).toHaveBeenCalledWith(true);
+    trocarComRecarga.mockClear();
+
+    fireEvent.click(screen.getByTestId('jogar-local'));
+    fireEvent.click(screen.getByTestId('comeca-jogador-1'));
+    fireEvent.click(screen.getByTestId('iniciar-partida'));
+    expect(screen.getByTestId('campo')).toBeDefined();
+    trocarComRecarga.mockClear();
+
+    // Com a batalha montada, nada recarrega.
+    fireEvent.click(screen.getByTestId('encerrar-turno'));
+    fireEvent.click(screen.getByTestId('estou-pronto'));
+    expect(trocarComRecarga).not.toHaveBeenCalled();
+
+    // Abandonar volta ao menu e libera a versão que estava esperando.
+    fireEvent.click(screen.getByTestId('menu-da-partida'));
+    fireEvent.click(screen.getByTestId('abandonar'));
+    expect(screen.getByTestId('menu-principal')).toBeDefined();
     expect(trocarComRecarga).toHaveBeenCalledWith(true);
   });
 });

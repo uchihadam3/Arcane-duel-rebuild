@@ -5,6 +5,7 @@ export * from './apoio.js';
 export * from './registro.js';
 export * from './pipeline.js';
 export * from './partida.js';
+export * from './interacao.js';
 export * from './receitas.js';
 export * from './simulador/politica.js';
 export * from './simulador/motor.js';
