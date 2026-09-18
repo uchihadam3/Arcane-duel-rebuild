@@ -33,26 +33,76 @@ O cliente é um site estático. `npm run build` gera `apps/web/dist`, e a branch
 `main` é a fonte da publicação. Nenhum serviço externo participa do deploy, e
 nenhum segredo é necessário.
 
+### O método de publicação é GitHub Pages via GitHub Actions
+
+Esta é a regra, e ela não é detalhe de implementação:
+
+> A publicação oficial do Arcane Duel é **GitHub Pages via GitHub Actions**,
+> com `actions/upload-pages-artifact` e `actions/deploy-pages`.
+> **Não publicar empurrando a branch `gh-pages`.**
+
+O motivo é concreto. A origem do Pages deste repositório é "GitHub Actions".
+Quando a origem é essa, o serviço publica o **artefato** que `deploy-pages`
+envia e ignora completamente o conteúdo de qualquer branch. Em algum momento o
+workflow passou a publicar fazendo commit e push em `gh-pages`, e o resultado
+foi a pior combinação possível:
+
+- o workflow terminava **verde**;
+- a branch `gh-pages` ficava **em dia**;
+- o endereço público continuava servindo o **primeiro deploy**, de dias antes.
+
+Nada acusava o problema, porque ninguém estava errado isoladamente — os dois
+mecanismos simplesmente não conversam. A branch pode continuar existindo como
+histórico, mas não é o endpoint público e não deve voltar a ser o caminho de
+publicação.
+
 ### Como o deploy acontece
 
-`.github/workflows/pages.yml` roda a cada push em `main`:
+`.github/workflows/pages.yml` roda a cada push em `main`, em dois jobs:
+
+**Construir o cliente**
 
 1. instala com `npm ci` e constrói com `npm run build`, a partir da raiz do
    monorepo — não existe cópia separada do cliente;
-2. passa `BASE_PATH` com o nome do repositório, porque o Pages serve o site
-   sob `/Arcane-duel-rebuild/` e não na raiz do domínio;
-3. copia `index.html` para `404.html`, que é como o Pages faz fallback de SPA
+2. `actions/configure-pages` com `enablement: true`, que garante que a origem
+   do Pages seja "GitHub Actions";
+3. passa `BASE_PATH` com o nome do repositório, porque o Pages serve o site
+   sob `/Arcane-duel-rebuild/` e não na raiz do domínio, e `GITHUB_SHA` e
+   `GITHUB_RUN_NUMBER`, que viram o commit e a build mostrados na tela;
+4. copia `index.html` para `404.html`, que é como o Pages faz fallback de SPA
    — ele não tem reescrita de rota;
-4. cria `.nojekyll`, senão o Pages reprocessaria o site pelo Jekyll;
-5. publica o conteúdo de `apps/web/dist` na branch `gh-pages`, com um commit
-   por deploy. Sem force push: o histórico do que já foi publicado é
-   preservado.
+5. cria `.nojekyll`;
+6. **confere o artefato** com `scripts/verificar-artefato-publicado.mjs`;
+7. envia `apps/web/dist` com `actions/upload-pages-artifact`.
 
-A branch `gh-pages` guarda apenas o resultado do build. Ela é gerada — nada
-deve ser editado à mão nela.
+**Publicar**
 
-`apps/web/src/deploy.test.ts` verifica essas garantias lendo o próprio
-workflow. Um erro ali só apareceria depois do deploy, com o jogo no ar.
+8. `actions/deploy-pages` no environment `github-pages`. É **este** job que
+   troca o site público. Um build verde não significa site novo: enquanto este
+   job não terminar, o endereço continua servindo a versão anterior.
+
+### Conferir o artefato, e não só o workflow
+
+`scripts/verificar-artefato-publicado.mjs` roda logo antes do upload e recusa a
+publicação quando o `dist` não corresponde ao commit em construção. Ele exige
+que `index.html` aponte para um bundle que existe, que esse bundle carregue o
+commit atual, ofereça "Jogar local" e mencione a Etapa 5, e que não carregue
+texto da fundação do projeto — `COMBATE NÃO IMPLEMENTADO` e afins.
+
+`apps/web/src/deploy.test.ts` verifica o método lendo o próprio workflow, e
+**recusa** qualquer volta a `gh-pages`, `git worktree`, `git commit` ou
+`git push` dentro dele.
+
+### Como confirmar que uma publicação realmente aconteceu
+
+Ler a branch `gh-pages` não prova nada — ela não é o endpoint público. O que
+prova:
+
+1. o job `Publicar` terminou verde, com `actions/deploy-pages` executado;
+2. existe um deployment novo no environment `github-pages` apontando para o
+   commit esperado;
+3. o HTML servido em https://uchihadam3.github.io/Arcane-duel-rebuild/
+   referencia o bundle daquela build.
 
 ### Do push ao aplicativo instalado
 

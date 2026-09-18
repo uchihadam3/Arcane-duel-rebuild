@@ -12,6 +12,13 @@ import { criarManifesto } from './pwa/manifest.js';
  * painel de configuração: tudo o que garante o comportamento do site está no
  * workflow. Um erro aqui só apareceria depois do deploy, com o jogo no ar —
  * por isso o workflow é verificado como código.
+ *
+ * A guarda mais importante é a do **método**. O site público ficou dias
+ * servindo o primeiro deploy porque a origem do Pages é "GitHub Actions" e o
+ * workflow havia passado a publicar empurrando a branch `gh-pages`. Os dois
+ * mecanismos não conversam: o job ficava verde, a branch ficava em dia, e o
+ * endereço público não mudava. Voltar a publicar por branch é regressão, e os
+ * testes abaixo recusam.
  */
 const workflow = readFileSync(
   fileURLToPath(new URL('../../../.github/workflows/pages.yml', import.meta.url)),
@@ -47,13 +54,41 @@ describe('workflow de publicação', () => {
     expect(workflow).toContain('touch apps/web/dist/.nojekyll');
   });
 
-  it('publica o conteúdo de apps/web/dist, sem cópia separada do cliente', () => {
-    expect(workflow).toContain('cp -r apps/web/dist/. ../site/');
+  it('publica o conteúdo de apps/web/dist pelo mecanismo oficial do Pages', () => {
+    expect(workflow).toContain('actions/upload-pages-artifact@v3');
+    expect(workflow).toContain('path: apps/web/dist');
   });
 
-  it('nunca reescreve o histórico do site publicado', () => {
-    expect(workflow).not.toMatch(/push[^\n]*--force/);
-    expect(workflow).not.toMatch(/push[^\n]*-f\b/);
+  it('usa o deploy oficial do Pages, que é quem troca o site público', () => {
+    expect(workflow).toContain('actions/configure-pages@v5');
+    expect(workflow).toContain('actions/deploy-pages@v4');
+  });
+
+  it('declara as permissões que o deploy oficial exige', () => {
+    // `id-token: write` é o OIDC que autentica o artefato perante o Pages.
+    expect(workflow).toContain('pages: write');
+    expect(workflow).toContain('id-token: write');
+  });
+
+  it('prende o deploy ao environment github-pages', () => {
+    expect(workflow).toContain('name: github-pages');
+    expect(workflow).toContain('url: ${{ steps.deployment.outputs.page_url }}');
+  });
+
+  it('NÃO volta a publicar empurrando a branch gh-pages', () => {
+    /*
+     * Esta é a regressão que tirou o site do ar por dias. Publicar na branch
+     * não atualiza um Pages cuja origem é "GitHub Actions" — e o workflow
+     * continua verde, o que torna a falha silenciosa.
+     */
+    expect(workflow).not.toContain('gh-pages');
+    expect(workflow).not.toContain('git worktree');
+    expect(workflow).not.toMatch(/git\s+push/);
+    expect(workflow).not.toMatch(/git\s+commit/);
+  });
+
+  it('confere o artefato antes de publicá-lo', () => {
+    expect(workflow).toContain('node scripts/verificar-artefato-publicado.mjs');
   });
 
   it('não depende de nenhum serviço externo de publicação', () => {

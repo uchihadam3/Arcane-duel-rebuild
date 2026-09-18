@@ -5,9 +5,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Publicar é escrever na branch gh-pages; nada além disso é necessário.
+# Estas três são as permissões que o deploy oficial do Pages exige. Em
+# particular `id-token: write`: é o OIDC que autentica o artefato perante o
+# serviço do Pages. Sem ele, `deploy-pages` falha.
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 # Um deploy de cada vez, e sem cancelar um que já começou.
 concurrency:
@@ -15,8 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publicar:
-    name: Construir e publicar
+  construir:
+    name: Construir o cliente
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,14 +33,28 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Configurar o Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          # Garante que a origem do Pages seja "GitHub Actions". Foi
+          # exatamente a divergência entre a origem configurada e o método de
+          # publicação que deixou o site público parado por dias.
+          enablement: true
+
       - name: Construir
         run: npm run build
         env:
-          # No Pages o cliente é servido sob o nome do repositório, não na raiz.
+          # O prefixo é escrito aqui, e não lido de `steps.pages.outputs`, por
+          # uma razão prática: este valor é o que já provou produzir
+          # `/Arcane-duel-rebuild/` no bundle publicado, com barra final
+          # garantida. `normalizarBase` aceitaria as duas formas, mas o build
+          # do site no ar não é lugar para depender de um detalhe de formato.
           BASE_PATH: /${{ github.event.repository.name }}/
-          # O número da execução vira o identificador de build mostrado na
-          # tela: é determinístico, sobe a cada publicação e é fácil de
-          # comparar com o que está no ar.
+          # O commit e o número da execução viram o que a tela de status
+          # mostra. Ambos existem no ambiente do Actions; ficam explícitos para
+          # que a dependência seja visível e verificável.
+          GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
       - name: Preparar o site
@@ -45,36 +63,28 @@ jobs:
           # 404.html faz /login, /builds, /match e /profile abrirem o cliente.
           # Um asset que falta continua devolvendo status 404, que é o correto.
           cp apps/web/dist/index.html apps/web/dist/404.html
-          # Sem isto o Pages passaria o site pelo Jekyll.
+          # Redundante no caminho do artefato, que não passa pelo Jekyll, e
+          # barato: protege o site se a origem do Pages algum dia voltar a ser
+          # uma branch.
           touch apps/web/dist/.nojekyll
 
-      - name: Publicar na branch gh-pages
-        env:
-          BRANCH: gh-pages
-        run: |
-          set -e
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Conferir o artefato antes de publicar
+        run: node scripts/verificar-artefato-publicado.mjs
 
-          # A gh-pages guarda só o resultado do build. O histórico é preservado
-          # commit a commit — nada de reescrever o que já foi publicado.
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git fetch origin "$BRANCH" --depth=1
-            git worktree add ../site "origin/$BRANCH"
-            git -C ../site switch -c "$BRANCH" 2>/dev/null || git -C ../site switch "$BRANCH"
-          else
-            git worktree add --detach ../site
-            git -C ../site switch --orphan "$BRANCH"
-          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
 
-          find ../site -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -r apps/web/dist/. ../site/
-
-          cd ../site
-          git add -A
-          if git diff --cached --quiet; then
-            echo 'Nada mudou no site publicado.'
-          else
-            git commit -q -m "deploy: ${GITHUB_SHA}"
-            git push origin "$BRANCH"
-          fi
+  publicar:
+    name: Publicar
+    needs: construir
+    runs-on: ubuntu-latest
+    # O deployment de verdade acontece aqui. Enquanto este job não terminar
+    # verde, o endereço público continua servindo a versão anterior — por mais
+    # verde que o job de build esteja.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
