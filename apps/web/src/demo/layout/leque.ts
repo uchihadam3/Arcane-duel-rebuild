@@ -99,6 +99,38 @@ export const LARGURA_DA_CARTA = (zona: Caixa, invertido = false): number => {
   return Math.min(porAltura, zona.largura * (invertido ? 0.16 : 0.28));
 };
 
+/**
+ * O ponto em torno do qual a carta gira no leque.
+ *
+ * Abaixo do meio, perto do pé: é o que faz o leque abrir como uma mão que
+ * segura as cartas pela base. O CSS usa exatamente este número.
+ */
+export const PIVO_DO_GIRO = { x: 0.5, y: 0.82 } as const;
+
+/**
+ * Meia largura de uma carta **girada**, medida a partir do pivô.
+ *
+ * Isto não é detalhe. Uma carta de 121 × 170 inclinada 9° ocupa 146 px de
+ * largura, e não 121 — e o leque inteiro estoura a faixa da mão por doze
+ * pixels de cada lado. Foi assim que a mão encostou no HUD do jogador e no
+ * botão de encerrar turno nos seis viewports ao mesmo tempo: a conta tratava
+ * a carta como um retângulo sem giro.
+ */
+export const meiaLarguraGirada = (largura: number, altura: number, giroEmGraus: number): number => {
+  const r = (Math.abs(giroEmGraus) * Math.PI) / 180;
+  const cos = Math.cos(r);
+  const sen = Math.sin(r);
+  const px = PIVO_DO_GIRO.x * largura;
+  const py = PIVO_DO_GIRO.y * altura;
+  const cantos: readonly (readonly [number, number])[] = [
+    [-px, -py],
+    [largura - px, -py],
+    [largura - px, altura - py],
+    [-px, altura - py],
+  ];
+  return Math.max(...cantos.map(([x, y]) => Math.abs(x * cos - y * sen)));
+};
+
 export interface OpcoesDoLeque {
   readonly zona: Caixa;
   readonly total: number;
@@ -124,8 +156,16 @@ export const lugaresDoLeque = (opcoes: OpcoesDoLeque): readonly LugarNoLeque[] =
   const altura = (largura * 7) / 5;
   const sentido = invertido ? -1 : 1;
 
+  /*
+   * O espaço que o leque pode usar já desconta o volume do giro.
+   *
+   * A carta da ponta é a mais inclinada, então é ela que decide a folga. Sem
+   * este desconto, as duas pontas do leque invadem as colunas de apoio.
+   */
+  const meiaGirada = meiaLarguraGirada(largura, altura, LEQUE.giroMaximo);
+  const util = Math.max(0, zona.largura - meiaGirada * 2);
   const passoIdeal = largura * 0.62;
-  const passoQueCabe = total > 1 ? (zona.largura - largura) / (total - 1) : 0;
+  const passoQueCabe = total > 1 ? util / (total - 1) : 0;
   const passo = Math.max(largura * 0.26, Math.min(passoIdeal, passoQueCabe));
 
   const centroX = zona.x + zona.largura / 2;
@@ -164,11 +204,21 @@ export const lugaresDoLeque = (opcoes: OpcoesDoLeque): readonly LugarNoLeque[] =
      * bem: a carta vem para a frente e se acomoda, em vez de escapar pela
      * borda.
      */
+    /*
+     * Toda carta é presa à faixa da mão, contando o giro e a escala dela.
+     *
+     * Não só a focada: o empurrão que abre espaço para ela move as vizinhas, e
+     * a da ponta sai da faixa. Prendendo todas, o leque nunca encosta no HUD
+     * nem nos controles — e a prisão só age em quem chegou à borda, então o
+     * miolo do leque continua se movendo livremente.
+     */
     const bruto = centroX + desvio * passo * ((total - 1) / 2) + empurrao;
-    const meiaFocada = (largura * LEQUE.ampliacaoDoFoco) / 2;
-    const x = estaFocada
-      ? Math.min(zona.x + zona.largura - meiaFocada, Math.max(zona.x + meiaFocada, bruto))
-      : bruto;
+    const giroDesta = estaFocada
+      ? desvio * LEQUE.giroMaximo * 0.12
+      : desvio * LEQUE.giroMaximo * sentido;
+    const escalaDesta = estaFocada ? LEQUE.ampliacaoDoFoco : 1;
+    const meia = meiaLarguraGirada(largura, altura, giroDesta) * escalaDesta;
+    const x = Math.min(zona.x + zona.largura - meia, Math.max(zona.x + meia, bruto));
 
     return {
       x,
@@ -179,8 +229,8 @@ export const lugaresDoLeque = (opcoes: OpcoesDoLeque): readonly LugarNoLeque[] =
        * Zerar produz um salto perceptível quando o foco sai; um fio de
        * inclinação residual mantém a continuidade e ainda lê como reta.
        */
-      giro: estaFocada ? desvio * LEQUE.giroMaximo * 0.12 : desvio * LEQUE.giroMaximo * sentido,
-      escala: estaFocada ? LEQUE.ampliacaoDoFoco : 1,
+      giro: giroDesta,
+      escala: escalaDesta,
       recuo: focada === null || estaFocada ? 0 : LEQUE.recuoDasVizinhas,
       // A focada vem na frente de todas; o resto empilha da esquerda para a direita.
       ordem: estaFocada ? total + 10 : indice,
@@ -208,8 +258,33 @@ export const caixaDaCartaFocada = (opcoes: OpcoesDoLeque): Caixa | null => {
   const lugares = lugaresDoLeque(opcoes);
   const lugar = lugares.find((item) => item.focada);
   if (lugar === undefined) return null;
-  const { largura, altura } = tamanhoDaCartaNaMao(opcoes.zona);
-  const l = largura * lugar.escala;
+  const { largura, altura } = tamanhoDaCartaNaMao(opcoes.zona, opcoes.invertido ?? false);
+  const meia = meiaLarguraGirada(largura, altura, lugar.giro) * lugar.escala;
   const a = altura * lugar.escala;
-  return { x: lugar.x - l / 2, y: lugar.y - a / 2, largura: l, altura: a };
+  return { x: lugar.x - meia, y: lugar.y - a / 2, largura: meia * 2, altura: a };
+};
+
+/**
+ * A caixa que o leque inteiro ocupa na tela, **com o giro contado**.
+ *
+ * É esta caixa que o teste de colisão usa, e não a zona: a zona é o espaço
+ * reservado, e o que precisa não encostar em nada é o que realmente aparece.
+ */
+export const caixaDoLeque = (opcoes: OpcoesDoLeque): Caixa | null => {
+  const lugares = lugaresDoLeque(opcoes);
+  if (lugares.length === 0) return null;
+  const { largura, altura } = tamanhoDaCartaNaMao(opcoes.zona, opcoes.invertido ?? false);
+  let esquerda = Infinity;
+  let direita = -Infinity;
+  let topo = Infinity;
+  let base = -Infinity;
+  for (const lugar of lugares) {
+    const meia = meiaLarguraGirada(largura, altura, lugar.giro) * lugar.escala;
+    const a = (altura * lugar.escala) / 2;
+    esquerda = Math.min(esquerda, lugar.x - meia);
+    direita = Math.max(direita, lugar.x + meia);
+    topo = Math.min(topo, lugar.y - a);
+    base = Math.max(base, lugar.y + a);
+  }
+  return { x: esquerda, y: topo, largura: direita - esquerda, altura: base - topo };
 };

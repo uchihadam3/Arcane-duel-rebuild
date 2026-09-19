@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { LEQUE, caixaDaCartaFocada, lugaresDoLeque, tamanhoDaCartaNaMao } from './leque.js';
+import {
+  LEQUE,
+  caixaDaCartaFocada,
+  caixaDoLeque,
+  lugaresDoLeque,
+  meiaLarguraGirada,
+  tamanhoDaCartaNaMao,
+} from './leque.js';
 import { VIEWPORTS_ALVO, VIEWPORT_DE_CALIBRACAO, seCruzam, zonasDaTela } from './zonas.js';
 
 /*
@@ -50,17 +57,29 @@ describe('o leque é sutil e cabe na zona da mão', () => {
     }
   });
 
-  it('as oito cartas cabem na largura da zona da mão, em todo viewport alvo', () => {
+  /*
+   * As cartas do leque são **giradas**, e isso muda a conta.
+   *
+   * Uma carta de 121 × 170 inclinada 9° ocupa 146 px de largura. A primeira
+   * versão deste teste media o retângulo sem giro, passava, e no navegador as
+   * duas pontas do leque encostavam no HUD do jogador e no botão de encerrar
+   * turno — nos seis viewports ao mesmo tempo. Aqui a medida é a real.
+   */
+  it('o leque girado cabe na zona da mão, em todo viewport alvo', () => {
     for (const viewport of VIEWPORTS_ALVO) {
       const zona = zonasDaTela(viewport).maoDoJogador;
-      const lugares = lugaresDoLeque({ zona, total: OITO, focada: null });
-      const { largura } = tamanhoDaCartaNaMao(zona);
-      const esquerda = Math.min(...lugares.map((l) => l.x)) - largura / 2;
-      const direita = Math.max(...lugares.map((l) => l.x)) + largura / 2;
+      const caixa = caixaDoLeque({ zona, total: OITO, focada: null });
+      expect(caixa).not.toBeNull();
+      if (caixa === null) continue;
       const rotulo = `${String(viewport.largura)}×${String(viewport.altura)}`;
-      expect(esquerda, rotulo).toBeGreaterThanOrEqual(zona.x - 1);
-      expect(direita, rotulo).toBeLessThanOrEqual(zona.x + zona.largura + 1);
+      expect(caixa.x, rotulo).toBeGreaterThanOrEqual(zona.x - 1);
+      expect(caixa.x + caixa.largura, rotulo).toBeLessThanOrEqual(zona.x + zona.largura + 1);
     }
+  });
+
+  it('a conta do giro devolve mais que a largura da carta parada', () => {
+    expect(meiaLarguraGirada(120, 168, 0) * 2).toBeCloseTo(120, 6);
+    expect(meiaLarguraGirada(120, 168, 9) * 2).toBeGreaterThan(130);
   });
 
   it('a carta em repouso fica parcialmente abaixo da borda de baixo', () => {
@@ -195,6 +214,36 @@ describe('a carta focada não invade nada', () => {
    * carta **levantada**, que é maior que a em repouso. Uma composição que só
    * confere o repouso passa no teste e falha no dedo.
    */
+  /*
+   * O leque **inteiro**, parado, não pode encostar nas colunas de apoio.
+   *
+   * É a regra "mão nunca cobre HUD nem botões" da tarefa, medida com o giro.
+   */
+  it('o leque parado não encosta no HUD nem nos controles, em nenhum viewport', () => {
+    for (const viewport of VIEWPORTS_ALVO) {
+      const zonas = zonasDaTela(viewport);
+      const caixa = caixaDoLeque({ zona: zonas.maoDoJogador, total: OITO, focada: null });
+      if (caixa === null) continue;
+      const rotulo = `${String(viewport.largura)}×${String(viewport.altura)}`;
+      expect(seCruzam(caixa, zonas.hudDoJogador), `${rotulo} × HUD`).toBe(false);
+      expect(seCruzam(caixa, zonas.controlesDeTurno), `${rotulo} × controles`).toBe(false);
+      expect(seCruzam(caixa, zonas.arena), `${rotulo} × arena`).toBe(false);
+    }
+  });
+
+  it('e nem quando qualquer carta está focada, em nenhum viewport', () => {
+    for (const viewport of VIEWPORTS_ALVO) {
+      const zonas = zonasDaTela(viewport);
+      for (let indice = 0; indice < OITO; indice += 1) {
+        const caixa = caixaDoLeque({ zona: zonas.maoDoJogador, total: OITO, focada: indice });
+        if (caixa === null) continue;
+        const rotulo = `${String(viewport.largura)}×${String(viewport.altura)} foco ${String(indice)}`;
+        expect(seCruzam(caixa, zonas.hudDoJogador), `${rotulo} × HUD`).toBe(false);
+        expect(seCruzam(caixa, zonas.controlesDeTurno), `${rotulo} × controles`).toBe(false);
+      }
+    }
+  });
+
   it('não cobre o HUD do jogador nem os controles de turno, em nenhum viewport', () => {
     for (const viewport of VIEWPORTS_ALVO) {
       const zonas = zonasDaTela(viewport);
