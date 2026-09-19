@@ -815,3 +815,78 @@
 .partida--arena .inspetor__acoes {
   align-self: end;
 }
+
+/* ------------------------------------------------------------------ */
+/* Vitória                                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A arena desacelera e o lado do vencedor acende.
+ *
+ * O campo continua visível atrás: a última jogada é o que o jogador acabou de
+ * ver, e cobri-la com um retângulo apagaria o final da partida. O escurecido é
+ * leve, a luz é da classe de quem ganhou, e a caixa é peça do jogo — moldura
+ * dourada, fundo de material, nada de formulário.
+ */
+.partida--arena .resultado {
+  backdrop-filter: blur(2px) saturate(0.8);
+  background: radial-gradient(90% 90% at 50% 50%, rgb(6 8 14 / 68%), rgb(4 5 9 / 88%));
+}
+
+.partida--arena .resultado::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  z-index: -1;
+  block-size: 56%;
+  background: radial-gradient(
+    70% 100% at 50% var(--origem-da-luz, 100%),
+    var(--cor-do-vencedor, #c9a227),
+    transparent 70%
+  );
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  animation: vitoria-acende 900ms ease-out;
+}
+
+.partida--arena .resultado--proprio::before {
+  inset-block-end: 0;
+  --origem-da-luz: 100%;
+}
+
+.partida--arena .resultado--adversario::before {
+  inset-block-start: 0;
+  --origem-da-luz: 0%;
+}
+
+@keyframes vitoria-acende {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0.4;
+  }
+}
+
+.partida--arena .resultado__caixa {
+  border: 1px solid var(--cor-do-vencedor, #c9a227);
+  background:
+    linear-gradient(180deg, rgb(26 22 18 / 96%), rgb(12 11 10 / 97%)),
+    radial-gradient(80% 60% at 50% 0%, rgb(255 226 170 / 10%), transparent 70%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 60%),
+    0 18px 50px rgb(0 0 0 / 70%);
+}
+
+.partida--arena .resultado__titulo {
+  color: var(--cor-do-vencedor, #c9a227);
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--cor-do-vencedor, #c9a227) 60%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .partida--arena .resultado::before {
+    animation: none;
+  }
+}

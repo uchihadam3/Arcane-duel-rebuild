@@ -15,6 +15,7 @@ import { cartaVisivel, nomeDaCarta, nomeDaClasse } from '../partida/apresentacao
 import { textoDoErro } from '../partida/mensagens.js';
 import { REGRAS_UNIVERSAIS } from '@arcane-duel/rules-engine';
 
+import { paletaDaClasse } from '../arena/paleta.js';
 import { webglDisponivel } from '../arena/webgl.js';
 import { cartasConhecidas, roteirizar } from '../partida/roteiro.js';
 /*
@@ -684,6 +685,8 @@ export const PartidaLocal = ({
       {encerrada && (
         <ResultadoDaPartida
           vencedor={campeao === null ? null : nomeDe(String(campeao.id))}
+          lado={campeao === null ? null : campeao.id === noAparelho ? 'proprio' : 'adversario'}
+          corDaClasse={campeao === null ? null : paletaDaClasse(campeao.classe).cssLuz}
           classeVencedora={campeao === null ? null : nomeDaClasse(campeao.classe)}
           classePerdedora={derrotado === null ? null : nomeDaClasse(derrotado.classe)}
           turnos={partida.turno?.numero ?? 0}
