@@ -95,7 +95,13 @@ export default defineConfig([
   {
     files: ['scripts/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
-    languageOptions: { globals: globals.node },
+    /*
+     * Os scripts rodam em Node, mas alguns deles enviam funções para dentro de
+     * um navegador — `page.evaluate` executa o corpo lá, com `document` e
+     * `window` à disposição. Sem os dois conjuntos de globais, o lint acusaria
+     * de indefinido exatamente o que só existe do outro lado.
+     */
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       'no-console': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',

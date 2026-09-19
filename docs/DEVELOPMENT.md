@@ -104,6 +104,51 @@ prova:
 3. o HTML servido em https://uchihadam3.github.io/Arcane-duel-rebuild/
    referencia o bundle daquela build.
 
+### Conferir a arena num navegador de verdade
+
+```bash
+npm run build
+npm run verify:arena
+```
+
+O jsdom não faz layout, não tem WebGL e não sabe o que é uma safe area. Tudo o
+que a Etapa 6 promete — nada competitivo cortado, alvo de toque de 44 px,
+nenhuma exceção de WebGL — só se confere abrindo o cliente publicado num
+Chromium e medindo. Foi assim que a Etapa 5 achou dois defeitos que os testes
+em jsdom não pegavam, e foi assim que a Etapa 6 achou a recarga sozinha na
+primeira visita.
+
+A verificação abre Guerreiro contra Mago nas seis resoluções alvo e confere:
+canvas presente, nenhuma rolagem, nenhuma zona competitiva cortada, nenhum alvo
+de toque abaixo de 44 px e nenhum erro no console. O alvo de toque é medido pela
+área **clicável** — a carta mantém a proporção impressa da moldura, e quem
+cresce é o alcance.
+
+Quadros por segundo são **medidos e relatados**, não usados como nota. Este
+Chromium rasteriza por software: o número oscila com a carga da máquina e a
+mesma resolução já mediu 31 e 2 em execuções seguidas. Critério de aprovação é
+só o laço continuar vivo; a meta de sessenta quadros se mede em aparelho.
+
+O Playwright não entra no `package.json` — ele é ferramenta de bancada. Aponte
+`PLAYWRIGHT_MODULO` para uma instalação existente e, se precisar,
+`CHROMIUM_EXECUTAVEL` para o navegador.
+
+### A referência de regressão visual
+
+`docs/capturas/` guarda os momentos do **nosso** jogo, em 844×390: início, mão
+de cada classe, carta focada, inspetor, janela de Resposta, Carta de Classe
+Ativada, Carta de Classe Exaurida e vitória. Elas são produzidas jogando de
+verdade — nenhum estado é forjado e nenhum painel de depuração é aberto.
+
+A comparação é sempre contra nós mesmos. Nada aqui é comparado com o jogo do
+vídeo de referência, e nada dele entra no repositório.
+
+Momentos que uma partida automática pode não alcançar — Ruptura e Ultimate —
+são cobertos por teste em vez de captura: `batalha/momentos.test.tsx` monta a
+camada a partir do beat, que é exatamente o que a fila entrega quando eles
+acontecem. Uma captura que não existe não prova nada; um teste que monta o
+componente, sim.
+
 ### A sonda de versão
 
 https://uchihadam3.github.io/Arcane-duel-rebuild/assets/versao.html

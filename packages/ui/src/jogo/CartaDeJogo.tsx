@@ -38,6 +38,15 @@ export interface CartaDeJogoProps {
   readonly deitada?: boolean;
   readonly aoTocar?: (() => void) | undefined;
   readonly rotuloDeAcesso?: string | undefined;
+  /**
+   * O que preenche a janela de arte.
+   *
+   * O componente não sabe desenhar arte e não deve saber: quem monta a carta é
+   * que decide o que entra ali — a ilustração aprovada, quando existir, ou a
+   * composição procedural que a substitui até lá. Vazio, a janela fica com o
+   * fundo neutro.
+   */
+  readonly arte?: React.ReactNode | undefined;
 }
 
 const OVERLAY: Readonly<Partial<Record<EstadoDeSelecao, string>>> = {
@@ -61,13 +70,16 @@ export const CartaDeJogo = ({
   deitada = false,
   aoTocar,
   rotuloDeAcesso,
+  arte,
 }: CartaDeJogoProps): React.JSX.Element => {
   const overlay = OVERLAY[selecao];
   const conteudo = (
     <>
-      {/* A janela de arte fica vazia enquanto não houver ilustração da carta:
-          composição neutra por código, nunca arte inventada. */}
-      <span className="carta__arte" aria-hidden="true" />
+      {/* A janela de arte: a composição que quem monta a carta entregou, ou o
+          fundo neutro. Arte de habilidade nunca é inventada aqui. */}
+      <span className="carta__arte" aria-hidden="true">
+        {arte}
+      </span>
       <AssetImage assetId={moldura} alt="" className="carta__moldura" />
 
       {custo !== null && <span className="carta__custo">{custo}</span>}

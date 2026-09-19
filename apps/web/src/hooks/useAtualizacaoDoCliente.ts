@@ -99,10 +99,21 @@ export const useAtualizacaoDoCliente = (
    * aviso que chega primeiro — antes, e às vezes em vez, de `needRefresh`. Sem
    * escutá-lo, a página continuaria mostrando a build antiga até alguém fechar
    * e reabrir o aplicativo.
+   *
+   * Com uma ressalva, e ela custou uma recarga em toda primeira visita: quando
+   * a página abre **sem** controlador, o `clientsClaim` da primeira instalação
+   * dispara este mesmo evento. Ali não há build antiga para trocar — o
+   * documento acabou de vir da rede, já na versão nova — e recarregar só faz o
+   * aplicativo piscar e jogar fora a tela em que a pessoa estava.
+   *
+   * A verificação em navegador pegou isto: a tela de configuração sumia
+   * sozinha um segundo depois de abrir.
    */
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
+    const jaTinhaControlador = navigator.serviceWorker.controller !== null;
     const aoTrocar = (): void => {
+      if (!jaTinhaControlador) return;
       coordenador.current.aoTrocarDeControlador();
     };
     navigator.serviceWorker.addEventListener('controllerchange', aoTrocar);

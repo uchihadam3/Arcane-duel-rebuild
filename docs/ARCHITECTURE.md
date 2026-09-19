@@ -22,6 +22,12 @@ apps/simulator ────┤        │                ├── packages/shar
                    └── packages/vfx
 ```
 
+Three.js mora **só** em `apps/web`, e dentro dele só em `src/arena`. `vfx` e
+`audio` continuam puros: eles definem quando um beat toca, quanto ele dura e
+que som ele tem, sem conhecer canvas, DOM ou contexto gráfico. É o que permite
+testar ritmo, fila e mixagem em Node, e o que faz a mesma apresentação servir à
+arena tridimensional e ao campo em DOM que sobra quando o WebGL falha.
+
 A seta aponta para o que o pacote pode importar. As setas nunca voltam:
 
 - `shared-types` não importa ninguém;
@@ -38,6 +44,80 @@ A seta aponta para o que o pacote pode importar. As setas nunca voltam:
 Isso não é só convenção: o ESLint proíbe, nas camadas puras, importar React,
 Three.js ou qualquer pacote de apresentação, e proíbe tocar em `window`,
 `document` e `fetch` (veja `eslint.config.js`).
+
+## A arena tridimensional (Etapa 6)
+
+A batalha é uma cena de verdade: geometria, luz, sombra e cartas como objetos
+do mundo. Ela é montada em três camadas que não se misturam.
+
+| Camada        | Onde                                | O que faz                                          |
+| ------------- | ----------------------------------- | -------------------------------------------------- |
+| **cena**      | `arena/cena.ts`, `arena/efeitos.ts` | desenha; não recebe toque e não decide nada        |
+| **interação** | `batalha/CamadaDeInteracao.tsx`     | alvos de toque, foco de teclado e rótulo de acesso |
+| **tela**      | `batalha/HudDeCombate.tsx`, disco   | HUD preso aos cantos, que nunca se inclina         |
+
+### A planta é o contrato
+
+`arena/layout.ts` é a única fonte de "onde fica cada coisa", em unidades de
+mundo. A cena posiciona objetos a partir dela, a camada de interação projeta os
+mesmos pontos para a tela com a mesma câmera, e os efeitos perguntam por chave
+de âncora. Não existe uma coordenada de tela escrita à mão em lugar nenhum — e
+`arena/layout.test.ts` prova, nas seis resoluções alvo, que nenhuma zona do
+tabuleiro sai da tela.
+
+O tabuleiro é largo e raso porque a tela é. Os dois eixos recebem um fator de
+escala (`ESCALA`), e ajustar a proporção do campo é mexer em dois números.
+
+### A câmera é fixa, o enquadramento não
+
+Perspectiva oblíqua, posição e alvo constantes: nenhum gesto do jogador move a
+câmera. O que muda com a tela é a abertura. `enquadrar` projeta os pontos que
+não podem ficar de fora e resolve a lente para que o mais extremo deles encoste
+na margem — nos dois sentidos, porque caber não basta: a arena precisa ocupar o
+espaço que tem.
+
+A mão é a exceção deliberada. As cartas dela são grandes o bastante para serem
+lidas num telefone e, por isso, o pé sai pela borda de baixo — como na
+referência. O que nunca sai é o topo, onde ficam nome, custo e tipo.
+
+### A apresentação alcança o estado, nunca o contrário
+
+`packages/vfx` publica o vocabulário (`EventoDeApresentacao`), o ritmo e a fila.
+`apps/web/src/partida/roteiro.ts` traduz os eventos canônicos do motor em beats.
+O controlador expõe os eventos de cada comando e **segue**: não existe
+`await animacao()` antes de aplicar regra, e perder um lote deixa a partida
+feia, nunca errada.
+
+A privacidade atravessa junto. Um beat só recebe a identidade de uma carta
+quando o observador tem direito de conhecê-la; sem esse direito ele usa a
+família visual da classe, que já é pública — senão a **cor** do efeito contaria
+o que o texto não conta.
+
+### Uma linguagem visual por classe
+
+`partida/familia-visual.ts` diz de que família é cada uma das trinta cartas das
+Receitas 1 de Guerreiro e Mago. É direção de arte, não regra: nada ali muda
+custo, Dano, Impacto ou condição. Guerreiro e Mago não compartilham **nenhuma**
+família — duas classes com a mesma linguagem visual seriam a mesma classe na
+tela.
+
+As outras dez classes usam a linguagem genérica. Elas continuam jogáveis e
+legíveis; fingir um acabamento que ainda não foi desenhado seria pior.
+
+### Qualidade cede antes dos quadros
+
+O nível escolhido pelo jogador é o teto, não uma promessa: se a média do quadro
+passar de 33 ms por um segundo inteiro, a cena desce um degrau sozinha. Isso
+mexe em partícula, sombra, luz e resolução — e em nada mais. `ORCAMENTO_VISUAL`
+não tem, e um teste garante que não ganhe, nenhum campo de tempo: baixar a
+qualidade não pode virar vantagem competitiva.
+
+### Sem WebGL o jogo continua inteiro
+
+A projeção é matemática pura e não precisa de contexto gráfico. Sem canvas, a
+camada de interação desenha o campo sozinha; se o contexto se perde no meio da
+partida, a tela cai para o campo da Etapa 5 com as mesmas peças e os mesmos
+comandos. Tela preta nunca é resposta.
 
 ## Determinismo e replay
 

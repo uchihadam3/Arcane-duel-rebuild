@@ -90,6 +90,22 @@ export interface EstadoDaSessao {
   readonly noAparelho: PlayerId | null;
   /** Ruptura, Dano e fim de turno, para os avisos curtos da batalha. */
   readonly avisos: readonly AvisoDaPartida[];
+  /**
+   * Os eventos canônicos que o último comando produziu.
+   *
+   * Eles existem aqui para a apresentação poder roteirizar o que acabou de
+   * acontecer. O caminho é de mão única: o controlador publica e segue; ele
+   * **não** espera ninguém desenhar, e nenhuma animação pode adiar o estado.
+   */
+  readonly eventos: readonly EventoUniversal[];
+  /**
+   * O número do lote, que só cresce.
+   *
+   * Dois lotes idênticos em turnos diferentes precisam de identidade
+   * diferente, senão a fila de apresentação reaproveitaria o efeito do
+   * anterior e o segundo golpe não apareceria.
+   */
+  readonly lote: number;
   /** A última recusa do motor, para virar texto humano na tela. */
   readonly ultimoErro: ErroDeDominio | null;
 }
@@ -206,6 +222,8 @@ export const criarControladorLocal = (
     aguardando: configuracao.comeca,
     noAparelho: configuracao.comeca,
     avisos: [{ tipo: 'turno', jogador: configuracao.comeca, numero: 1 }],
+    eventos: [...iniciada.valor.eventos, ...aberta.valor.eventos],
+    lote: 1,
     ultimoErro: null,
   };
 
@@ -242,6 +260,8 @@ export const criarControladorLocal = (
       partida,
       etapa,
       aguardando,
+      eventos: [...eventos],
+      lote: sessao.lote + 1,
       // Trocar de jogador tira o aparelho das mãos de quem estava com ele: a
       // cobertura entra antes de qualquer projeção nova ser calculada.
       noAparelho: aguardando === sessao.noAparelho ? sessao.noAparelho : null,
@@ -251,14 +271,16 @@ export const criarControladorLocal = (
   };
 
   const recusar = (erro: ErroDeDominio): void => {
-    publicar({ ...sessao, ultimoErro: erro });
+    // Uma recusa não é evento de partida: nada aconteceu, e a fila não tem o
+    // que tocar. O lote fica onde estava.
+    publicar({ ...sessao, eventos: [], ultimoErro: erro });
   };
 
   return {
     estado: () => sessao,
 
     confirmarTroca: () => {
-      publicar({ ...sessao, noAparelho: sessao.aguardando });
+      publicar({ ...sessao, eventos: [], noAparelho: sessao.aguardando });
     },
 
     declarar: (pedido) => {
@@ -295,7 +317,13 @@ export const criarControladorLocal = (
         recusar(resposta.erro);
         return;
       }
-      publicar({ ...sessao, partida: resposta.valor.partida, ultimoErro: null });
+      publicar({
+        ...sessao,
+        partida: resposta.valor.partida,
+        eventos: [...resposta.valor.eventos],
+        lote: sessao.lote + 1,
+        ultimoErro: null,
+      });
     },
 
     ativarPassiva: (carta, escolhas) => {
@@ -312,7 +340,13 @@ export const criarControladorLocal = (
         recusar(resposta.erro);
         return;
       }
-      publicar({ ...sessao, partida: resposta.valor.partida, ultimoErro: null });
+      publicar({
+        ...sessao,
+        partida: resposta.valor.partida,
+        eventos: [...resposta.valor.eventos],
+        lote: sessao.lote + 1,
+        ultimoErro: null,
+      });
     },
 
     metamorfosear: (forma) => {
@@ -322,7 +356,13 @@ export const criarControladorLocal = (
         recusar(resposta.erro);
         return;
       }
-      publicar({ ...sessao, partida: resposta.valor.partida, ultimoErro: null });
+      publicar({
+        ...sessao,
+        partida: resposta.valor.partida,
+        eventos: [...resposta.valor.eventos],
+        lote: sessao.lote + 1,
+        ultimoErro: null,
+      });
     },
 
     responder: (pedido) => {
@@ -387,7 +427,7 @@ export const criarControladorLocal = (
     },
 
     limparErro: () => {
-      publicar({ ...sessao, ultimoErro: null });
+      publicar({ ...sessao, eventos: [], ultimoErro: null });
     },
 
     aoMudar: (ouvinte) => {

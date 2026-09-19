@@ -34,3 +34,4 @@ Thumbs.db
 
 # Build temporário da verificação do service worker.
 dist-verificacao-sw/
+capturas/

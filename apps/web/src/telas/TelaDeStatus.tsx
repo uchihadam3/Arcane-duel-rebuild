@@ -23,10 +23,12 @@ import { useOrientacao } from '../hooks/useOrientacao.js';
 
 const COMMIT_CURTO = __COMMIT_DO_CLIENTE__.slice(0, 7);
 
-/** O que a Etapa 5 entregou, em uma linha cada. */
+/** O que está entregue até aqui, em uma linha cada. */
 const ENTREGUE: readonly string[] = [
   'Motor de combate universal ativo',
-  'Protótipo local jogável do início ao fim',
+  'Partida local jogável do início ao fim',
+  'Arena tridimensional com câmera fixa',
+  'Apresentação, VFX e áudio de Guerreiro × Mago',
   'Privacidade hot-seat pela projeção',
   'Simulador headless e matriz 12 × 12 disponíveis',
 ];
@@ -54,8 +56,8 @@ export const TelaDeStatus = ({
     <div className="app">
       <header className="cabecalho">
         <h1>Arcane Duel</h1>
-        <span className="selo">Etapa 5 concluída</span>
-        <span className="selo">protótipo local jogável</span>
+        <span className="selo">Etapa 6 concluída</span>
+        <span className="selo">vertical slice Guerreiro × Mago</span>
         <BotaoDeInstalacao />
         <BotaoDeJogo tom="discreto" aoTocar={aoVoltar} dadoDeTeste="voltar-do-status">
           Voltar
@@ -70,7 +72,7 @@ export const TelaDeStatus = ({
               <dt>Motor</dt>
               <dd>Combate implementado</dd>
               <dt>Etapa atual</dt>
-              <dd>Etapa 5 concluída — protótipo local jogável</dd>
+              <dd>Etapa 6 concluída — vertical slice Guerreiro × Mago</dd>
               <dt>Interface de partida</dt>
               <dd>Partida local completa, do menu à tela de vitória</dd>
             </dl>

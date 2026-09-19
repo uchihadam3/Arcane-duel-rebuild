@@ -37,6 +37,50 @@ const NOME_DO_PASSO: Readonly<Record<string, string>> = {
   finalizacao: 'Finalização',
 };
 
+/**
+ * O Momentum como objeto, não como número.
+ *
+ * Três brasas metálicas numa trilha. Ganhar acende uma; gastar apaga. O número
+ * fica no rótulo acessível — quem precisa dele continua tendo, e quem joga
+ * olhando vê a ficha acender.
+ */
+const MomentumDoGuerreiro = ({ momentum }: { readonly momentum: number }): React.JSX.Element => (
+  <div className="recurso recurso--momentum" data-recurso="momentum">
+    <span className="recurso__rotulo">Momentum</span>
+    <span className="recurso__pecas" aria-label={`Momentum: ${String(momentum)} de 3`}>
+      {[0, 1, 2].map((indice) => (
+        <span
+          key={indice}
+          className={`brasa${indice < momentum ? ' brasa--acesa' : ''}`}
+          aria-hidden="true"
+        />
+      ))}
+    </span>
+  </div>
+);
+
+/**
+ * A Mana como medidor arcano de seis segmentos.
+ *
+ * Recuperar preenche de baixo para cima, gastar esvazia. É deliberadamente
+ * diferente das brasas do Guerreiro: as duas classes não podem ler igual.
+ */
+const ManaDoMago = ({ mana }: { readonly mana: number }): React.JSX.Element => (
+  <div className="recurso recurso--mana" data-recurso="mana">
+    <span className="recurso__rotulo">Mana</span>
+    <span className="recurso__pecas" aria-label={`Mana: ${String(mana)} de 6`}>
+      {[0, 1, 2, 3, 4, 5].map((indice) => (
+        <span
+          key={indice}
+          className={`orbe${indice < mana ? ' orbe--cheio' : ''}`}
+          aria-hidden="true"
+        />
+      ))}
+    </span>
+    <span className="recurso__numero">{mana}</span>
+  </div>
+);
+
 export interface RecursoDaClasseProps {
   readonly recurso: RecursoProjetado;
   /** A Guarda atual: o combustível do Bárbaro vive no estado do jogador. */
@@ -46,10 +90,10 @@ export interface RecursoDaClasseProps {
 export const RecursoDaClasse = ({ recurso, guarda }: RecursoDaClasseProps): React.JSX.Element => {
   switch (recurso.classe) {
     case 'guerreiro':
-      return <Fichas rotulo="Momentum" total={3} cheias={recurso.momentum} tom="acao" />;
+      return <MomentumDoGuerreiro momentum={recurso.momentum} />;
 
     case 'mago':
-      return <Medidor rotulo="Mana" valor={recurso.mana} maximo={6} tom="acao" compacto />;
+      return <ManaDoMago mana={recurso.mana} />;
 
     case 'clerigo':
       return (

@@ -2,13 +2,20 @@ import type { CardId } from '@arcane-duel/shared-types';
 import { BotaoDeJogo, CartaDeJogo } from '@arcane-duel/ui';
 
 import { MOLDURA_DO_TIPO, NOME_DO_TIPO, cartaVisivel } from '../partida/apresentacao.js';
+import { SigiloDaCarta } from './SigiloDaCarta.js';
 
 /*
  * A inspeção de carta.
  *
  * Coluna lateral, e não modal: durante uma sequência de Ação o jogador precisa
- * continuar vendo os três espaços centrais. O painel cobre a lateral, nunca o
- * miolo do campo.
+ * continuar vendo os três espaços centrais. A coluna só toma largura enquanto
+ * está aberta, e o enquadramento da arena é recalculado a partir da área que
+ * sobra — abrir a inspeção reenquadra o campo sem cortar nada e sem mover a
+ * câmera.
+ *
+ * A carta aqui é a mesma do campo, em tamanho de leitura e com tudo o que está
+ * impresso nela. Nome, custo, Dano, Impacto e cooldown continuam sendo texto
+ * por cima da moldura aprovada, nunca pixels dentro dela.
  */
 
 export interface AcaoDoInspetor {
@@ -55,7 +62,18 @@ export const InspetorDeCarta = ({
           nome={visivel.nome}
           tipo={NOME_DO_TIPO[visivel.tipo]}
           moldura={MOLDURA_DO_TIPO[visivel.tipo]}
+          custo={
+            visivel.custo === null
+              ? null
+              : `${String(visivel.custo.valor)}${visivel.custo.recurso === null ? '' : '+'}`
+          }
+          dano={visivel.dano}
+          impacto={visivel.impacto}
+          cooldown={visivel.cooldown}
           tamanho="inspecao"
+          arte={
+            <SigiloDaCarta id={String(visivel.id)} tipo={visivel.tipo} classe={visivel.classe} />
+          }
         />
       </div>
 

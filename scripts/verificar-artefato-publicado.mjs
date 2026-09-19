@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { RAIZ } from './paths.mjs';
@@ -65,7 +65,7 @@ exigir(
   `o bundle não carrega o commit em construção (${commitAtual.slice(0, 7)})`,
 );
 exigir(codigo.includes('Jogar local'), 'o bundle não oferece "Jogar local"');
-exigir(codigo.includes('Etapa 5'), 'o bundle não menciona a Etapa 5');
+exigir(codigo.includes('Etapa 6'), 'o bundle não menciona a Etapa 6');
 
 /* 3. E não é um fantasma da fundação do projeto. */
 for (const fantasma of ['COMBATE NÃO IMPLEMENTADO', 'interface jogável ainda não implementada']) {
@@ -86,6 +86,20 @@ exigir(
  */
 exigir(existsSync(join(dist, '404.html')), 'falta 404.html, o fallback de rota do Pages');
 exigir(existsSync(join(dist, 'sw.js')), 'falta sw.js no artefato');
+
+/*
+ * A arena viaja em pedaço próprio.
+ *
+ * Three.js, a cena e as texturas de carta somam mais que todo o resto do
+ * cliente, e quem abre o menu não precisa de nada disso. Se um dia a arena
+ * voltar para o pacote principal, o aplicativo passa a baixar meio megabyte
+ * antes de mostrar o botão "Jogar local" — e ninguém perceberia.
+ */
+const pedacos = readdirSync(join(dist, 'app'));
+exigir(
+  pedacos.some((arquivo) => arquivo.startsWith('ArenaDeBatalha') && arquivo.endsWith('.js')),
+  'a arena não saiu em pedaço próprio: ela voltou para o pacote principal',
+);
 
 /*
  * 5. A sonda de versão vai junto, e diz a verdade.
@@ -112,7 +126,8 @@ console.log('artefato conferido:');
 console.log(`  commit ................ ${commitAtual}`);
 console.log(`  bundle ................ ${referencias.join(', ')}`);
 console.log('  "Jogar local" ......... presente');
-console.log('  Etapa 5 ............... presente');
+console.log('  Etapa 6 ............... presente');
 console.log('  textos da fundação .... ausentes');
 console.log('  404.html e sw.js ...... presentes');
 console.log('  sonda de versão ....... assets/versao.html');
+console.log('  arena em pedaço próprio  sim');

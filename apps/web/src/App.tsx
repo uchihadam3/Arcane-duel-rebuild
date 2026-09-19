@@ -6,6 +6,7 @@ import { BarraDeAtualizacao } from './components/BarraDeAtualizacao.js';
 import { useAtualizacaoDoCliente } from './hooks/useAtualizacaoDoCliente.js';
 import { useOrientacao } from './hooks/useOrientacao.js';
 import type { ConfiguracaoLocal as Configuracao } from './partida/controlador.js';
+import { ProvedorDePreferencias } from './preferencias/preferencias.js';
 import { ConfiguracaoLocal } from './telas/ConfiguracaoLocal.js';
 import { MenuPrincipal } from './telas/MenuPrincipal.js';
 import { PartidaLocal } from './telas/PartidaLocal.js';
@@ -46,61 +47,63 @@ export const App = (): React.JSX.Element => {
 
   return (
     <AssetProvider base={import.meta.env.BASE_URL}>
-      <div className={`raiz raiz--${tela.nome}`}>
-        <BarraDeAtualizacao atualizacao={atualizacao} />
+      <ProvedorDePreferencias>
+        <div className={`raiz raiz--${tela.nome}`}>
+          <BarraDeAtualizacao atualizacao={atualizacao} />
 
-        {tela.nome === 'menu' && (
-          <MenuPrincipal
-            commitCurto={COMMIT_CURTO}
-            aoJogarLocal={() => {
-              setTela({ nome: 'configuracao' });
-            }}
-            aoAbrirStatus={() => {
-              setTela({ nome: 'status' });
-            }}
-          />
-        )}
+          {tela.nome === 'menu' && (
+            <MenuPrincipal
+              commitCurto={COMMIT_CURTO}
+              aoJogarLocal={() => {
+                setTela({ nome: 'configuracao' });
+              }}
+              aoAbrirStatus={() => {
+                setTela({ nome: 'status' });
+              }}
+            />
+          )}
 
-        {tela.nome === 'configuracao' && (
-          <ConfiguracaoLocal
-            aoVoltar={() => {
-              setTela({ nome: 'menu' });
-            }}
-            aoComecar={(configuracao) => {
-              setTela({ nome: 'partida', configuracao, semente: `local-${String(Date.now())}` });
-            }}
-          />
-        )}
+          {tela.nome === 'configuracao' && (
+            <ConfiguracaoLocal
+              aoVoltar={() => {
+                setTela({ nome: 'menu' });
+              }}
+              aoComecar={(configuracao) => {
+                setTela({ nome: 'partida', configuracao, semente: `local-${String(Date.now())}` });
+              }}
+            />
+          )}
 
-        {tela.nome === 'partida' && (
-          <PartidaLocal
-            configuracao={tela.configuracao}
-            semente={tela.semente}
-            aoSair={() => {
-              setTela({ nome: 'menu' });
-            }}
-            aoRevanche={() => {
-              // Revanche mantém as classes e pergunta de novo quem começa: o
-              // documento não define alternância oficial, e a interface não a
-              // inventa.
-              setTela({ nome: 'configuracao' });
-            }}
-          />
-        )}
+          {tela.nome === 'partida' && (
+            <PartidaLocal
+              configuracao={tela.configuracao}
+              semente={tela.semente}
+              aoSair={() => {
+                setTela({ nome: 'menu' });
+              }}
+              aoRevanche={() => {
+                // Revanche mantém as classes e pergunta de novo quem começa: o
+                // documento não define alternância oficial, e a interface não a
+                // inventa.
+                setTela({ nome: 'configuracao' });
+              }}
+            />
+          )}
 
-        {tela.nome === 'status' && (
-          <TelaDeStatus
-            aoVoltar={() => {
-              setTela({ nome: 'menu' });
-            }}
-            estadoDaAtualizacao={textoDaAtualizacao}
-            aoVerificarAtualizacao={atualizacao.verificarAgora}
-            aoForcarAtualizacao={atualizacao.aplicarAgora}
-          />
-        )}
+          {tela.nome === 'status' && (
+            <TelaDeStatus
+              aoVoltar={() => {
+                setTela({ nome: 'menu' });
+              }}
+              estadoDaAtualizacao={textoDaAtualizacao}
+              aoVerificarAtualizacao={atualizacao.verificarAgora}
+              aoForcarAtualizacao={atualizacao.aplicarAgora}
+            />
+          )}
 
-        <AvisoDeOrientacao visivel={orientacao === 'portrait' && tela.nome === 'partida'} />
-      </div>
+          <AvisoDeOrientacao visivel={orientacao === 'portrait' && tela.nome === 'partida'} />
+        </div>
+      </ProvedorDePreferencias>
     </AssetProvider>
   );
 };

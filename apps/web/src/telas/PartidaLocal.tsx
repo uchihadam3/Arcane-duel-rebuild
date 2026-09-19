@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { CardId, IndiceDeAcao, ModoDeUso } from '@arcane-duel/shared-types';
 import type { OpcaoDeEscolha, PedidoDeAcao, SituacaoDaJogada } from '@arcane-duel/gameplay/jogo';
 import {
@@ -13,6 +13,25 @@ import type { ConfiguracaoLocal } from '../partida/controlador.js';
 import { usePartidaLocal } from '../hooks/usePartidaLocal.js';
 import { cartaVisivel, nomeDaCarta, nomeDaClasse } from '../partida/apresentacao.js';
 import { textoDoErro } from '../partida/mensagens.js';
+import { REGRAS_UNIVERSAIS } from '@arcane-duel/rules-engine';
+
+import { webglDisponivel } from '../arena/webgl.js';
+import { cartasConhecidas, roteirizar } from '../partida/roteiro.js';
+/*
+ * A arena entra por `lazy`.
+ *
+ * Three.js, a cena, os efeitos e as texturas de carta somam mais que todo o
+ * resto do cliente. Menu, configuração e tela de status não precisam de nada
+ * disso — o download só acontece quando alguém entra numa partida, e só
+ * quando há WebGL para desenhá-la.
+ */
+const ArenaDeBatalha = lazy(async () => {
+  const modulo = await import('../batalha/ArenaDeBatalha.js');
+  return { default: modulo.ArenaDeBatalha };
+});
+
+import type { AcaoDoDisco } from '../batalha/DiscoDeTurno.js';
+import { useApresentacao } from '../batalha/useApresentacao.js';
 import { AvisoDeRuptura } from '../batalha/AvisoDeRuptura.js';
 import { BannerDeTurno } from '../batalha/BannerDeTurno.js';
 import { CampoDeBatalha } from '../batalha/CampoDeBatalha.js';
@@ -60,6 +79,14 @@ export interface PartidaLocalProps {
   readonly semente: string;
   readonly aoSair: () => void;
   readonly aoRevanche: () => void;
+  /**
+   * Se a arena tridimensional está disponível.
+   *
+   * O padrão pergunta ao navegador. O parâmetro existe para o teste poder
+   * montar os dois caminhos — e porque a resposta precisa ser injetável de
+   * qualquer forma: o contexto pode se perder no meio da partida.
+   */
+  readonly cenaDisponivel?: boolean;
 }
 
 export const PartidaLocal = ({
@@ -67,8 +94,11 @@ export const PartidaLocal = ({
   semente,
   aoSair,
   aoRevanche,
+  cenaDisponivel,
 }: PartidaLocalProps): React.JSX.Element => {
   const { sessao, visao, controle } = usePartidaLocal(configuracao, semente);
+  const apresentacao = useApresentacao();
+  const [cenaAtiva, setCenaAtiva] = useState(() => cenaDisponivel ?? webglDisponivel());
   const [focada, setFocada] = useState<CardId | null>(null);
   const [jogada, setJogada] = useState<JogadaEmCurso | null>(null);
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null);
@@ -76,6 +106,43 @@ export const PartidaLocal = ({
   const [escolhaDaResposta, setEscolhaDaResposta] = useState<EscolhaDaResposta | null>(null);
 
   const { partida, etapa, aguardando, noAparelho, avisos, ultimoErro } = sessao;
+
+  /*
+   * Do motor para a tela, uma vez por lote.
+   *
+   * O estado já mudou quando isto roda. A fila só recebe o que desenhar e
+   * segue no relógio dela; nenhum comando espera um beat terminar, e perder um
+   * lote deixaria a partida feia, nunca errada.
+   */
+  const ultimoLote = useRef(0);
+  const enfileirar = apresentacao.enfileirar;
+  useEffect(() => {
+    if (sessao.lote === ultimoLote.current || sessao.eventos.length === 0) return;
+    /*
+     * Enquanto ninguém está com o aparelho, o lote **espera**.
+     *
+     * Na troca de jogador não existe observador, e sem observador não há para
+     * quem apresentar — nem projeção calculada. Guardar o lote e tocá-lo
+     * depois de a pessoa confirmar é o que faz o próximo jogador ver o ataque
+     * que acabou de resolver, em vez de encontrar o campo já mudado.
+     */
+    if (visao === null || noAparelho === null) return;
+    ultimoLote.current = sessao.lote;
+    const outro = visao.jogadores.find((item) => item.id !== noAparelho);
+    enfileirar(
+      roteirizar(
+        sessao.eventos,
+        {
+          observador: noAparelho,
+          classeDoObservador:
+            visao.jogadores.find((item) => item.id === noAparelho)?.classe ?? 'guerreiro',
+          classeDoAdversario: outro?.classe ?? 'mago',
+          cartasVisiveis: cartasConhecidas(visao),
+        },
+        String(sessao.lote),
+      ),
+    );
+  }, [sessao.lote, sessao.eventos, visao, noAparelho, enfileirar]);
 
   const eu = visao?.jogadores.find((item) => item.id === noAparelho) ?? null;
   const adversario = visao?.jogadores.find((item) => item.id !== noAparelho) ?? null;
@@ -300,12 +367,49 @@ export const PartidaLocal = ({
           partida.jogadores.find((item) => item.id === noAparelho) ?? partida.jogadores[0],
         ) ?? null);
 
+  /*
+   * O que o disco de turno oferece agora.
+   *
+   * Ele não decide nada: apenas mostra qual dos comandos do controlador está
+   * disponível na etapa atual, e diz "aguardando" quando a vez é do outro.
+   */
+  const acaoDoDisco: AcaoDoDisco = !minhaVez
+    ? 'aguardando'
+    : etapa.tipo === 'complementos'
+      ? 'enviar-acao'
+      : etapa.tipo === 'acao'
+        ? 'encerrar-turno'
+        : 'aguardando';
+
+  /*
+   * Quando a coluna lateral precisa existir.
+   *
+   * Ela é coluna, e não modal: enquanto está fechada a arena recebe a tela
+   * inteira, e o enquadramento é recalculado sozinho quando ela abre — sem
+   * cortar nada e sem mover a câmera.
+   */
+  const lateralAberta =
+    focada !== null ||
+    jogada !== null ||
+    escolhaDaResposta !== null ||
+    (etapa.tipo === 'resposta' && minhaVez) ||
+    (etapa.tipo === 'escolha-pendente' && minhaVez);
+
   const avisoDeRuptura = avisos.find((aviso) => aviso.tipo === 'ruptura');
   const avisoDeTurno = avisos.find((aviso) => aviso.tipo === 'turno');
   const encerrada = partida.situacao === 'encerrada';
 
   return (
-    <div className="partida" data-teste="partida">
+    <div
+      className={[
+        'partida',
+        cenaAtiva ? 'partida--arena' : '',
+        lateralAberta ? 'partida--lateral-aberta' : '',
+      ]
+        .filter((parte) => parte !== '')
+        .join(' ')}
+      data-teste="partida"
+    >
       <div className="partida__topo">
         <BotaoDeJogo
           tom="discreto"
@@ -322,20 +426,57 @@ export const PartidaLocal = ({
       </div>
 
       <div className="partida__corpo">
-        <CampoDeBatalha
-          visao={visao}
-          eu={eu}
-          adversario={adversario}
-          nomeDoJogador={nomeDe(String(eu.id))}
-          nomeDoAdversario={nomeDe(String(adversario.id))}
-          focada={focada}
-          jogaveis={jogaveis}
-          reservado={reservado}
-          emFoco={indiceDaResposta}
-          aoFocarCarta={(carta) => {
-            setFocada(carta);
-          }}
-        />
+        {cenaAtiva ? (
+          <Suspense fallback={<div className="arena arena--carregando" data-teste="campo" />}>
+            <ArenaDeBatalha
+              visao={visao}
+              eu={eu}
+              adversario={adversario}
+              nomeDoJogador={nomeDe(String(eu.id))}
+              nomeDoAdversario={nomeDe(String(adversario.id))}
+              focada={focada}
+              jogaveis={jogaveis}
+              respondendo={indiceDaResposta}
+              momentos={apresentacao.momentos}
+              enfaseProprio={apresentacao.enfaseProprio}
+              enfaseAdversario={apresentacao.enfaseAdversario}
+              bloqueada={apresentacao.bloqueada}
+              comCena={cenaAtiva}
+              vidaMaxima={REGRAS_UNIVERSAIS.vidaInicial}
+              guardaMaxima={REGRAS_UNIVERSAIS.guardaInicial}
+              acaoDoDisco={acaoDoDisco}
+              aoTocarDisco={() => {
+                apresentacao.destravarAudio();
+                if (acaoDoDisco === 'enviar-acao') controle.enviarAcao();
+                if (acaoDoDisco === 'encerrar-turno') controle.encerrarTurno();
+              }}
+              aoFocarCarta={(carta) => {
+                apresentacao.destravarAudio();
+                setFocada(carta);
+              }}
+              aoFalharCena={() => {
+                // Contexto perdido não derruba a partida: a cena sai, a camada
+                // em DOM continua com o campo inteiro e o jogo segue.
+                setCenaAtiva(false);
+              }}
+            />
+          </Suspense>
+        ) : (
+          <CampoDeBatalha
+            visao={visao}
+            eu={eu}
+            adversario={adversario}
+            nomeDoJogador={nomeDe(String(eu.id))}
+            nomeDoAdversario={nomeDe(String(adversario.id))}
+            focada={focada}
+            jogaveis={jogaveis}
+            reservado={reservado}
+            emFoco={indiceDaResposta}
+            aoFocarCarta={(carta) => {
+              setFocada(carta);
+            }}
+          />
+        )}
 
         <div className="partida__lateral">
           {jogada !== null ? (
@@ -420,32 +561,39 @@ export const PartidaLocal = ({
             />
           )}
 
-          <div className="partida__controles">
-            {etapa.tipo === 'complementos' && minhaVez && (
-              <BotaoDeJogo
-                tom="principal"
-                aoTocar={() => {
-                  controle.enviarAcao();
-                }}
-                largo
-                dadoDeTeste="enviar-acao"
-              >
-                Enviar Ação
-              </BotaoDeJogo>
-            )}
-            {etapa.tipo === 'acao' && minhaVez && (
-              <BotaoDeJogo
-                tom="principal"
-                aoTocar={() => {
-                  controle.encerrarTurno();
-                }}
-                largo
-                dadoDeTeste="encerrar-turno"
-              >
-                Encerrar turno
-              </BotaoDeJogo>
-            )}
-          </div>
+          {/*
+            Na arena o disco de turno é quem carrega estes dois comandos: ele
+            fica ao alcance do polegar e junta estado e ação no mesmo lugar.
+            Sem a cena, eles voltam a ser botões da coluna lateral.
+          */}
+          {!cenaAtiva && (
+            <div className="partida__controles">
+              {etapa.tipo === 'complementos' && minhaVez && (
+                <BotaoDeJogo
+                  tom="principal"
+                  aoTocar={() => {
+                    controle.enviarAcao();
+                  }}
+                  largo
+                  dadoDeTeste="enviar-acao"
+                >
+                  Enviar Ação
+                </BotaoDeJogo>
+              )}
+              {etapa.tipo === 'acao' && minhaVez && (
+                <BotaoDeJogo
+                  tom="principal"
+                  aoTocar={() => {
+                    controle.encerrarTurno();
+                  }}
+                  largo
+                  dadoDeTeste="encerrar-turno"
+                >
+                  Encerrar turno
+                </BotaoDeJogo>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -463,15 +611,26 @@ export const PartidaLocal = ({
         </div>
       )}
 
-      <BannerDeTurno
-        texto={
-          avisoDeTurno?.tipo === 'turno' ? `Turno de ${nomeDe(String(avisoDeTurno.jogador))}` : null
-        }
-      />
-      <AvisoDeRuptura
-        bonus={avisoDeRuptura?.tipo === 'ruptura' ? avisoDeRuptura.bonus : null}
-        alvo={avisoDeRuptura?.tipo === 'ruptura' ? nomeDe(String(avisoDeRuptura.alvo)) : null}
-      />
+      {/*
+        Com a arena no ar, a faixa de turno e a Ruptura são desenhadas pela
+        camada de momentos, sobre o campo e no ritmo da fila. Sem ela, valem
+        os avisos da Etapa 5 — nunca os dois, que seriam dois avisos iguais.
+      */}
+      {!cenaAtiva && (
+        <>
+          <BannerDeTurno
+            texto={
+              avisoDeTurno?.tipo === 'turno'
+                ? `Turno de ${nomeDe(String(avisoDeTurno.jogador))}`
+                : null
+            }
+          />
+          <AvisoDeRuptura
+            bonus={avisoDeRuptura?.tipo === 'ruptura' ? avisoDeRuptura.bonus : null}
+            alvo={avisoDeRuptura?.tipo === 'ruptura' ? nomeDe(String(avisoDeRuptura.alvo)) : null}
+          />
+        </>
+      )}
 
       {confirmacao !== null && (
         <div className="confirmacao" role="dialog" aria-modal="true" data-teste="confirmacao">

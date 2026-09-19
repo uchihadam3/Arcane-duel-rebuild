@@ -5,6 +5,7 @@ import { App } from './App.js';
 import './styles/global.css';
 import './styles/app.css';
 import './styles/jogo.css';
+import './styles/arena.css';
 
 const raiz = document.getElementById('raiz');
 if (raiz === null) {
