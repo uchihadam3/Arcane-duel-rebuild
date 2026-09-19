@@ -7,8 +7,8 @@ import type { MusicaAdaptativa } from './musica.js';
 import { criarMusica, tensaoDaPartida } from './musica.js';
 import type { Destino } from './sintese.js';
 import { criarAmbienteDeArena } from './sintese.js';
-import type { Barramento, EventoDaDemo } from './vozes.js';
-import { BARRAMENTO_DO_EVENTO, DUCKING_DO_EVENTO, tocarVoz } from './vozes.js';
+import type { Barramento, Compasso, EventoDaDemo } from './vozes.js';
+import { BARRAMENTO_DO_EVENTO, DUCKING_DO_EVENTO, agendaDasVozes, tocarVoz } from './vozes.js';
 
 /*
  * O palco sonoro.
@@ -30,8 +30,14 @@ import { BARRAMENTO_DO_EVENTO, DUCKING_DO_EVENTO, tocarVoz } from './vozes.js';
 export interface PalcoSonoro {
   readonly tocarInterface: (evento: EventoDaDemo) => void;
   readonly tocarEfeito: (evento: EventoDaDemo) => void;
-  /** Lê o estado novo e toca o que ele significa. */
-  readonly reagir: (estado: EstadoDaDemo) => void;
+  /**
+   * Lê o estado novo e toca o que ele significa, **no compasso da fila**.
+   *
+   * O log chega inteiro num quadro; as vozes saem uma a uma. Sem o compasso,
+   * um lance com Ruptura, Dano e quebra de Guarda sairia como um único
+   * estouro, e nenhuma das três informações chegaria.
+   */
+  readonly reagir: (estado: EstadoDaDemo, compasso?: Omit<Compasso, 'agoraMs'>) => void;
   readonly silenciar: (silencioso: boolean) => void;
   readonly silencioso: () => boolean;
   readonly descartar: () => void;
@@ -132,12 +138,22 @@ const vozesDoEvento = (evento: EventoUniversal): readonly EventoDaDemo[] => {
 
 const VIDA_INICIAL = 30;
 
+/**
+ * O espaço mínimo entre duas vozes de um mesmo lote.
+ *
+ * É o passo da cascata visual: som e imagem contam a mesma história, e no
+ * mesmo compasso.
+ */
+const ESPACO_MINIMO_ENTRE_VOZES_MS = 210;
+
 export const criarPalco = (): PalcoSonoro => {
   let grafo: Grafo | null = null;
   let destravado = false;
   let mudo = false;
   let ultimoLote = 0;
   let musicaNoAr = false;
+  /** As vozes deste lote que ainda não saíram. */
+  const agendadas: ReturnType<typeof setTimeout>[] = [];
 
   const ativo = (): Grafo | null => {
     if (grafo !== null) return grafo;
@@ -198,7 +214,7 @@ export const criarPalco = (): PalcoSonoro => {
       tocar(evento);
     },
 
-    reagir: (estado) => {
+    reagir: (estado, compasso) => {
       const atual = ativo();
       if (atual === null) return;
 
@@ -223,16 +239,42 @@ export const criarPalco = (): PalcoSonoro => {
       ultimoLote = estado.lote;
 
       const vistos = new Set<EventoDaDemo>();
+      const vozes: EventoDaDemo[] = [];
       for (const evento of estado.eventos) {
         for (const voz of vozesDoEvento(evento)) {
           if (vistos.has(voz)) continue;
           vistos.add(voz);
-          tocar(voz);
+          vozes.push(voz);
         }
       }
 
       if (estado.etapa.tipo === 'fim') {
-        tocar(estado.visao.desfecho?.vencedor === HUMANO ? 'vitoria' : 'derrota');
+        vozes.push(estado.visao.desfecho?.vencedor === HUMANO ? 'vitoria' : 'derrota');
+      }
+
+      /*
+       * As vozes do lote anterior perdem a vez.
+       *
+       * Se um lance novo chega antes de o anterior terminar de soar, insistir
+       * nas vozes velhas sobrepõe duas histórias. A última sempre ganha.
+       */
+      for (const bilhete of agendadas) clearTimeout(bilhete);
+      agendadas.length = 0;
+
+      for (const { voz, atrasoMs } of agendaDasVozes(vozes, {
+        aPartirDeMs: compasso?.aPartirDeMs ?? null,
+        passoMs: compasso?.passoMs ?? ESPACO_MINIMO_ENTRE_VOZES_MS,
+        agoraMs: typeof performance === 'undefined' ? 0 : performance.now(),
+      })) {
+        if (atrasoMs <= 0) {
+          tocar(voz);
+          continue;
+        }
+        agendadas.push(
+          setTimeout(() => {
+            tocar(voz);
+          }, atrasoMs),
+        );
       }
     },
 
@@ -246,6 +288,8 @@ export const criarPalco = (): PalcoSonoro => {
     silencioso: () => mudo,
 
     descartar: () => {
+      for (const bilhete of agendadas) clearTimeout(bilhete);
+      agendadas.length = 0;
       const atual = grafo;
       grafo = null;
       musicaNoAr = false;

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  type DiferencaDeCena,
-  duracaoDaApresentacao,
-  movimentosDaDiferenca,
-} from './apresentacao.js';
+import { type DiferencaDeCena, apresentar, movimentosDaDiferenca } from './apresentacao.js';
 
 /*
  * O diretor de apresentação, conferido.
@@ -202,9 +198,9 @@ describe('Exaurir tira a carta do campo de verdade', () => {
   });
 });
 
-describe('os movimentos se encadeiam em vez de se atropelarem', () => {
-  it('o que sai da mão vem antes do que vai para o cooldown', () => {
-    const movimentos = movimentosDaDiferenca({
+describe('a fila conta um beat principal por vez', () => {
+  const jogadaComCooldown = (): ReturnType<typeof movimentosDaDiferenca> =>
+    movimentosDaDiferenca({
       antes: cena([['c:W15', 'acao']], ['c:W08']),
       depois: cena(
         [
@@ -214,40 +210,109 @@ describe('os movimentos se encadeiam em vez de se atropelarem', () => {
         [],
       ),
     });
-    const especies = movimentos.map((m) => m.especie);
+
+  it('o que sai da mão vem antes do que se arruma no tabuleiro', () => {
+    const { movimentos } = apresentar(jogadaComCooldown());
+    const especies = movimentos.map((movimento) => movimento.especie);
     expect(especies.indexOf('mao-para-campo')).toBeLessThan(
       especies.indexOf('campo-para-cooldown'),
     );
   });
 
-  it('cada movimento começa depois do anterior, mas antes de ele acabar', () => {
-    const movimentos = movimentosDaDiferenca({
-      antes: cena([['c:W15', 'acao']], ['c:W08']),
-      depois: cena(
-        [
-          ['c:W08', 'acao'],
-          ['c:W15', 'cooldown:3'],
-        ],
-        [],
-      ),
-    });
-    expect(movimentos[0]?.atrasoMs).toBe(0);
-    expect(movimentos[1]?.atrasoMs).toBeGreaterThan(0);
-    expect(movimentos[1]?.atrasoMs).toBeLessThan(780);
+  /*
+   * Este é o teste que a revisão pediu, e ele olha a **ordem**.
+   *
+   * Um teste de duração total não distingue "a carta assentou e então desceu
+   * para o cooldown" de "as duas coisas aconteceram juntas" — e era essa
+   * sobreposição que tornava o lance ilegível no aparelho.
+   */
+  it('o movimento seguinte só começa depois de o anterior terminar', () => {
+    const { movimentos } = apresentar(jogadaComCooldown());
+    const [primeiro, segundo] = movimentos;
+    if (primeiro === undefined || segundo === undefined) throw new Error('faltou movimento');
+    expect(primeiro.atrasoMs).toBe(0);
+    expect(segundo.atrasoMs).toBeGreaterThanOrEqual(primeiro.atrasoMs + primeiro.duracaoMs);
   });
 
-  it('a apresentação inteira dura o último atraso mais um voo', () => {
+  it('o voo da mão é contado em cinco beats, e não num salto de 780 ms', () => {
+    const { movimentos, fila } = apresentar(jogadaComCooldown());
+    const voo = movimentos.find((movimento) => movimento.especie === 'mao-para-campo');
+    expect(voo?.duracaoMs).toBeGreaterThan(1200);
+    expect(fila.map((beat) => beat.especie).slice(0, 5)).toEqual([
+      'foco',
+      'levantar',
+      'viagem',
+      'encaixe',
+      'leitura',
+    ]);
+  });
+
+  it('o efeito só entra depois da pausa de leitura do voo', () => {
+    const { fila, inicioDoEfeitoMs } = apresentar(jogadaComCooldown(), { efeito: 'comum' });
+    const leitura = fila.find((beat) => beat.especie === 'leitura');
+    expect(inicioDoEfeitoMs).not.toBeNull();
+    expect(inicioDoEfeitoMs ?? 0).toBeGreaterThanOrEqual(leitura?.fimMs ?? 0);
+  });
+
+  it('o número do HUD espera o beat de resultado', () => {
+    const { inicioDoEfeitoMs, inicioDoResultadoMs } = apresentar(jogadaComCooldown(), {
+      efeito: 'comum',
+    });
+    expect(inicioDoResultadoMs).not.toBeNull();
+    expect(inicioDoResultadoMs ?? 0).toBeGreaterThan(inicioDoEfeitoMs ?? 0);
+  });
+
+  /*
+   * A migração do fim do turno é a exceção, e ela é explícita.
+   *
+   * Três habilidades descendo uma depois da outra inteira levariam quase três
+   * segundos e leriam como três acontecimentos. Em cascata, com um passo curto
+   * entre os começos, elas leem como uma arrumação só do tabuleiro.
+   */
+  it('as habilidades descem para o cooldown em cascata, e não num quadro só', () => {
     const movimentos = movimentosDaDiferenca({
-      antes: cena([['c:W15', 'acao']], ['c:W08']),
+      antes: cena(
+        [
+          ['c:A', 'acao'],
+          ['c:B', 'acao'],
+          ['c:C', 'acao'],
+        ],
+        [],
+      ),
       depois: cena(
         [
-          ['c:W08', 'acao'],
-          ['c:W15', 'cooldown:3'],
+          ['c:A', 'cooldown:3'],
+          ['c:B', 'cooldown:2'],
+          ['c:C', 'cooldown:1'],
         ],
         [],
       ),
     });
-    expect(duracaoDaApresentacao(movimentos, 780)).toBe((movimentos.at(-1)?.atrasoMs ?? 0) + 780);
-    expect(duracaoDaApresentacao([], 780)).toBe(0);
+    const { movimentos: agendados } = apresentar(movimentos);
+    expect(agendados).toHaveLength(3);
+    const atrasos = agendados.map((movimento) => movimento.atrasoMs);
+    expect(atrasos[0]).toBe(0);
+    for (let indice = 1; indice < atrasos.length; indice += 1) {
+      const passo = (atrasos[indice] ?? 0) - (atrasos[indice - 1] ?? 0);
+      expect(passo).toBeGreaterThanOrEqual(180);
+      expect(passo).toBeLessThanOrEqual(250);
+    }
+    // Nenhuma delas desce num piscar: cada carta tem o tempo dela.
+    for (const movimento of agendados) {
+      expect(movimento.duracaoMs).toBeGreaterThanOrEqual(650);
+    }
+  });
+
+  it('o RÁPIDO conta a mesma história em outro andamento', () => {
+    const normal = apresentar(jogadaComCooldown(), { efeito: 'comum' });
+    const rapido = apresentar(jogadaComCooldown(), { efeito: 'comum', andamento: 'rapido' });
+    expect(rapido.fila.map((beat) => beat.especie)).toEqual(
+      normal.fila.map((beat) => beat.especie),
+    );
+    expect(rapido.duracaoMs).toBeLessThan(normal.duracaoMs * 0.7);
+  });
+
+  it('sem movimento nenhum a fila é vazia', () => {
+    expect(apresentar([]).duracaoMs).toBe(0);
   });
 });

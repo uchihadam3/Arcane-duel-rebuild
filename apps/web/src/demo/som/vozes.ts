@@ -488,3 +488,41 @@ export const tocarVoz = (destino: Destino, evento: EventoDaDemo): void => {
 
 /** Quantas camadas cada evento usa. Exposto para o teste medir a densidade. */
 export const EVENTOS_DA_DEMO = Object.keys(RECEITAS) as readonly EventoDaDemo[];
+
+/* ---------------------------------------------------------------------------
+ * A serialização das vozes.
+ * ------------------------------------------------------------------------- */
+
+export interface Compasso {
+  /**
+   * O instante em que a primeira voz pode sair, no relógio da apresentação.
+   *
+   * `null` é "agora": não há beat reservado para este lote, então não há o que
+   * esperar.
+   */
+  readonly aPartirDeMs: number | null;
+  /** O espaço mínimo entre duas vozes. */
+  readonly passoMs: number;
+  readonly agoraMs: number;
+}
+
+/**
+ * Quando cada voz de um lote deve sair.
+ *
+ * O log do motor chega inteiro num quadro. Tocar tudo ali empilha cinco sons
+ * no mesmo instante — que foi o que o aparelho real produziu, e o que a
+ * revisão chamou de ilegível. Aqui as vozes ganham o mesmo espaçamento da
+ * fila visual: a primeira espera o beat reservado, e as seguintes saem uma a
+ * uma.
+ *
+ * A função é pura, e é ela que o teste confere — o palco só aplica os atrasos
+ * que ela devolve.
+ */
+export const agendaDasVozes = (
+  vozes: readonly EventoDaDemo[],
+  compasso: Compasso,
+): readonly { readonly voz: EventoDaDemo; readonly atrasoMs: number }[] => {
+  const espera =
+    compasso.aPartirDeMs === null ? 0 : Math.max(0, compasso.aPartirDeMs - compasso.agoraMs);
+  return vozes.map((voz, indice) => ({ voz, atrasoMs: espera + indice * compasso.passoMs }));
+};

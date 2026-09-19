@@ -23,6 +23,8 @@
 export type FaseDoVoo =
   /** Ainda parada onde estava. */
   | 'na-origem'
+  /** Destacada onde está: cresceu um fio, e nada mais se mexe na tela. */
+  | 'focada'
   /** Descolou da mão: subiu, ainda sobre a origem. */
   | 'levantada'
   /** Endireitou e cresceu, anunciando que virou o assunto da tela. */
@@ -39,6 +41,7 @@ export type FaseDoVoo =
 /** As fases, na ordem em que acontecem. */
 export const FASES: readonly FaseDoVoo[] = [
   'na-origem',
+  'focada',
   'levantada',
   'apresentada',
   'em-transito',
@@ -87,20 +90,27 @@ export interface Pose {
 /*
  * Os marcos, em milissegundos a partir do início.
  *
- * São os da tarefa, e cada um tem uma razão de leitura:
+ * Eles são a soma dos beats de `ritmo.ts`, e cada intervalo entre dois marcos
+ * é um beat inteiro daquela tabela:
  *
- *   100  a carta se descola da mão — sem isso ela parece arrastada;
- *   200  endireita e cresce, anunciando que virou o assunto da tela;
- *   500  o grosso da travessia, onde o peso aparece;
- *   650  desacelera, para o encaixe não ser uma batida seca;
- *   780  assentou, e o efeito pode começar.
+ *    340  `foco` — a carta se destaca onde está, e **nada mais se move**;
+ *    220  `levantar` — ela se descola da mão;
+ *    730  `viagem` — o grosso da travessia, onde o peso aparece;
+ *    230  `encaixe` — desacelera e encaixa, com o recuo curto.
+ *
+ * O voo antigo cabia em 780 ms inteiros. No aparelho real isso lia como um
+ * corte: a carta estava na mão e já estava no pedestal. A revisão pediu que
+ * cada um desses quatro momentos tivesse tempo próprio, e é o que os números
+ * abaixo fazem — o teste de `ritmo.ts` confere que cada intervalo cai dentro
+ * da faixa pedida, então encurtar um deles por engano quebra o build.
  */
 export const MARCOS = {
-  levanta: 100,
-  apresenta: 200,
-  viaja: 500,
-  desacelera: 650,
-  assenta: 780,
+  foco: 340,
+  levanta: 560,
+  apresenta: 700,
+  viaja: 1290,
+  desacelera: 1430,
+  assenta: 1660,
 } as const;
 
 export const DURACAO_DO_VOO_MS = MARCOS.assenta;
@@ -184,10 +194,14 @@ const LEVANTADA = 0.18;
 /** Quanto ela cresce ao ser apresentada, antes de viajar. */
 const AMPLIACAO_DA_APRESENTACAO = 1.16;
 /** Quando a carta começa a deitar para virar a rotação do campo. */
-const MARCOS_DO_GIRO = 430;
+const MARCOS_DO_GIRO = 1240;
+
+/** Quanto ela cresce durante o beat de foco, ainda parada na origem. */
+const AMPLIACAO_DO_FOCO = 1.07;
 
 const faseEm = (decorrido: number): FaseDoVoo => {
   if (decorrido <= 0) return 'na-origem';
+  if (decorrido < MARCOS.foco) return 'focada';
   if (decorrido < MARCOS.levanta) return 'levantada';
   if (decorrido < MARCOS.apresenta) return 'apresentada';
   if (decorrido < MARCOS.viaja) return 'em-transito';
@@ -260,9 +274,11 @@ export const estadoDoVoo = (voo: DescricaoDoVoo, agoraMs: number): Pose => {
    * chegaria ao pedestal ainda erguida e o encaixe pareceria um salto.
    */
   const subida =
-    decorrido < MARCOS.levanta
-      ? suaveNoFim(decorrido / MARCOS.levanta)
-      : Math.max(0, 1 - limitar(andamento / 0.34));
+    decorrido < MARCOS.foco
+      ? 0
+      : decorrido < MARCOS.levanta
+        ? suaveNoFim((decorrido - MARCOS.foco) / (MARCOS.levanta - MARCOS.foco))
+        : Math.max(0, 1 - limitar(andamento / 0.34));
 
   /*
    * O arco.
@@ -282,7 +298,17 @@ export const estadoDoVoo = (voo: DescricaoDoVoo, agoraMs: number): Pose => {
       ? 0
       : suaveNoFim(limitar((decorrido - MARCOS.levanta) / (MARCOS.apresenta - MARCOS.levanta)));
 
-  const escalaApresentada = interpolar(1, AMPLIACAO_DA_APRESENTACAO, apresentacao);
+  /*
+   * O destaque do beat de foco.
+   *
+   * A carta cresce 7 % **sem sair do lugar**. É pouco de propósito: o que esse
+   * beat comunica não é movimento, é atenção — "olhe para esta carta, o que
+   * vem a seguir parte daqui". Sem ele o voo começava sem aviso, e o jogador
+   * descobria qual carta tinha sido jogada só quando ela já estava no campo.
+   */
+  const destaque = interpolar(1, AMPLIACAO_DO_FOCO, suaveNoFim(limitar(decorrido / MARCOS.foco)));
+
+  const escalaApresentada = interpolar(destaque, AMPLIACAO_DA_APRESENTACAO, apresentacao);
   const escala = interpolar(escalaApresentada, escalaDoDestino, suaveNoComeco(limitar(andamento)));
 
   const giro = interpolar(

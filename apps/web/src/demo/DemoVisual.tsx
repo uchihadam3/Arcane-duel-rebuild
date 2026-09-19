@@ -4,6 +4,10 @@ import { acoesLegais, ameacaDaAcao, respostasLegais } from '@arcane-duel/gamepla
 import type { PedidoDeResposta } from '@arcane-duel/gameplay/jogo';
 
 import { Sobreposicao } from './animacao/Sobreposicao.jsx';
+import type { EfeitoDoLote } from './animacao/apresentacao.js';
+import type { Andamento } from './animacao/ritmo.js';
+import { PASSO_DA_CASCATA_MS } from './animacao/ritmo.js';
+import { useValorNoBeat } from './animacao/useValorNoBeat.js';
 import { useVoos } from './animacao/useVoos.js';
 import { Tabuleiro } from './arena/Tabuleiro.jsx';
 import type { Metade } from './arena/planta.js';
@@ -118,6 +122,15 @@ export const DemoVisual = ({
   const [estado, definirEstado] = useState<EstadoDaDemo>(() => controlador.estado());
   const [focada, definirFocada] = useState<number | null>(null);
   const [pensando, definirPensando] = useState(false);
+  /*
+   * O andamento.
+   *
+   * NORMAL é o padrão, e é o andamento em que o jogo deve ser jogado: cada
+   * beat tem o tempo dele e a jogada é contada inteira. RÁPIDO existe para
+   * quem já conhece as cartas, e é **visivelmente** outro andamento — não uma
+   * preferência sem efeito.
+   */
+  const [andamento, definirAndamento] = useState<Andamento>('normal');
   const [medida, medir] = useMedida();
   const raiz = useRef<HTMLDivElement | null>(null);
   const movimentoReduzido = useMovimentoReduzido();
@@ -160,10 +173,6 @@ export const DemoVisual = ({
     };
   }, [controlador, estado]);
 
-  useEffect(() => {
-    palco.reagir(estado);
-  }, [palco, estado]);
-
   const eu = estado.visao.jogadores.find((jogador) => jogador.id === HUMANO);
   const ela = estado.visao.jogadores.find((jogador) => jogador.id === MAQUINA);
 
@@ -177,6 +186,21 @@ export const DemoVisual = ({
   );
 
   const pecas = useMemo(() => pecasDoCampo(estado.visao, String(HUMANO)), [estado.visao]);
+
+  /*
+   * O que resolveu neste lote.
+   *
+   * A fila precisa saber disto **antes** de montar os beats: se uma Ação
+   * resolveu, ela reserva telégrafo, efeito, impacto e resultado depois do
+   * encaixe. Sem a reserva, o efeito entraria no quadro em que o log chegou —
+   * com a carta ainda no ar.
+   */
+  const efeitoDoLote = useMemo<EfeitoDoLote>(() => {
+    if (!estado.eventos.some((evento) => evento.tipo === 'acao-resolvida')) return 'nenhum';
+    return estado.eventos.some((evento) => evento.tipo === 'ultimate-consumida')
+      ? 'ultimate'
+      : 'comum';
+  }, [estado.eventos]);
 
   /*
    * Quem ganhou a quarta Ação agora.
@@ -207,6 +231,7 @@ export const DemoVisual = ({
    */
   const cenaParaVoo = useMemo(
     () => ({
+      lote: estado.lote,
       pecas: pecas.map((peca) => ({
         chave: peca.chave,
         lugar: peca.lugar === 'cooldown' ? `cooldown:${String(peca.indice)}` : peca.lugar,
@@ -218,21 +243,57 @@ export const DemoVisual = ({
         mao.find((item) => item.chave === chave)?.carta ??
         null,
     }),
-    [pecas, mao, versosDaMaquina],
+    [estado.lote, pecas, mao, versosDaMaquina],
   );
 
   const aoEncaixar = useCallback(() => {
     palco.tocarInterface('soltar');
   }, [palco]);
 
-  const { clones, emVoo } = useVoos({ cena: cenaParaVoo, raiz, movimentoReduzido, aoEncaixar });
+  const { clones, emVoo, marcos } = useVoos({
+    cena: cenaParaVoo,
+    raiz,
+    movimentoReduzido,
+    andamento,
+    efeito: efeitoDoLote,
+    aoEncaixar,
+  });
 
   const efeito = useEfeito({
     eventos: estado.eventos,
     lote: estado.lote,
     humano: HUMANO,
     palco,
+    marcos,
   });
+
+  /*
+   * Os números do HUD entram no beat de resultado.
+   *
+   * O motor já baixou a Vida quando o log chegou; o HUD espera o instante em
+   * que a apresentação conta o resultado. Antes disso ele estaria revelando o
+   * desfecho enquanto a carta ainda atravessa a arena.
+   */
+  const beatDoResultado = useMemo(
+    () => ({ lote: marcos.lote, emMs: marcos.resultadoMs }),
+    [marcos.lote, marcos.resultadoMs],
+  );
+  const jogadoresNoBeat = useValorNoBeat(estado.visao.jogadores, estado.lote, beatDoResultado);
+
+  /*
+   * O som entra no mesmo compasso da imagem.
+   *
+   * `marcos` é publicado pela medição de layout, então ele chega um commit
+   * depois do estado. O efeito abaixo depende dos dois: quando os marcos do
+   * lote atual aparecem, as vozes são reagendadas a partir do beat certo — e
+   * o palco descarta as do lote anterior sozinho.
+   */
+  useEffect(() => {
+    palco.reagir(estado, {
+      aPartirDeMs: marcos.lote === estado.lote ? marcos.efeitoMs : null,
+      passoMs: PASSO_DA_CASCATA_MS,
+    });
+  }, [palco, estado, marcos]);
 
   /* As cartas que o motor aceitaria agora, e as Respostas legais. */
   const jogaveis = useMemo(() => {
@@ -367,6 +428,10 @@ export const DemoVisual = ({
     );
   }
 
+  /* O HUD desenha a projeção do beat, e não a do motor. */
+  const euNoHud = jogadoresNoBeat.find((jogador) => jogador.id === HUMANO) ?? eu;
+  const elaNoHud = jogadoresNoBeat.find((jogador) => jogador.id === MAQUINA) ?? ela;
+
   const vencedor = estado.visao.desfecho?.vencedor ?? null;
   const ganhei = vencedor === HUMANO;
   const acoesUsadas = eu.acoesRealizadasNoTurno;
@@ -479,7 +544,7 @@ export const DemoVisual = ({
 
       {/* 4 · o HUD, em retângulos próprios */}
       <HudV2
-        jogador={ela}
+        jogador={elaNoHud}
         caixa={zonas.hudDaMaquina}
         daVez={estado.aguardando === MAQUINA}
         posicao="maquina"
@@ -487,7 +552,7 @@ export const DemoVisual = ({
         dadoDeTeste="hud-maquina"
       />
       <HudV2
-        jogador={eu}
+        jogador={euNoHud}
         caixa={zonas.hudDoJogador}
         daVez={estado.aguardando === HUMANO}
         posicao="jogador"
@@ -518,6 +583,25 @@ export const DemoVisual = ({
 
       <button type="button" className="v2__sair" onClick={aoSair} data-teste="sair-da-demo">
         Sair
+      </button>
+
+      {/*
+       * O andamento, à vista.
+       *
+       * Ele fica na tela e não num menu porque é uma decisão de leitura, e
+       * não uma configuração: quem não está entendendo o que aconteceu
+       * precisa achar isto sem sair da partida.
+       */}
+      <button
+        type="button"
+        className="v2__andamento"
+        data-teste="andamento"
+        data-andamento={andamento}
+        onClick={() => {
+          definirAndamento((atual) => (atual === 'normal' ? 'rapido' : 'normal'));
+        }}
+      >
+        {andamento === 'normal' ? 'RITMO NORMAL' : 'RITMO RÁPIDO'}
       </button>
 
       {/*

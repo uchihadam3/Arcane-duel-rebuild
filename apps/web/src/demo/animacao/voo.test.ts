@@ -99,6 +99,23 @@ describe('a carta passa por todas as fases, na ordem', () => {
 
 describe('o movimento tem peso', () => {
   /*
+   * Primeiro a carta é **apontada**, e só depois se move.
+   *
+   * Durante o beat de foco ela cresce um fio sem sair do lugar: é o aviso de
+   * que a próxima coisa a acontecer parte dali. A revisão do aparelho real
+   * cobrou exatamente isso — a carta partia sem anúncio e o jogador só
+   * descobria qual tinha sido jogada quando ela já estava no pedestal.
+   */
+  it('destaca a carta no lugar antes de tirá-la de lá', () => {
+    const noFoco = estadoDoVoo(voo(), 1000 + MARCOS.foco / 2);
+    expect(noFoco.fase).toBe('focada');
+    expect(noFoco.x).toBeCloseTo(centro(MAO).x, 6);
+    expect(noFoco.y).toBeCloseTo(centro(MAO).y, 6);
+    expect(noFoco.escala).toBeGreaterThan(1);
+    expect(noFoco.elevacao).toBe(0);
+  });
+
+  /*
    * A carta se descola da mão **antes** de viajar.
    *
    * Até o marco de apresentação ela não anda no eixo da travessia — ela
@@ -106,10 +123,10 @@ describe('o movimento tem peso', () => {
    * exatamente isso que a tarefa pediu para evitar.
    */
   it('levanta antes de andar', () => {
-    const aos60 = estadoDoVoo(voo(), 1000 + 60);
-    expect(aos60.x).toBeCloseTo(centro(MAO).x, 6);
-    expect(aos60.y).toBeLessThan(centro(MAO).y);
-    expect(aos60.elevacao).toBeGreaterThan(0);
+    const levantando = estadoDoVoo(voo(), 1000 + MARCOS.foco + 60);
+    expect(levantando.x).toBeCloseTo(centro(MAO).x, 6);
+    expect(levantando.y).toBeLessThan(centro(MAO).y);
+    expect(levantando.elevacao).toBeGreaterThan(0);
   });
 
   it('cresce e endireita na apresentação, ainda sobre a mão', () => {

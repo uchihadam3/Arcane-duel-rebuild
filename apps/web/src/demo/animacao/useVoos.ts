@@ -2,8 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import type { CartaVisivel } from '../../partida/apresentacao.js';
 
-import type { Movimento } from './apresentacao.js';
-import { movimentosDaDiferenca } from './apresentacao.js';
+import type { EfeitoDoLote, Movimento } from './apresentacao.js';
+import { apresentar, movimentosDaDiferenca } from './apresentacao.js';
+import type { Andamento } from './ritmo.js';
 import type { Caixa, Pose } from './voo.js';
 import { MARCOS, RITMO_REDUZIDO, estadoDoVoo } from './voo.js';
 
@@ -34,6 +35,8 @@ export interface PecaMensuravel {
 }
 
 export interface CenaParaVoo {
+  /** O lote do motor que produziu esta cena. Muda a cada lance. */
+  readonly lote: number;
   readonly pecas: readonly PecaMensuravel[];
   readonly mao: readonly string[];
   readonly maoDaMaquina: number;
@@ -47,7 +50,29 @@ export interface VooAtivo {
   readonly origem: Caixa;
   readonly destino: Caixa;
   readonly inicioMs: number;
+  /** Quanto este movimento leva, já com o andamento aplicado. */
+  readonly duracaoMs: number;
   readonly carta: CartaVisivel | null;
+}
+
+/**
+ * Os instantes que o resto da tela precisa respeitar.
+ *
+ * São relógio absoluto — o mesmo `performance.now()` que os voos usam —, e é
+ * assim que o efeito, o som e o número do HUD entram **no beat deles** em vez
+ * de entrarem todos no quadro em que o lote chegou.
+ */
+export interface MarcosDoLote {
+  /** A que lote estes instantes pertencem. */
+  readonly lote: number;
+  /** Quando o efeito da carta pode começar. */
+  readonly efeitoMs: number | null;
+  /** Quando o resultado assenta, e o número do HUD tem permissão de mudar. */
+  readonly resultadoMs: number | null;
+  /** Quanto tempo o efeito tem: o roteiro da carta é esticado para caber. */
+  readonly janelaDoEfeitoMs: number;
+  /** Quando a apresentação inteira termina. */
+  readonly fimMs: number;
 }
 
 export interface VooRenderizado {
@@ -92,6 +117,10 @@ export interface OpcoesDosVoos {
   readonly raiz: React.RefObject<HTMLElement | null>;
   /** Encurta tudo quando o sistema pede movimento reduzido. */
   readonly movimentoReduzido?: boolean;
+  /** O andamento escolhido. NORMAL é o padrão, e é o deliberado. */
+  readonly andamento?: Andamento;
+  /** O que resolveu neste lote, para a fila reservar o tempo do efeito. */
+  readonly efeito?: EfeitoDoLote;
   /** Chamado quando um voo termina, para o som do encaixe. */
   readonly aoEncaixar?: (movimento: Movimento) => void;
 }
@@ -102,12 +131,23 @@ export interface ResultadoDosVoos {
   readonly emVoo: ReadonlySet<string>;
   /** Há movimento acontecendo agora? */
   readonly animando: boolean;
+  readonly marcos: MarcosDoLote;
 }
+
+const SEM_MARCOS: MarcosDoLote = {
+  lote: -1,
+  efeitoMs: null,
+  resultadoMs: null,
+  janelaDoEfeitoMs: 0,
+  fimMs: 0,
+};
 
 export const useVoos = ({
   cena,
   raiz,
   movimentoReduzido = false,
+  andamento = 'normal',
+  efeito = 'nenhum',
   aoEncaixar,
 }: OpcoesDosVoos): ResultadoDosVoos => {
   const medidasAnteriores = useRef<Map<string, Caixa>>(new Map());
@@ -117,6 +157,7 @@ export const useVoos = ({
     maoDaMaquina: number;
   }>({ pecas: [], mao: [], maoDaMaquina: 0 });
   const [ativos, definirAtivos] = useState<readonly VooAtivo[]>([]);
+  const [marcos, definirMarcos] = useState<MarcosDoLote>(SEM_MARCOS);
   const [agora, definirAgora] = useState(0);
   const encaixados = useRef<Set<string>>(new Set());
 
@@ -137,13 +178,24 @@ export const useVoos = ({
     const anteriores = medidasAnteriores.current;
     const antes = cenaAnterior.current;
 
-    const movimentos =
+    const crus =
       antes.pecas.length === 0 && antes.mao.length === 0
         ? []
         : movimentosDaDiferenca({
             antes,
             depois: { pecas: cena.pecas, mao: cena.mao, maoDaMaquina: cena.maoDaMaquina },
           });
+
+    /*
+     * A fila serial.
+     *
+     * Aqui o lote deixa de ser "tudo o que mudou" e passa a ser uma sequência:
+     * a carta é apontada, levanta, atravessa, encaixa, dá tempo de ser lida, e
+     * só então o efeito acontece. O motor já terminou — nada disto o faz
+     * esperar.
+     */
+    const roteiro = apresentar(crus, { efeito, andamento });
+    const movimentos = roteiro.movimentos;
 
     const relogio = performance.now();
     const novos: VooAtivo[] = [];
@@ -189,6 +241,7 @@ export const useVoos = ({
         origem,
         destino,
         inicioMs: relogio + movimento.atrasoMs * ritmo,
+        duracaoMs: movimento.duracaoMs * ritmo,
         carta: cena.cartaDe(movimento.para.chave) ?? cena.cartaDe(movimento.de.chave),
       });
     }
@@ -203,9 +256,31 @@ export const useVoos = ({
     if (novos.length > 0) {
       encaixados.current = new Set();
       definirAtivos(novos);
-      definirAgora(relogio);
     }
-  }, [cena, raiz, ritmo]);
+
+    /*
+     * Os marcos são publicados **sempre**, mesmo quando nada se moveu.
+     *
+     * Um lance que não move peça nenhuma — uma Condição aplicada, um ganho de
+     * AP — não pode deixar o HUD preso esperando um beat que nunca vem. Sem
+     * movimento não há fila, e sem fila o número muda na hora.
+     */
+    if (cena.lote !== marcos.lote) {
+      definirMarcos({
+        lote: cena.lote,
+        efeitoMs:
+          roteiro.inicioDoEfeitoMs === null ? null : relogio + roteiro.inicioDoEfeitoMs * ritmo,
+        resultadoMs:
+          roteiro.inicioDoResultadoMs === null
+            ? null
+            : relogio + roteiro.inicioDoResultadoMs * ritmo,
+        janelaDoEfeitoMs: roteiro.janelaDoEfeitoMs * ritmo,
+        fimMs: relogio + roteiro.duracaoMs * ritmo,
+      });
+    }
+
+    if (novos.length > 0) definirAgora(relogio);
+  }, [andamento, cena, efeito, marcos.lote, raiz, ritmo]);
 
   /* O relógio: um rAF enquanto houver voo, e nenhum quando não houver. */
   useEffect(() => {
@@ -216,7 +291,7 @@ export const useVoos = ({
       if (!vivo) return;
       const t = performance.now();
       definirAgora(t);
-      const fim = Math.max(...ativos.map((voo) => voo.inicioMs + MARCOS.assenta * ritmo));
+      const fim = Math.max(...ativos.map((voo) => voo.inicioMs + voo.duracaoMs));
       if (t >= fim) {
         definirAtivos([]);
         return;
@@ -243,6 +318,14 @@ export const useVoos = ({
   const emVoo = new Set<string>();
 
   for (const voo of ativos) {
+    /*
+     * Cada movimento tem o **seu** tempo.
+     *
+     * Um voo da mão para o campo é contado em cinco beats e passa de um
+     * segundo e meio; um deslize de cooldown é um beat só. Antes os dois
+     * usavam a mesma constante, e por isso o fim do turno rearrumava o
+     * tabuleiro num piscar enquanto uma carta jogada demorava a chegar.
+     */
     const pose = estadoDoVoo(
       {
         origem: voo.origem,
@@ -251,7 +334,7 @@ export const useVoos = ({
         giroDeDestino: 0,
         inclinacaoDoCampo: 0,
         inicioMs: voo.inicioMs,
-        ritmo,
+        ritmo: voo.duracaoMs / MARCOS.assenta,
       },
       agora,
     );
@@ -276,5 +359,5 @@ export const useVoos = ({
     });
   }
 
-  return { clones, emVoo, animando: clones.length > 0 };
+  return { clones, emVoo, animando: clones.length > 0, marcos };
 };

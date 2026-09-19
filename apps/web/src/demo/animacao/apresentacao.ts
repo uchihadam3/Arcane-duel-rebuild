@@ -2,6 +2,10 @@ import type { CardId } from '@arcane-duel/shared-types';
 
 import type { Metade } from '../arena/planta.js';
 
+import type { BeatNaFila, PedidoDeBeat } from './fila.js';
+import { duracaoDaFila, enfileirar } from './fila.js';
+import type { Andamento, EspecieDeBeat } from './ritmo.js';
+
 /*
  * O diretor de apresentação.
  *
@@ -64,8 +68,17 @@ export interface Movimento {
   /** Vira no meio do caminho? Só quando a carta se torna pública ao chegar. */
   readonly vira: boolean;
   readonly metade: Metade;
-  /** Atraso antes de começar, para encadear vários movimentos. */
+  /** Atraso antes de começar: o instante em que a fila chama este movimento. */
   readonly atrasoMs: number;
+  /**
+   * Quanto este movimento leva, vindo da fila.
+   *
+   * Não é uma constante do voo: um voo da mão para o campo é contado em cinco
+   * beats e leva mais de um segundo e meio; um deslize de cooldown é um beat
+   * só. Amarrar os dois à mesma duração era o que fazia o tabuleiro se
+   * rearrumar num piscar no fim do turno.
+   */
+  readonly duracaoMs: number;
 }
 
 /* ---------------------------------------------------------------------------
@@ -162,6 +175,7 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
         vira: false,
         metade: 'jogador',
         atrasoMs: 0,
+        duracaoMs: 0,
       });
       continue;
     }
@@ -193,6 +207,7 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
           vira: true,
           metade: 'jogador',
           atrasoMs: 0,
+          duracaoMs: 0,
         });
         continue;
       }
@@ -214,6 +229,7 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
         vira: true,
         metade: 'maquina',
         atrasoMs: 0,
+        duracaoMs: 0,
       });
       continue;
     }
@@ -229,6 +245,7 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
         vira: false,
         metade: 'jogador',
         atrasoMs: 0,
+        duracaoMs: 0,
       });
     }
   }
@@ -246,6 +263,7 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
       vira: false,
       metade: 'jogador',
       atrasoMs: 0,
+      duracaoMs: 0,
     });
   }
 
@@ -263,43 +281,189 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
       vira: false,
       metade: 'jogador',
       atrasoMs: 0,
+      duracaoMs: 0,
     });
   }
 
-  return escalonar(movimentos);
+  return movimentos;
 };
 
-/**
- * Espalha os movimentos no tempo.
- *
- * Tudo junto vira confusão; um de cada vez vira espera. O passo curto abaixo
- * deixa o segundo movimento começar enquanto o primeiro ainda freia, que é
- * como uma jogada de verdade se encadeia.
- */
-const PASSO_ENTRE_MOVIMENTOS_MS = 140;
+/* ---------------------------------------------------------------------------
+ * A fila: um beat principal por vez.
+ * ------------------------------------------------------------------------- */
 
-const PRIORIDADE: Readonly<Record<EspecieDeMovimento, number>> = {
+/** O que resolveu neste lote, além do que se moveu. */
+export type EfeitoDoLote = 'nenhum' | 'comum' | 'ultimate';
+
+export interface OpcoesDaApresentacao {
+  readonly efeito?: EfeitoDoLote;
+  readonly andamento?: Andamento;
+}
+
+export interface Apresentacao {
+  /** Os movimentos, agora com começo e duração vindos da fila. */
+  readonly movimentos: readonly Movimento[];
+  readonly fila: readonly BeatNaFila[];
+  /**
+   * Quando o efeito da carta pode começar.
+   *
+   * Depois do encaixe **e** da pausa de leitura: a carta assenta, o jogador
+   * lê o que foi jogado, e só então o efeito acontece. Começar o efeito junto
+   * com o pouso foi o que tornou a jogada ilegível no aparelho.
+   */
+  readonly inicioDoEfeitoMs: number | null;
+  /**
+   * Quando o resultado assenta.
+   *
+   * É o beat em que o número do HUD tem permissão de se mexer. Antes disso
+   * ele estaria contando o fim da história durante a primeira frase.
+   */
+  readonly inicioDoResultadoMs: number | null;
+  /**
+   * Quanto tempo a fila reservou para o efeito inteiro.
+   *
+   * O roteiro da carta é esticado para caber exatamente aqui. Assim o efeito
+   * não precisa correr para terminar antes do próximo beat, nem sobra parado
+   * enquanto a fila já seguiu — e o Meteoro continua sendo o momento longo
+   * que ele é, porque a faixa dele é outra.
+   */
+  readonly janelaDoEfeitoMs: number;
+  readonly duracaoMs: number;
+}
+
+/**
+ * A ordem dos acontecimentos.
+ *
+ * Ela é narrativa, e por isso está escrita aqui em vez de ser deduzida de uma
+ * tabela de prioridade: a carta entra, o efeito dela acontece, o que o efeito
+ * revelou se revela, e só no fim o tabuleiro se arruma.
+ */
+const ORDEM: Readonly<Record<EspecieDeMovimento, number>> = {
   'mao-para-campo': 0,
   'maquina-para-campo': 0,
   'ultimate-apresentada': 0,
-  'passiva-revela': 1,
-  'classe-ativa': 1,
-  'classe-exaure': 1,
-  'campo-para-cooldown': 2,
-  'cooldown-avanca': 3,
-  'cooldown-para-mao': 4,
+  'passiva-revela': 2,
+  'classe-ativa': 3,
+  'classe-exaure': 4,
+  'campo-para-cooldown': 5,
+  'cooldown-avanca': 6,
+  'cooldown-para-mao': 7,
 };
 
-export const escalonar = (movimentos: readonly Movimento[]): readonly Movimento[] =>
-  [...movimentos]
-    .sort((a, b) => PRIORIDADE[a.especie] - PRIORIDADE[b.especie])
-    .map((movimento, indice) => ({ ...movimento, atrasoMs: indice * PASSO_ENTRE_MOVIMENTOS_MS }));
+/** Um voo de entrada é contado em cinco beats; o resto é um beat só. */
+const ehEntrada = (especie: EspecieDeMovimento): boolean =>
+  especie === 'mao-para-campo' || especie === 'maquina-para-campo';
 
-/** Quanto tempo a apresentação inteira leva. */
-export const duracaoDaApresentacao = (
+const BEAT_DO_MOVIMENTO: Readonly<Record<EspecieDeMovimento, EspecieDeBeat>> = {
+  'mao-para-campo': 'viagem',
+  'maquina-para-campo': 'viagem',
+  'ultimate-apresentada': 'ultimate',
+  'passiva-revela': 'passiva-revela',
+  'classe-ativa': 'classe-ativa',
+  'classe-exaure': 'exaurir',
+  'campo-para-cooldown': 'cooldown-migra',
+  'cooldown-avanca': 'cooldown-avanca',
+  'cooldown-para-mao': 'cooldown-para-mao',
+};
+
+/** As espécies que saem em cascata quando se repetem. */
+const EM_CASCATA: ReadonlySet<EspecieDeMovimento> = new Set<EspecieDeMovimento>([
+  'campo-para-cooldown',
+  'cooldown-avanca',
+]);
+
+/**
+ * Põe o lote inteiro no tempo.
+ *
+ * O motor já terminou quando esta função roda — ela não decide nada, só diz
+ * em que instante cada coisa é contada. É a diferença entre "o estado mudou"
+ * e "o jogador entendeu que o estado mudou".
+ */
+export const apresentar = (
   movimentos: readonly Movimento[],
-  duracaoDeUm: number,
-): number =>
-  movimentos.length === 0
-    ? 0
-    : Math.max(...movimentos.map((movimento) => movimento.atrasoMs)) + duracaoDeUm;
+  opcoes: OpcoesDaApresentacao = {},
+): Apresentacao => {
+  const andamento = opcoes.andamento ?? 'normal';
+  const efeito = opcoes.efeito ?? 'nenhum';
+
+  const ordenados = [...movimentos].sort((a, b) => ORDEM[a.especie] - ORDEM[b.especie]);
+  const pedidos: PedidoDeBeat[] = [];
+  /** Movimento → [id do primeiro beat, id do último beat] dele. */
+  const janelas = new Map<string, readonly [string, string]>();
+
+  const antesDoEfeito = ordenados.filter((movimento) => ORDEM[movimento.especie] === 0);
+  const depoisDoEfeito = ordenados.filter((movimento) => ORDEM[movimento.especie] > 0);
+
+  const enfileirarMovimento = (movimento: Movimento, anterior: Movimento | undefined): void => {
+    if (ehEntrada(movimento.especie)) {
+      for (const especie of ['foco', 'levantar', 'viagem', 'encaixe', 'leitura'] as const) {
+        pedidos.push({ id: `${especie}:${movimento.id}`, especie });
+      }
+      // O voo termina no encaixe: a leitura é pausa, e a carta já está parada.
+      janelas.set(movimento.id, [`foco:${movimento.id}`, `encaixe:${movimento.id}`]);
+      return;
+    }
+    const especie = BEAT_DO_MOVIMENTO[movimento.especie];
+    const id = `${especie}:${movimento.id}`;
+    const emCascata = EM_CASCATA.has(movimento.especie) && anterior?.especie === movimento.especie;
+    pedidos.push(emCascata ? { id, especie, emCascata: true } : { id, especie });
+    janelas.set(movimento.id, [id, id]);
+  };
+
+  antesDoEfeito.forEach((movimento, indice) => {
+    enfileirarMovimento(movimento, antesDoEfeito[indice - 1]);
+  });
+
+  if (efeito === 'comum') {
+    for (const especie of ['telegrafo', 'efeito', 'impacto', 'resultado'] as const) {
+      pedidos.push({ id: especie, especie });
+    }
+  } else if (efeito === 'ultimate') {
+    // A Ultimate **é** o efeito: ela não ganha telégrafo antes de si mesma.
+    for (const especie of ['ultimate', 'impacto', 'resultado'] as const) {
+      pedidos.push({ id: `efeito:${especie}`, especie });
+    }
+  }
+
+  depoisDoEfeito.forEach((movimento, indice) => {
+    enfileirarMovimento(movimento, depoisDoEfeito[indice - 1]);
+  });
+
+  const fila = enfileirar(pedidos, andamento);
+  const porId = new Map(fila.map((beat) => [beat.id, beat]));
+
+  const agendados = ordenados.map((movimento) => {
+    const janela = janelas.get(movimento.id);
+    const comeco = janela === undefined ? undefined : porId.get(janela[0]);
+    const fim = janela === undefined ? undefined : porId.get(janela[1]);
+    if (comeco === undefined || fim === undefined) return movimento;
+    return {
+      ...movimento,
+      atrasoMs: comeco.inicioMs,
+      duracaoMs: fim.fimMs - comeco.inicioMs,
+    };
+  });
+
+  const primeiroDoEfeito =
+    efeito === 'comum'
+      ? (porId.get('telegrafo') ?? null)
+      : efeito === 'ultimate'
+        ? (porId.get('efeito:ultimate') ?? null)
+        : null;
+
+  const resultado = fila.find((beat) => beat.especie === 'resultado') ?? null;
+
+  const janelaDoEfeitoMs =
+    primeiroDoEfeito === null || resultado === null
+      ? 0
+      : resultado.fimMs - primeiroDoEfeito.inicioMs;
+
+  return {
+    movimentos: agendados,
+    fila,
+    inicioDoEfeitoMs: primeiroDoEfeito?.inicioMs ?? null,
+    inicioDoResultadoMs: resultado?.inicioMs ?? null,
+    janelaDoEfeitoMs,
+    duracaoMs: duracaoDaFila(fila),
+  };
+};

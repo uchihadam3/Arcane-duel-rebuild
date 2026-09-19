@@ -473,6 +473,34 @@
   cursor: pointer;
 }
 
+/*
+ * O andamento fica ao lado do Sair, na mesma faixa morta do canto.
+ *
+ * Ele é discreto quando está em NORMAL — que é o padrão — e se acende em
+ * RÁPIDO, porque um andamento acelerado precisa ser visível: é a explicação
+ * de por que a partida está passando depressa.
+ */
+.v2__andamento {
+  position: absolute;
+  top: 6px;
+  right: 58px;
+  z-index: 320;
+  padding: 3px 9px;
+  border: 1px solid #45404e;
+  border-radius: 6px;
+  background: rgb(10 9 14 / 70%);
+  color: #7d7568;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+}
+
+.v2__andamento[data-andamento='rapido'] {
+  border-color: var(--v2-energia);
+  color: #ece4d5;
+}
+
 .v2__botao {
   padding: 8px 16px;
   border: 1px solid #6b5a33;
