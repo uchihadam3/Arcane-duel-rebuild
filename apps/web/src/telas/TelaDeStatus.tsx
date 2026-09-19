@@ -56,7 +56,7 @@ export const TelaDeStatus = ({
     <div className="app">
       <header className="cabecalho">
         <h1>Arcane Duel</h1>
-        <span className="selo">Etapa 6 concluída</span>
+        <span className="selo">Etapa 6 em revisão visual</span>
         <span className="selo">vertical slice Guerreiro × Mago</span>
         <BotaoDeInstalacao />
         <BotaoDeJogo tom="discreto" aoTocar={aoVoltar} dadoDeTeste="voltar-do-status">
@@ -72,7 +72,12 @@ export const TelaDeStatus = ({
               <dt>Motor</dt>
               <dd>Combate implementado</dd>
               <dt>Etapa atual</dt>
-              <dd>Etapa 6 concluída — vertical slice Guerreiro × Mago</dd>
+              {/*
+                A etapa está aberta, e a tela diz isso.
+                O vertical slice foi reprovado em aparelho real; declará-lo
+                concluído aqui seria a mesma coisa que declarar no relatório.
+              */}
+              <dd>Etapa 6 — Checkpoint A da revisão visual, à espera de avaliação</dd>
               <dt>Interface de partida</dt>
               <dd>Partida local completa, do menu à tela de vitória</dd>
             </dl>

@@ -79,12 +79,13 @@ describe('tela de status do desenvolvimento', () => {
     expect(valorDe('Status', 'Motor')).toBe('Combate implementado');
   });
 
-  it('declara a Etapa 6 concluída e o vertical slice existente', () => {
+  it('declara a Etapa 6 em revisão, e não concluída', () => {
     abrirStatus();
-    expect(screen.getByText('Etapa 6 concluída')).toBeDefined();
+    expect(screen.getByText('Etapa 6 em revisão visual')).toBeDefined();
+    expect(screen.queryByText('Etapa 6 concluída')).toBeNull();
     expect(screen.getByText('vertical slice Guerreiro × Mago')).toBeDefined();
     expect(valorDe('Status', 'Etapa atual')).toBe(
-      'Etapa 6 concluída — vertical slice Guerreiro × Mago',
+      'Etapa 6 — Checkpoint A da revisão visual, à espera de avaliação',
     );
     expect(valorDe('Status', 'Interface de partida')).toBe(
       'Partida local completa, do menu à tela de vitória',
