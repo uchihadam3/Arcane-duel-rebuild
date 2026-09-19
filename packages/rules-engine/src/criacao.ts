@@ -79,6 +79,7 @@ export const criarEstadoDeJogador = (configuracao: ConfiguracaoDeJogador): Estad
     reserva: configuracao.reservaInicial ?? 0,
     impulsoInicial: configuracao.impulsoInicial ?? false,
     acoesRealizadasNoTurno: 0,
+    cooldownAgendado: [],
 
     // A build inteira começa disponível: não há baralho, compra nem descarte.
     mao: [...build.habilidades],

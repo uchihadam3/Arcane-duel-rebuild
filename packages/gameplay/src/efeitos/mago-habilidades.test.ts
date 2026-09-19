@@ -12,6 +12,8 @@ import {
   jogar,
   manaDe,
   virarTurno,
+  comCartaEmCooldown,
+  guardarNoCooldown,
 } from '../teste-apoio.js';
 import { declarar, responder } from '../partida.js';
 
@@ -159,15 +161,34 @@ describe('Mago — habilidades', () => {
   });
 
   it('M13 Distorção Temporal devolve uma carta de CD1 para a mão', () => {
-    const partida = duelo(mago(['M01', 'M13']), guerreiro, A);
-    const primeira = jogar(partida, A, { pedido: { carta: 'M01' as never } }).partida;
-    expect(jogador(primeira, A).cooldown[1]).toContain('M01');
+    const partida = comCartaEmCooldown(duelo(mago(['M01', 'M13']), guerreiro, A), A, 'M01', 1);
+    expect(jogador(partida, A).cooldown[1]).toContain('M01');
 
-    const { partida: depois } = jogar(primeira, A, {
+    const { partida: depois } = jogar(partida, A, {
       pedido: { carta: 'M13' as never, escolhas: { cartaEmCooldown: 'M01' as never } },
     });
     expect(jogador(depois, A).mao).toContain('M01');
     expect(jogador(depois, A).cooldown[1]).not.toContain('M01');
+  });
+
+  /*
+   * A interação que a mudança de regra criou, auditada.
+   *
+   * Pela regra vigente (§11), a habilidade usada fica no espaço de Ação até o
+   * encerramento do turno — ela **não** está em CD1. Distorção Temporal pede
+   * "uma carta sua em CD1", então ela não alcança uma carta jogada neste
+   * mesmo turno. Isso não é um efeito colateral tolerado: é o comportamento
+   * correto, e fingir que a carta já está na zona seria inventar regra.
+   */
+  it('M13 não alcança uma carta jogada neste mesmo turno', () => {
+    const partida = duelo(mago(['M01', 'M13']), guerreiro, A);
+    const primeira = jogar(partida, A, { pedido: { carta: 'M01' as never } }).partida;
+    expect(jogador(primeira, A).cooldown[1]).not.toContain('M01');
+    expect(jogador(primeira, A).cooldownAgendado.map((a) => String(a.carta))).toContain('M01');
+
+    expect(erroDe(declarar(primeira, A, { carta: 'M13' as never })).tipo).toBe(
+      'condicao-de-uso-nao-satisfeita',
+    );
   });
 
   it('M13 é recusada quando não há carta em CD1', () => {
@@ -246,8 +267,8 @@ describe('Mago — habilidades', () => {
       resposta: { tipo: 'carta-de-reacao', carta: 'M19' as never },
     }).partida;
 
-    // A Técnica saiu da mão, custou AP e foi para o cooldown; o texto não valeu.
-    expect(jogador(comTecnica, B).cooldown[2]).toContain('W11');
+    // A Técnica saiu da mão, custou AP e ficou agendada para CD2; o texto não valeu.
+    expect(jogador(guardarNoCooldown(comTecnica, B), B).cooldown[2]).toContain('W11');
     expect(jogador(comTecnica, B).pontosDeAcao).toBe(4);
 
     const { eventos } = jogar(comTecnica, B, { pedido: { carta: 'W01' as never } });

@@ -13,6 +13,7 @@ import {
   jogador,
   jogar,
   manaDe,
+  guardarNoCooldown,
 } from './teste-apoio.js';
 import type { PedidoDeAcao, PedidoDeResposta } from './partida.js';
 import { declarar, responder } from './partida.js';
@@ -83,7 +84,9 @@ describe('o pedido do cliente não carrega dados de carta', () => {
     expect(impacto?.tipo === 'impacto-aplicado' ? impacto.valor : -1).toBe(
       definicao?.valores?.impacto,
     );
-    expect(jogador(depois, A).cooldown[definicao?.cooldown ?? 1]).toContain('W03');
+    // A carta só entra na zona no encerramento do turno (§11).
+    const guardada = guardarNoCooldown(depois, A);
+    expect(jogador(guardada, A).cooldown[definicao?.cooldown ?? 1]).toContain('W03');
   });
 
   it('recusa uma carta que não existe no catálogo', () => {
@@ -135,8 +138,13 @@ describe('o pedido do cliente não carrega dados de carta', () => {
       pedido: { carta: 'M05' as never },
       resposta: { tipo: 'carta-de-reacao', carta: 'W15' as never },
     });
-    expect(jogador(fim, A).cooldown[1]).toContain('W15');
-    expect(jogador(fim, B).cooldown[2]).toContain('M05');
+    /*
+     * As duas migram no mesmo encerramento: a Ação de quem jogou e a Reação de
+     * quem defendeu foram usadas no mesmo turno (§11).
+     */
+    const guardadas = guardarNoCooldown(fim, B);
+    expect(jogador(guardadas, A).cooldown[1]).toContain('W15');
+    expect(jogador(guardadas, B).cooldown[2]).toContain('M05');
   });
 });
 

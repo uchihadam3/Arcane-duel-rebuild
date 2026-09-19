@@ -165,6 +165,39 @@ export type SlotsDeAcao = readonly [SlotDeAcao, SlotDeAcao, SlotDeAcao, SlotDeAc
  */
 export type EstadoDeCooldown = Readonly<Record<ZonaDeCooldown, readonly CardId[]>>;
 
+/**
+ * Uma habilidade usada que ainda **não** entrou no cooldown.
+ *
+ * Pela regra vigente (§11), a habilidade usada permanece fisicamente no seu
+ * espaço de Ação ou de Resposta depois de resolver, e só entra na zona de
+ * cooldown no **encerramento do turno atual**. Entre a resolução e o
+ * encerramento, ela existe aqui — e só aqui.
+ *
+ * A carta nunca está em dois lugares: enquanto há um agendamento para ela, ela
+ * está no slot e **não** está em `cooldown`; quando o turno encerra, o
+ * agendamento some e ela aparece na zona. Um teste confere essa exclusividade.
+ *
+ * `destino` começa igual a `zonaImpressa` e é o que os modificadores mexem —
+ * Runa do Eco e Mente Calculista adiantam o **agendamento**, não uma carta que
+ * já está no cooldown, porque ela ainda não está lá.
+ */
+export interface CooldownAgendado {
+  readonly carta: CardId;
+  /** A zona impressa na carta. Referência, e nunca muda. */
+  readonly zonaImpressa: ZonaDeCooldown;
+  /** Para onde ela vai de fato, depois dos modificadores. */
+  readonly destino: ZonaDeCooldown;
+  /** Em que turno a habilidade foi usada. */
+  readonly turnoDeUso: number;
+  /** De onde ela sai quando o turno encerrar. */
+  readonly origem: OrigemDoAgendamento;
+}
+
+/** O espaço físico que a habilidade agendada ainda ocupa. */
+export type OrigemDoAgendamento =
+  | { readonly tipo: 'acao'; readonly indice: IndiceDeAcao }
+  | { readonly tipo: 'resposta'; readonly indice: IndiceDeAcao };
+
 /** Quantidade acumulada de cada Condição, na área de Condições do Personagem. */
 export type EstadoDeCondicoes = Readonly<Record<CondicaoId, number>>;
 
@@ -191,6 +224,14 @@ export interface EstadoDeJogador<TClasse extends ClassId = ClassId> {
    */
   readonly impulsoInicial: boolean;
   readonly acoesRealizadasNoTurno: number;
+
+  /**
+   * As habilidades usadas neste turno que ainda estão no campo.
+   *
+   * Elas entram no cooldown no encerramento do turno, e não ao resolver. Ver
+   * `CooldownAgendado`.
+   */
+  readonly cooldownAgendado: readonly CooldownAgendado[];
 
   /**
    * As oito habilidades disponíveis.

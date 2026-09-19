@@ -63,6 +63,15 @@ describe('avanço das zonas', () => {
 });
 
 describe('cooldown dentro do ciclo de turno', () => {
+  /*
+   * A regra mudou **onde a carta fica**, não **quanto tempo ela demora**.
+   *
+   * Antes ela entrava na zona ao resolver; agora entra no encerramento do
+   * mesmo turno. Como o avanço acontece no **início** do turno seguinte do
+   * dono, e o encerramento vem antes disso, a carta fica disponível
+   * exatamente no mesmo turno de antes. Nenhum número de balanceamento mudou,
+   * e este teste é o que segura essa afirmação.
+   */
   /** Joga uma carta com o cooldown pedido e encerra o turno de A. */
   const jogarEPassar = (
     partida: EstadoDaPartida,
@@ -86,7 +95,12 @@ describe('cooldown dentro do ciclo de turno', () => {
 
   it('uma carta em CD1 volta à mão no próximo turno do dono', () => {
     let partida = jogarEPassar(partidaEmAndamento(), CARTA_A1, 1, 0);
-    expect(jogadorDe(partida, ID_A).cooldown[1]).toContain(CARTA_A1);
+    /*
+     * Logo depois de resolver ela ainda **não** está em CD1: está no espaço de
+     * Ação, agendada (§11). Quem a move é o encerramento, dentro de `darAVolta`.
+     */
+    expect(jogadorDe(partida, ID_A).cooldown[1]).not.toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_A).cooldownAgendado[0]?.destino).toBe(1);
 
     partida = darAVolta(partida);
     expect(jogadorDe(partida, ID_A).mao).toContain(CARTA_A1);
@@ -95,7 +109,8 @@ describe('cooldown dentro do ciclo de turno', () => {
 
   it('uma carta em CD3 leva três turnos próprios para voltar', () => {
     let partida = jogarEPassar(partidaEmAndamento(), CARTA_A1, 3, 0);
-    expect(jogadorDe(partida, ID_A).cooldown[3]).toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_A).cooldown[3]).not.toContain(CARTA_A1);
+    expect(jogadorDe(partida, ID_A).cooldownAgendado[0]?.destino).toBe(3);
 
     partida = darAVolta(partida);
     expect(jogadorDe(partida, ID_A).cooldown[2]).toContain(CARTA_A1);

@@ -14,6 +14,7 @@ import {
   jogador,
   jogar,
   virarTurno,
+  guardarNoCooldown,
 } from '../teste-apoio.js';
 import { anexarAlmaNoServo, declarar, resolver } from '../partida.js';
 
@@ -324,12 +325,22 @@ describe('recursos das doze classes', () => {
   it('acusa carta reservada que também está no cooldown', () => {
     const patrulheiro = build('patrulheiro', { habilidades: ['R13', 'R05', 'R01'] });
     const base = duelo(patrulheiro, guerreiro, A);
-    // R13 vai ao cooldown ao ser usada; plantar a reserva nela é a dupla zona.
+    /*
+     * A carta usada fica agendada para o cooldown e só entra na zona no
+     * encerramento (§11). A dupla zona é acusada nos dois momentos: enquanto
+     * agendada, e depois de ter entrado.
+     */
     const usada = jogar(base, A, {
       pedido: { carta: carta('R13'), escolhas: { cartaDaMao: carta('R05') } },
     }).partida;
-    const partida = comEmboscadaDeTeste(usada, A, { carta: carta('R13'), estado: 'armada' });
-    expect(quebras(partida)).toContain('está reservada e no cooldown');
+    const agendada = comEmboscadaDeTeste(usada, A, { carta: carta('R13'), estado: 'armada' });
+    expect(quebras(agendada)).toContain('está reservada e no cooldown agendado');
+
+    const naZona = comEmboscadaDeTeste(guardarNoCooldown(usada, A), A, {
+      carta: carta('R13'),
+      estado: 'armada',
+    });
+    expect(quebras(naZona)).toContain('está reservada e no cooldown');
   });
 
   it('acusa estado de Emboscada fora do ciclo', () => {

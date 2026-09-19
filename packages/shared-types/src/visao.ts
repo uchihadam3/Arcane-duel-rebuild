@@ -1,5 +1,6 @@
 import type { CardId, ClassId, MatchId, PlayerId } from './ids.js';
 import type { PerfilDeHabilidade, ZonaDeCooldown } from './cards.js';
+import type { CooldownAgendado } from './estado-de-partida.js';
 import type { IndiceDeAcao } from './zones.js';
 import type { Anotacoes } from './anotacoes.js';
 import type { EstadoDePassiva } from './card-state.js';
@@ -142,6 +143,15 @@ export interface VisaoDeJogador {
   readonly mao: readonly CartaProjetada[];
   /** Cartas em cooldown já foram jogadas publicamente, então ficam visíveis. */
   readonly cooldown: Readonly<Record<ZonaDeCooldown, readonly CardId[]>>;
+  /**
+   * As habilidades usadas neste turno que ainda estão no campo.
+   *
+   * Elas entram no cooldown no encerramento (§11). A informação é pública: a
+   * carta está face-up no espaço de Ação ou de Resposta, e qualquer um vê para
+   * onde ela vai. Projetar isso não vaza nada — deixar de projetar é que
+   * obrigaria a interface a adivinhar.
+   */
+  readonly cooldownAgendado: readonly CooldownAgendado[];
 
   readonly passivas: readonly PassivaProjetada[];
   readonly cartasDeClasse: readonly CartaDeClasseEquipada[];

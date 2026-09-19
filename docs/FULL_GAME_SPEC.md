@@ -238,7 +238,22 @@ A sequência padrão é:
 7. se a Guarda passou de acima de zero para zero, ocorre Ruptura e a ação recebe mais dois de Dano;
 8. Dano é aplicado à Vida;
 9. condições e efeitos posteriores são resolvidos;
-10. a ação termina.
+10. a habilidade usada recebe a zona de cooldown em que vai entrar, e permanece fisicamente no espaço de Ação;
+11. a ação termina.
+
+A habilidade usada não entra no cooldown neste momento. Ela fica no espaço de Ação, resolvida, até o encerramento do turno atual, conforme a seção 11.
+
+O encerramento do turno segue esta ordem:
+
+1. efeitos de fim de turno declarados por carta;
+2. resolução de condições cujo texto age no fim do turno;
+3. conversão de pontos de Ação não gastos em Reserva, conforme a seção 7;
+4. as habilidades usadas no turno migram dos espaços de Ação e de Resposta para as zonas de cooldown de destino, na ordem em que foram usadas, para os dois jogadores;
+5. os espaços de Ação e as bandejas de Resposta ficam vazios;
+6. o turno passa ao outro jogador;
+7. no início do turno seguinte, o cooldown do jogador ativo avança conforme a seção 11.
+
+A migração vem depois da conversão em Reserva porque a conversão lê pontos de Ação, que nada têm a ver com a posição das cartas; e vem antes de limpar os espaços porque é dos espaços que as cartas saem.
 
 A interface digital deve apresentar esses passos de forma fluida sem obrigar o jogador a ler uma lista durante a partida.
 
@@ -246,7 +261,13 @@ A interface digital deve apresentar esses passos de forma fluida sem obrigar o j
 
 # 11. COOLDOWN
 
-Habilidades usadas saem da mão e entram na zona de cooldown indicada na carta.
+Habilidades usadas saem da mão e, no encerramento do turno em que foram usadas, entram na zona de cooldown indicada na carta.
+
+Habilidades usadas permanecem em seus espaços de Ação ou de Resposta após a resolução. No encerramento do turno atual, cada habilidade usada entra no cooldown indicado, após aplicação de modificadores pertinentes.
+
+Isso vale igualmente para a carta de Reação: ela permanece na bandeja de Resposta da Ação a que respondeu e migra, no mesmo encerramento, para a zona impressa nela — não na zona da Ação a que respondeu.
+
+Entre a resolução e o encerramento, a habilidade está no campo e não está em nenhuma zona de cooldown. Um efeito que peça "uma carta sua em CD um" não alcança uma habilidade usada no turno atual, porque ela ainda não entrou em zona alguma. Um efeito que altere a zona de destino de uma habilidade recém-usada altera o destino dessa migração.
 
 As zonas são CD um, CD dois e CD três.
 
@@ -255,6 +276,8 @@ No início do turno do dono:
 - cartas em CD um voltam para a mão;
 - cartas em CD dois passam para CD um;
 - cartas em CD três passam para CD dois.
+
+Como a migração acontece no encerramento do turno e o avanço acontece no início do turno seguinte do dono, a disponibilidade de cada habilidade é a mesma de antes desta regra: uma carta de CD um volta à mão no próximo turno do dono, uma de CD dois leva dois turnos próprios, e uma de CD três leva três.
 
 Várias cartas podem existir na mesma zona.
 
@@ -673,7 +696,7 @@ Características obrigatórias:
 - Passivas fazem animação de virar quando reveladas;
 - Cartas de Classe giram para a horizontal quando Ativadas;
 - Carta de Classe Exaurida recebe uma animação extrema própria e sai do campo para uma área de cartas removidas;
-- cooldown é mostrado pelo movimento real da carta entre as zonas;
+- cooldown é mostrado pelo movimento real da carta entre as zonas, inclusive na saída do espaço de Ação para a zona de destino no encerramento do turno;
 - Ruptura precisa ter impacto visual e sonoro claro;
 - Ultimates recebem apresentação especial;
 - mudança de turno recebe transição curta e forte;

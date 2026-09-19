@@ -7,7 +7,7 @@ import { REGRAS_UNIVERSAIS } from './constants.js';
 import { aplicarMurchar, resolverQueimadura } from './condicoes.js';
 import { converterEmReserva } from './custos.js';
 import type { EventoUniversal } from './eventos.js';
-import { avancarCooldown } from './cooldown.js';
+import { avancarCooldown, liquidarAgendamentos } from './cooldown.js';
 import { adversarioDe, slotsVazios, substituirJogador } from './interno.js';
 
 /*
@@ -173,10 +173,44 @@ export const encerrarTurno = (partida: EstadoDaPartida, jogador: PlayerId): Resp
     eventos.push({ tipo: 'impulso-inicial-descartado', jogador });
   }
 
+  /*
+   * As habilidades usadas neste turno migram para o cooldown **agora**.
+   *
+   * Elas ficaram no espaço de Ação ou de Resposta desde que resolveram (§11),
+   * e é aqui que saem do campo. Os dois jogadores liquidam: a Reação de quem
+   * defendeu também foi usada neste turno.
+   *
+   * A liquidação vem **antes** de limpar os slots, porque é dela que sai a
+   * ordem em que a apresentação anima as cartas migrando — limpar primeiro
+   * apagaria a informação de onde cada uma estava.
+   */
+  const adversario = adversarioDe(partida, jogador);
+  const meus = liquidarAgendamentos(atual);
+  atual = meus.jogador;
+  for (const entrada of meus.entradas) {
+    eventos.push({
+      tipo: 'carta-para-cooldown',
+      jogador,
+      carta: entrada.carta,
+      zona: entrada.zona,
+    });
+  }
+
+  const dele = liquidarAgendamentos(adversario);
+  for (const entrada of dele.entradas) {
+    eventos.push({
+      tipo: 'carta-para-cooldown',
+      jogador: dele.jogador.id,
+      carta: entrada.carta,
+      zona: entrada.zona,
+    });
+  }
+
   atual = { ...atual, acoes: slotsVazios() };
   eventos.push({ tipo: 'turno-encerrado', jogador, numero: partida.turno.numero });
 
-  const comJogador = substituirJogador(partida, atual);
+  const comAdversario = substituirJogador(partida, dele.jogador);
+  const comJogador = substituirJogador(comAdversario, atual);
   const proximo = adversarioDe(comJogador, jogador);
   const comProximoTurno: EstadoDaPartida = {
     ...comJogador,

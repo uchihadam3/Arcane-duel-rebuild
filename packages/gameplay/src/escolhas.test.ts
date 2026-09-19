@@ -11,6 +11,7 @@ import {
   jogador,
   jogar,
   virarTurno,
+  comCartaEmCooldown,
 } from './teste-apoio.js';
 import {
   ativarPassivaNaAcao,
@@ -101,19 +102,20 @@ describe('escolha de carta', () => {
   });
 
   it('M13 não escolhe sozinha a carta de CD1', () => {
-    const partida = duelo(mago(['M01', 'M02', 'M13']), guerreiro(['W01']), A);
-    const primeira = jogar(partida, A, { pedido: { carta: 'M01' as never } }).partida;
-    const segunda = jogar(primeira, A, { pedido: { carta: 'M02' as never } }).partida;
     // M01 está em CD1 e M02 em CD2, então há exatamente uma opção — e mesmo
-    // assim o motor não escolhe por quem joga.
-    expect(erroDe(declarar(segunda, A, { carta: 'M13' as never })).tipo).toBe(
+    // assim o motor não escolhe por quem joga. As duas são postas nas zonas
+    // direto: uma carta usada neste turno ainda estaria no campo (§11).
+    let partida = duelo(mago(['M01', 'M02', 'M13']), guerreiro(['W01']), A);
+    partida = comCartaEmCooldown(partida, A, 'M01', 1);
+    partida = comCartaEmCooldown(partida, A, 'M02', 2);
+    expect(erroDe(declarar(partida, A, { carta: 'M13' as never })).tipo).toBe(
       'escolha-obrigatoria',
     );
   });
 
   it('MU03 exige a lista de cartas a devolver, mesmo que seja vazia', () => {
     const partida = duelo(mago(['M01', 'M11'], { ultimate: 'MU03' }), guerreiro(['W01']), A);
-    const comCooldown = jogar(partida, A, { pedido: { carta: 'M01' as never } }).partida;
+    const comCooldown = comCartaEmCooldown(partida, A, 'M01', 1);
     const comMana = comRecurso(comCooldown, A, 3);
 
     expect(erroDe(declarar(comMana, A, { carta: 'MU03' as never })).tipo).toBe(

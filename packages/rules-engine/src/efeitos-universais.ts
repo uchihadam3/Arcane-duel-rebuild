@@ -22,6 +22,15 @@ import { semNegativo } from './interno.js';
  */
 
 /** Em qual zona de cooldown a carta está, se estiver em alguma. */
+/**
+ * Em que zona de cooldown a carta está — **de fato**.
+ *
+ * Uma habilidade usada neste turno ainda não está em zona nenhuma: ela está no
+ * campo, agendada (§11). Esta função devolve `null` para ela, e isso é o
+ * comportamento certo. É o que faz Distorção Temporal ("escolha uma carta sua
+ * em CD1") não enxergar uma carta jogada agora — ela não está em CD1, e fingir
+ * que está seria inventar regra.
+ */
 export const zonaDaCarta = (jogador: EstadoDeJogador, carta: CardId): ZonaDeCooldown | null => {
   for (const zona of ZONAS_DE_COOLDOWN) {
     if (jogador.cooldown[zona].includes(carta)) return zona;
@@ -46,11 +55,34 @@ export interface MovimentoDeCarta {
   readonly de: ZonaDeCooldown;
 }
 
-/** Devolve uma carta do cooldown direto para a mão. */
+/**
+ * Devolve uma carta à mão, tirando-a do caminho do cooldown.
+ *
+ * Ela pode estar em dois pontos desse caminho: já numa zona, ou ainda no campo
+ * com um agendamento (§11). Os dois casos são a mesma intenção — "esta carta
+ * não vai ficar no cooldown" —, e é por isso que a função trata os dois.
+ *
+ * Quem **seleciona alvo** não passa por aqui: a legalidade de "uma carta sua
+ * em CD1" lê `jogador.cooldown[1]` direto, e continua sem enxergar
+ * agendamento nenhum. A distinção é deliberada: escolher uma carta que está na
+ * zona é uma coisa, tirar do caminho a carta que você acabou de usar é outra.
+ */
 export const devolverCartaAMao = (
   jogador: EstadoDeJogador,
   carta: CardId,
 ): Resultado<MovimentoDeCarta, ErroDeDominio> => {
+  const agendado = jogador.cooldownAgendado.find((atual) => atual.carta === carta);
+  if (agendado !== undefined) {
+    return sucesso({
+      jogador: {
+        ...jogador,
+        mao: [...jogador.mao, carta],
+        cooldownAgendado: jogador.cooldownAgendado.filter((atual) => atual.carta !== carta),
+      },
+      de: agendado.destino,
+    });
+  }
+
   const zona = zonaDaCarta(jogador, carta);
   if (zona === null) return falha({ tipo: 'carta-fora-do-cooldown', carta });
 
@@ -71,11 +103,47 @@ export interface AdiantamentoDeCarta {
  *
  * Sair de CD1 é chegar à mão: não existe zona anterior a CD1, e a carta que
  * "avança uma zona" a partir dali fica disponível de novo.
+ *
+ * **Uma habilidade usada neste turno ainda não está numa zona**: ela está no
+ * espaço de Ação ou de Resposta, com um agendamento (§11). Adiantá-la é mexer
+ * no **destino do agendamento**, não mover uma carta que não está lá. É o caso
+ * de Runa do Eco e de Mente Calculista, que agem logo depois de resolver — e,
+ * sem este ramo, elas simplesmente não fariam nada.
  */
 export const adiantarCartaNoCooldown = (
   jogador: EstadoDeJogador,
   carta: CardId,
 ): Resultado<AdiantamentoDeCarta, ErroDeDominio> => {
+  const agendado = jogador.cooldownAgendado.find((atual) => atual.carta === carta);
+  if (agendado !== undefined) {
+    const de = agendado.destino;
+    if (de === 1) {
+      // Adiantar a partir de CD1 é voltar à mão, e o agendamento deixa de valer.
+      return sucesso({
+        jogador: {
+          ...jogador,
+          mao: [...jogador.mao, carta],
+          cooldownAgendado: jogador.cooldownAgendado.filter((atual) => atual.carta !== carta),
+        },
+        de: 1,
+        para: 1,
+        voltouParaAMao: true,
+      });
+    }
+    const para: ZonaDeCooldown = de === 3 ? 2 : 1;
+    return sucesso({
+      jogador: {
+        ...jogador,
+        cooldownAgendado: jogador.cooldownAgendado.map((atual) =>
+          atual.carta === carta ? { ...atual, destino: para } : atual,
+        ),
+      },
+      de,
+      para,
+      voltouParaAMao: false,
+    });
+  }
+
   const zona = zonaDaCarta(jogador, carta);
   if (zona === null) return falha({ tipo: 'carta-fora-do-cooldown', carta });
 
@@ -117,6 +185,24 @@ export const atrasarCartaNoCooldown = (
   jogador: EstadoDeJogador,
   carta: CardId,
 ): Resultado<AtrasoDeCarta, ErroDeDominio> => {
+  /* Pelo mesmo motivo do adiantamento: a carta usada agora é um agendamento. */
+  const agendado = jogador.cooldownAgendado.find((atual) => atual.carta === carta);
+  if (agendado !== undefined) {
+    const de = agendado.destino;
+    const para: ZonaDeCooldown = de === 1 ? 2 : 3;
+    if (para === de) return sucesso({ jogador, de, para });
+    return sucesso({
+      jogador: {
+        ...jogador,
+        cooldownAgendado: jogador.cooldownAgendado.map((atual) =>
+          atual.carta === carta ? { ...atual, destino: para } : atual,
+        ),
+      },
+      de,
+      para,
+    });
+  }
+
   const zona = zonaDaCarta(jogador, carta);
   if (zona === null) return falha({ tipo: 'carta-fora-do-cooldown', carta });
 

@@ -448,6 +448,41 @@ export const jogar = (
   return { partida: exigir(resolvida), eventos };
 };
 
+/**
+ * Põe uma carta da mão diretamente numa zona de cooldown.
+ *
+ * Serve para montar o cenário de quem **lê** o cooldown — Distorção Temporal,
+ * Selar o Kata, Sobrecarga Temporal. Antes, esses testes montavam o cenário
+ * jogando a carta no mesmo turno; pela regra vigente isso não põe carta nenhuma
+ * em zona alguma (§11), porque a habilidade usada fica no campo até o
+ * encerramento. Montar o estado direto deixa o teste falando do efeito, e não
+ * da linha do tempo do cooldown — que tem testes próprios.
+ */
+export const comCartaEmCooldown = (
+  partida: EstadoDaPartida,
+  dono: PlayerId,
+  carta: string,
+  zona: 1 | 2 | 3,
+): EstadoDaPartida => {
+  const atual = jogador(partida, dono);
+  const id = cardId(carta);
+  return com(partida, dono, {
+    mao: atual.mao.filter((atualCarta) => atualCarta !== id),
+    cooldown: { ...atual.cooldown, [zona]: [...atual.cooldown[zona], id] },
+  });
+};
+
+/**
+ * Encerra o turno de quem jogou, só para as habilidades usadas irem ao cooldown.
+ *
+ * Pela regra vigente (§11), a habilidade usada fica no espaço de Ação até o
+ * encerramento do turno. Um teste que queira observar a carta **na zona**
+ * precisa passar por aqui; observar logo depois de resolver mostra o
+ * agendamento, que é outra coisa.
+ */
+export const guardarNoCooldown = (partida: EstadoDaPartida, dono: PlayerId): EstadoDaPartida =>
+  exigir(fecharTurno(partida, dono));
+
 export const virarTurno = (partida: EstadoDaPartida, deQuem: PlayerId): EstadoDaPartida => {
   const fechada = exigir(fecharTurno(partida, deQuem));
   const proximo = fechada.turno?.jogadorAtivo;

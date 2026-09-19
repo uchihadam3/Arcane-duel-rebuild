@@ -167,7 +167,7 @@ describe('Condições e cooldown', () => {
     }
   });
 
-  it('o cooldown avança no início do turno, sem esperar animação', () => {
+  it('a carta desce para o cooldown no encerramento, sem esperar animação', () => {
     montarPartida();
     const nome = focarPrimeiraJogavel();
     fireEvent.click(screen.getByText('Usar'));
@@ -176,7 +176,14 @@ describe('Condições e cooldown', () => {
     fireEvent.click(screen.getByTestId('sem-resposta'));
     passarOAparelho();
 
-    const meuCooldown = screen.getAllByTestId('cooldown')[1];
-    expect(meuCooldown?.textContent).toContain(nome);
+    // Enquanto o turno é meu, a carta continua no campo, não no cooldown.
+    expect(screen.getAllByTestId('cooldown')[1]?.textContent).not.toContain(nome);
+
+    fireEvent.click(screen.getByTestId('encerrar-turno'));
+    passarOAparelho();
+
+    // Encerrou: o estado já mostra a carta no cooldown de quem a usou, sem
+    // depender de nenhuma animação ter terminado.
+    expect(screen.getAllByTestId('cooldown')[0]?.textContent).toContain(nome);
   });
 });

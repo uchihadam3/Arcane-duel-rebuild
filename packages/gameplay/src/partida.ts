@@ -1300,7 +1300,16 @@ const resumirEventos = (
       guardaRemovida = evento.guardaAntes - evento.guardaDepois;
     } else if (evento.tipo === 'ruptura') ruptura = true;
     else if (evento.tipo === 'ruptura-impedida') rupturaImpedida = true;
-    else if (evento.tipo === 'carta-para-cooldown' && zona === null) zona = evento.zona;
+    /*
+     * A zona do resumo é **para onde a carta vai**, e não onde ela está.
+     *
+     * Pela regra vigente (§11) a habilidade usada não entra no cooldown ao
+     * resolver: ela fica no campo e ganha um agendamento. Quem lê
+     * `zonaDeCooldown` — Runa do Eco, Mente Calculista, Liturgia Contínua,
+     * Mantra do Retorno — quer saber o destino, e é esse o número. Ler o
+     * evento antigo aqui fazia todas elas simplesmente não fazerem nada.
+     */
+    else if (evento.tipo === 'cooldown-agendado' && zona === null) zona = evento.zona;
   }
 
   return {

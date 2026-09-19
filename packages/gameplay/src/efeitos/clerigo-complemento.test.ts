@@ -12,6 +12,7 @@ import {
   jogador,
   jogar,
   virarTurno,
+  guardarNoCooldown,
 } from '../teste-apoio.js';
 import { ativarPassivaNaAcao, declarar, responder, resolver } from '../partida.js';
 
@@ -195,8 +196,13 @@ describe('Clérigo — Passivas', () => {
     const uma = jogar(comPassiva, A, { pedido: { carta: 'C01' as never } }).partida;
     const duas = jogar(uma, A, { pedido: { carta: 'C08' as never } }).partida;
     const { partida: tres } = jogar(duas, A, { pedido: { carta: 'C12' as never } });
-    // C12 Vigília entra em CD2 e a Liturgia a puxa para CD1.
-    expect(jogador(tres, A).cooldown[1]).toContain('C12');
+    /*
+     * A Liturgia adianta o **agendamento**: C12 Vigília imprime CD2 e passa a
+     * ter destino CD1. A carta entra na zona no encerramento do turno (§11),
+     * e é lá que o efeito se confirma.
+     */
+    expect(jogador(tres, A).cooldownAgendado.find((a) => a.carta === 'C12')?.destino).toBe(1);
+    expect(jogador(guardarNoCooldown(tres, A), A).cooldown[1]).toContain('C12');
   });
 
   it('CP08 Escudo dos Fiéis restaura 1 Vida quando uma Reação zera o Dano', () => {

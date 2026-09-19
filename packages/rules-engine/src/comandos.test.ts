@@ -25,6 +25,16 @@ const declarar = (partida: EstadoDaPartida, carta = CARTA_A1, opcoes = {}): Esta
 const resolver = (partida: EstadoDaPartida, indice: 0 | 1 | 2 = 0): EstadoDaPartida =>
   exigirSucesso(resolverAcao(partida, ID_A, indice)).partida;
 
+/**
+ * Encerra o turno de A.
+ *
+ * É aqui que as habilidades usadas saem do campo e entram no cooldown (§11).
+ * Vários testes de cooldown passam por esta função porque, sem ela, a carta
+ * ainda está no espaço de Ação — que é exatamente a regra.
+ */
+const encerrar = (partida: EstadoDaPartida): EstadoDaPartida =>
+  exigirSucesso(encerrarTurno(partida, ID_A)).partida;
+
 describe('declaração de Ação', () => {
   it('gasta os pontos de Ação do custo', () => {
     const partida = declarar(partidaEmAndamento(), CARTA_A1, { custo: 2 });
@@ -144,7 +154,12 @@ describe('Resposta voluntária', () => {
     expect(!resposta.ok && resposta.erro.tipo).toBe('fora-do-turno');
   });
 
-  it('manda a carta de Reação para o cooldown quando a Ação resolve', () => {
+  /*
+   * A Reação segue a mesma regra da Ação: ela fica na bandeja de Resposta até
+   * o encerramento do turno, e o que a resolução produz é o agendamento dela —
+   * na zona impressa **nela**, e não na da Ação a que respondeu (§11).
+   */
+  it('agenda o cooldown da Reação e a deixa na bandeja', () => {
     let partida = declarar(partidaEmAndamento());
     partida = exigirSucesso(
       registrarResposta(partida, ID_B, 0, {
@@ -153,16 +168,32 @@ describe('Resposta voluntária', () => {
       }),
     ).partida;
     partida = resolver(partida);
-    expect(jogadorDe(partida, ID_B).cooldown[1]).toContain(CARTA_B1);
+    const defensor = jogadorDe(partida, ID_B);
+    expect(defensor.cooldown[1]).not.toContain(CARTA_B1);
+    expect(defensor.cooldownAgendado.map((a) => String(a.carta))).toContain(CARTA_B1);
+    expect(defensor.cooldownAgendado[0]?.origem.tipo).toBe('resposta');
   });
 });
 
 describe('resolução de Ação', () => {
-  it('manda a habilidade usada para o cooldown impresso', () => {
+  /*
+   * A habilidade usada **não** entra no cooldown ao resolver (§11).
+   *
+   * Ela fica no espaço de Ação até o encerramento do turno, e o que a
+   * resolução produz é o **agendamento**: a carta ganha um destino e continua
+   * onde está. Quem a move é `encerrarTurno`.
+   */
+  it('agenda o cooldown impresso e deixa a carta no campo', () => {
     const partida = resolver(declarar(partidaEmAndamento(), CARTA_A1, { cooldown: 2 }));
     const jogador = jogadorDe(partida, ID_A);
-    expect(jogador.cooldown[2]).toContain(CARTA_A1);
+    expect(jogador.cooldown[2]).not.toContain(CARTA_A1);
     expect(jogador.mao).not.toContain(CARTA_A1);
+    expect(jogador.cooldownAgendado.map((a) => String(a.carta))).toContain(CARTA_A1);
+    expect(jogador.cooldownAgendado[0]?.destino).toBe(2);
+    expect(jogador.cooldownAgendado[0]?.zonaImpressa).toBe(2);
+    // E ela continua ocupando o espaço de Ação, resolvida.
+    expect(jogador.acoes[0]?.situacao).toBe('resolvida');
+    expect(jogador.acoes[0]?.perfil?.carta).toBe(CARTA_A1);
   });
 
   it('conta a Ação do turno', () => {
@@ -223,11 +254,17 @@ describe('nenhuma carta se duplica entre mão, cooldown e campo', () => {
       partida = resolver(partida, indice as 0 | 1 | 2);
 
       const jogador = jogadorDe(partida, ID_A);
+      /*
+       * A carta usada está no campo, agendada — não na mão nem no cooldown.
+       * Contar as oito exige somar o agendamento, e **exatamente uma vez**:
+       * é isso que prova que ela não existe em dois lugares.
+       */
       const todas = [
         ...jogador.mao,
         ...jogador.cooldown[1],
         ...jogador.cooldown[2],
         ...jogador.cooldown[3],
+        ...jogador.cooldownAgendado.map((agendado) => String(agendado.carta)),
       ];
       expect(new Set(todas).size).toBe(todas.length);
       expect(todas).toHaveLength(8);
@@ -267,7 +304,14 @@ describe('carta de Reação: cooldown próprio', () => {
         perfil: perfilDeReacao(CARTA_B1, { cooldown: cooldownDaReacao }),
       }),
     ).partida;
-    return resolver(partida);
+    /*
+     * Encerrar o turno faz parte do caminho.
+     *
+     * A carta usada fica no campo até o encerramento (§11), então um teste de
+     * "cada carta vai para a própria zona" precisa passar por aqui — e assim
+     * ele prova o trajeto inteiro, e não só o agendamento.
+     */
+    return encerrar(resolver(partida));
   };
 
   it('Ataque CD3 respondido por Reação CD1: cada carta vai para a própria zona', () => {
@@ -290,8 +334,35 @@ describe('carta de Reação: cooldown próprio', () => {
   });
 
   it('o Ataque continua indo para o cooldown dele mesmo sem Resposta', () => {
-    const partida = resolver(declarar(partidaEmAndamento(), CARTA_A1, { cooldown: 2 }));
+    const partida = encerrar(resolver(declarar(partidaEmAndamento(), CARTA_A1, { cooldown: 2 })));
     expect(jogadorDe(partida, ID_A).cooldown[2]).toContain(CARTA_A1);
+  });
+
+  /*
+   * O trajeto completo, num teste só.
+   *
+   * Ele é o que prova a regra nova inteira: a carta sai da mão ao declarar,
+   * fica no campo depois de resolver, **não** está no cooldown nesse meio
+   * tempo, e só migra quando o turno encerra.
+   */
+  it('a habilidade fica no campo entre resolver e encerrar, e só então entra no cooldown', () => {
+    let partida = declarar(partidaEmAndamento(), CARTA_A1, { cooldown: 2 });
+    expect(jogadorDe(partida, ID_A).mao).not.toContain(CARTA_A1);
+
+    partida = resolver(partida);
+    const depoisDeResolver = jogadorDe(partida, ID_A);
+    expect(depoisDeResolver.acoes[0]?.perfil?.carta).toBe(CARTA_A1);
+    expect(depoisDeResolver.acoes[0]?.situacao).toBe('resolvida');
+    expect(depoisDeResolver.cooldown[1]).not.toContain(CARTA_A1);
+    expect(depoisDeResolver.cooldown[2]).not.toContain(CARTA_A1);
+    expect(depoisDeResolver.cooldown[3]).not.toContain(CARTA_A1);
+
+    partida = encerrar(partida);
+    const depoisDeEncerrar = jogadorDe(partida, ID_A);
+    expect(depoisDeEncerrar.cooldown[2]).toContain(CARTA_A1);
+    expect(depoisDeEncerrar.cooldownAgendado).toHaveLength(0);
+    // E o espaço de Ação fica limpo.
+    expect(depoisDeEncerrar.acoes[0]?.perfil).toBeNull();
   });
 
   it('a composição das oito continua íntegra para os dois lados', () => {
@@ -303,6 +374,7 @@ describe('carta de Reação: cooldown próprio', () => {
         ...jogador.cooldown[1],
         ...jogador.cooldown[2],
         ...jogador.cooldown[3],
+        ...jogador.cooldownAgendado.map((agendado) => String(agendado.carta)),
       ];
       expect(new Set(todas).size).toBe(8);
     }

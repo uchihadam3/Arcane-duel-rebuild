@@ -13,6 +13,7 @@ import {
   jogar,
   kataDe,
   virarTurno,
+  comCartaEmCooldown,
 } from '../teste-apoio.js';
 import { declarar } from '../partida.js';
 
@@ -163,17 +164,23 @@ describe('Monge — habilidades', () => {
   });
 
   it('MO15 Selar o Kata só sai depois de Fluxo e devolve uma carta de CD1', () => {
-    const base = comChi(duelo(monge(['MO01', 'MO04', 'MO15']), guerreiro, A), A, 3);
+    const base = comChi(duelo(monge(['MO01', 'MO04', 'MO15', 'MO16']), guerreiro, A), A, 3);
     expect(erroDe(declarar(base, A, { carta: 'MO15' as never })).tipo).toBe(
       'condicao-de-uso-nao-satisfeita',
     );
 
-    const uma = jogar(base, A, { pedido: { carta: 'MO01' as never } }).partida;
+    /*
+     * MO01 precisa estar **em CD1** para Selar o Kata devolvê-la. As cartas
+     * usadas neste turno ainda estão no campo (§11), então o alvo vem de uma
+     * carta que já estava na zona.
+     */
+    const comAlvo = comCartaEmCooldown(base, A, 'MO16', 1);
+    const uma = jogar(comAlvo, A, { pedido: { carta: 'MO01' as never } }).partida;
     const duas = jogar(uma, A, { pedido: { carta: 'MO04' as never } }).partida;
     const { partida: depois } = jogar(duas, A, {
-      pedido: { carta: 'MO15' as never, escolhas: { cartaEmCooldown: 'MO01' as never } },
+      pedido: { carta: 'MO15' as never, escolhas: { cartaEmCooldown: 'MO16' as never } },
     });
-    expect(jogador(depois, A).mao).toContain('MO01');
+    expect(jogador(depois, A).mao).toContain('MO16');
   });
 
   it('MO16 Antebraço de Pedra recupera 1 Chi ao impedir Ruptura', () => {

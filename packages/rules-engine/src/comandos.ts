@@ -16,7 +16,7 @@ import { REGRAS_UNIVERSAIS } from './constants.js';
 import { emboscadaArmadaCom, semEmboscada } from './recursos.js';
 import { concluiuASegundaAcao, consumirLento, resolverSangramento } from './condicoes.js';
 import { resolverAtaque } from './combate.js';
-import { enviarParaCooldown } from './cooldown.js';
+import { agendarCooldown } from './cooldown.js';
 import type { DescontosDeCusto } from './custos.js';
 import { pagarCustoCompleto } from './custos.js';
 import type { EventoUniversal } from './eventos.js';
@@ -440,12 +440,25 @@ export const resolverAcao = (
     });
   }
 
-  // Uma carta sem zona impressa não vai para cooldown: ela foi consumida e sai
-  // da partida, como a Ultimate (§14).
+  /*
+   * A habilidade usada **não** entra no cooldown agora.
+   *
+   * Ela permanece fisicamente no espaço de Ação até o encerramento do turno
+   * (§11), e o que acontece aqui é o **agendamento**: a carta continua no slot
+   * e ganha um destino de cooldown. Quem move de fato é `encerrarTurno`.
+   *
+   * Uma carta sem zona impressa não é agendada: ela foi consumida e sai da
+   * partida, como a Ultimate (§14).
+   */
   if (perfil.cooldown !== null) {
-    atacante = enviarParaCooldown(atacante, perfil.carta, perfil.cooldown);
+    atacante = agendarCooldown(atacante, {
+      carta: perfil.carta,
+      zona: perfil.cooldown,
+      turno: partida.turno?.numero ?? 0,
+      origem: { tipo: 'acao', indice },
+    });
     eventos.push({
-      tipo: 'carta-para-cooldown',
+      tipo: 'cooldown-agendado',
       jogador: atacanteId,
       carta: perfil.carta,
       zona: perfil.cooldown,
@@ -459,9 +472,14 @@ export const resolverAcao = (
     // cooldown (§11).
     const perfilDaReacao = respostaComCarta.perfil;
     if (perfilDaReacao.cooldown !== null) {
-      defensor = enviarParaCooldown(defensor, perfilDaReacao.carta, perfilDaReacao.cooldown);
+      defensor = agendarCooldown(defensor, {
+        carta: perfilDaReacao.carta,
+        zona: perfilDaReacao.cooldown,
+        turno: partida.turno?.numero ?? 0,
+        origem: { tipo: 'resposta', indice },
+      });
       eventos.push({
-        tipo: 'carta-para-cooldown',
+        tipo: 'cooldown-agendado',
         jogador: defensor.id,
         carta: perfilDaReacao.carta,
         zona: perfilDaReacao.cooldown,

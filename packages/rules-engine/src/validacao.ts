@@ -69,9 +69,19 @@ export const validarEstadoDeJogador = (
     problemas.push({ jogador: jogador.id, campo, problema });
   };
 
+  /*
+   * As habilidades agendadas também estão em trânsito.
+   *
+   * Depois de resolver, a carta fica no espaço de Ação ou de Resposta até o
+   * encerramento do turno (§11): ela não está na mão e ainda não está no
+   * cooldown. Sem contá-la aqui, a composição das oito pareceria quebrada
+   * durante todo o resto do turno — e é justamente **não estar em dois
+   * lugares** que o teste de duplicidade confere logo abaixo.
+   */
   const habilidades = [
     ...jogador.mao,
     ...ZONAS_DE_COOLDOWN.flatMap((zona) => jogador.cooldown[zona]),
+    ...jogador.cooldownAgendado.map((agendado) => String(agendado.carta)),
     ...cartasEmTransito,
   ];
   if (habilidades.length !== COMPOSICAO_DA_BUILD.habilidades) {

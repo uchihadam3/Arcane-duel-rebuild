@@ -68,6 +68,13 @@ export interface ResumoDaResolucao {
   readonly ruptura: boolean;
   readonly rupturaImpedida: boolean;
   readonly houveReacao: boolean;
+  /**
+   * Para onde a carta usada vai no cooldown, ou `null` se não vai.
+   *
+   * É o **destino agendado**: quando este gancho roda, a carta ainda está no
+   * espaço de Ação e só migra no encerramento do turno (§11). Quem adianta ou
+   * atrasa mexe neste destino.
+   */
   readonly zonaDeCooldown: ZonaDeCooldown | null;
   readonly vidaPerdidaPeloDefensor: number;
   /**

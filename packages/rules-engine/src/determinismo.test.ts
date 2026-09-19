@@ -122,7 +122,15 @@ describe('determinismo', () => {
     const resolucao = exigirSucesso(resolverAcao(partida, ID_A, 0));
     const tipos = resolucao.eventos.map((evento) => evento.tipo);
     expect(tipos.slice(0, 3)).toEqual(['impacto-aplicado', 'ruptura', 'dano-aplicado']);
-    expect(tipos).toContain('carta-para-cooldown');
+    /*
+     * A resolução **agenda** o cooldown; ela não move a carta.
+     *
+     * `carta-para-cooldown` só aparece no encerramento do turno (§11), e é
+     * essa separação que a ordem canônica precisa preservar: quem lê o log
+     * distingue "resolveu" de "saiu do campo".
+     */
+    expect(tipos).toContain('cooldown-agendado');
+    expect(tipos).not.toContain('carta-para-cooldown');
     expect(tipos.at(-1)).toBe('acao-resolvida');
   });
 

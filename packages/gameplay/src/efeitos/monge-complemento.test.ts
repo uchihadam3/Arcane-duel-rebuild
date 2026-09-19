@@ -13,6 +13,7 @@ import {
   jogar,
   kataDe,
   virarTurno,
+  guardarNoCooldown,
 } from '../teste-apoio.js';
 import { ativarPassivaNaAcao, declarar, resolver } from '../partida.js';
 
@@ -435,7 +436,12 @@ describe('Monge — Posturas e Mantras', () => {
         cartasDeClasse: [{ carta: 'MOC06' as never, modo: 'ativar' }],
       },
     });
-    expect(jogador(depois, A).cooldown[1]).toContain('MO08');
+    /*
+     * O Mantra adianta o **agendamento** da carta que fechou o Kata: ela
+     * imprime CD2 e passa a ter destino CD1, e migra no encerramento (§11).
+     */
+    expect(jogador(depois, A).cooldownAgendado.find((a) => a.carta === 'MO08')?.destino).toBe(1);
+    expect(jogador(guardarNoCooldown(depois, A), A).cooldown[1]).toContain('MO08');
   });
 
   it('MOC06 Exaurido devolve direto à mão a carta que fechou o Kata', () => {

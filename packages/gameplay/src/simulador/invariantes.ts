@@ -223,6 +223,16 @@ const conferirEmboscada = (
   if (jogador.mao.includes(reservada)) {
     quebras.push(`patrulheiro: ${reservada} está reservada e na mão ao mesmo tempo`);
   }
+  /*
+   * Estar reservada e a caminho do cooldown também é dupla zona.
+   *
+   * A habilidade usada fica no campo até o encerramento do turno (§11), com um
+   * agendamento. Olhar só as zonas deixaria passar a janela inteira entre
+   * resolver e encerrar — que é justamente onde o defeito apareceria.
+   */
+  if (jogador.cooldownAgendado.some((agendado) => agendado.carta === reservada)) {
+    quebras.push(`patrulheiro: ${reservada} está reservada e no cooldown agendado`);
+  }
   for (const [zona, cartas] of Object.entries(jogador.cooldown)) {
     if (cartas.includes(reservada)) {
       quebras.push(`patrulheiro: ${reservada} está reservada e no cooldown ${zona}`);

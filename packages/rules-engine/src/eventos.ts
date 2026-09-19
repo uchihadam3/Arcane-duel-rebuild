@@ -95,6 +95,17 @@ export type EventoUniversal =
       readonly vidaDepois: number;
     }
   | {
+      /**
+       * A habilidade resolveu e ganhou destino de cooldown, mas **continua no
+       * campo** — ela sai do slot só no encerramento do turno (§11).
+       */
+      readonly tipo: 'cooldown-agendado';
+      readonly jogador: PlayerId;
+      readonly carta: CardId;
+      readonly zona: ZonaDeCooldown;
+    }
+  | {
+      /** A carta saiu do campo e entrou de fato na zona de cooldown. */
       readonly tipo: 'carta-para-cooldown';
       readonly jogador: PlayerId;
       readonly carta: CardId;

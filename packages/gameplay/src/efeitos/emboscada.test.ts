@@ -15,6 +15,7 @@ import {
   jogador,
   jogar,
   virarTurno,
+  guardarNoCooldown,
 } from '../teste-apoio.js';
 
 /*
@@ -295,8 +296,8 @@ describe('R13 — usada, a carta segue o caminho normal', () => {
 
   it('29. a carta vai para o cooldown impresso', () => {
     const depois = jogar(naTerceira(), A, { pedido: { carta: RESERVADA } }).partida;
-    // R05 tem cooldown 2 impresso.
-    expect(jogador(depois, A).cooldown[2]).toContain(RESERVADA);
+    // R05 tem cooldown 2 impresso, e entra lá no encerramento do turno (§11).
+    expect(jogador(guardarNoCooldown(depois, A), A).cooldown[2]).toContain(RESERVADA);
   });
 
   it('30. revelada, a carta passa a ser pública', () => {

@@ -163,6 +163,7 @@ export const projetarJogador = (
   // A quantidade continua visível; a identidade, não.
   mao: jogador.mao.map((carta) => (dono ? revelar(carta) : ocultar())),
   cooldown: projetarCooldown(jogador),
+  cooldownAgendado: jogador.cooldownAgendado,
 
   passivas: projetarPassivas(jogador, dono),
   cartasDeClasse: jogador.cartasDeClasse.map((item) => ({ ...item })),

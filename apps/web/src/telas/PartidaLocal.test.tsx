@@ -140,7 +140,7 @@ describe('uma Ação, do toque à resolução', () => {
     expect(screen.getByTestId('sem-resposta')).toBeDefined();
   });
 
-  it('Sem Resposta resolve a Ação e a carta vai ao cooldown', () => {
+  it('Sem Resposta resolve a Ação, e a carta fica no espaço até o fim do turno', () => {
     montarPartida();
     const nome = focarPrimeiraJogavel();
     fireEvent.click(screen.getByText('Usar'));
@@ -149,8 +149,31 @@ describe('uma Ação, do toque à resolução', () => {
     fireEvent.click(screen.getByTestId('sem-resposta'));
     passarOAparelho();
 
-    expect(screen.getByTestId('acoes-proprio').textContent).toContain('Resolvida');
-    expect(screen.getAllByTestId('cooldown')[1]?.textContent).toContain(nome);
+    // O efeito já aconteceu, e a carta **continua** no espaço de Ação dela.
+    const acoes = screen.getByTestId('acoes-proprio');
+    expect(acoes.textContent).toContain('Resolvida');
+    expect(acoes.textContent).toContain(nome);
+
+    // E ela ainda não desceu para o cooldown: isso só acontece no encerramento.
+    expect(screen.getAllByTestId('cooldown')[1]?.textContent).not.toContain(nome);
+  });
+
+  it('a carta usada só entra no cooldown quando o turno encerra', () => {
+    montarPartida();
+    const nome = focarPrimeiraJogavel();
+    fireEvent.click(screen.getByText('Usar'));
+    fireEvent.click(screen.getByTestId('enviar-acao'));
+    passarOAparelho();
+    fireEvent.click(screen.getByTestId('sem-resposta'));
+    passarOAparelho();
+
+    fireEvent.click(screen.getByTestId('encerrar-turno'));
+    passarOAparelho();
+
+    // O aparelho é do outro jogador agora: a carta aparece no cooldown dele,
+    // e o espaço de Ação do turno que passou está limpo.
+    expect(screen.getAllByTestId('cooldown')[0]?.textContent).toContain(nome);
+    expect(screen.getByTestId('acoes-adversario').textContent).not.toContain(nome);
   });
 
   it('a Defesa Inata aparece como opção, e não como carta', () => {

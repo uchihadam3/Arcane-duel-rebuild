@@ -12,6 +12,8 @@ import {
   jogar,
   manaDe,
   virarTurno,
+  comCartaEmCooldown,
+  guardarNoCooldown,
 } from '../teste-apoio.js';
 import { declarar, resolver, responder } from '../partida.js';
 
@@ -250,14 +252,26 @@ describe('Mago — Runas', () => {
         cartasDeClasse: [{ carta: 'MC03' as never, modo: 'ativar' }],
       },
     });
-    // Bola de Fogo é CD2 e termina em CD1.
-    expect(jogador(depois, A).cooldown[1]).toContain('M02');
-    expect(jogador(depois, A).cooldown[2]).not.toContain('M02');
+    /*
+     * A Runa adianta o **agendamento**: Bola de Fogo imprime CD2 e passa a ter
+     * destino CD1. A carta migra no encerramento do turno (§11), e é lá que o
+     * efeito se confirma.
+     */
+    expect(jogador(depois, A).cooldownAgendado.find((a) => a.carta === 'M02')?.destino).toBe(1);
+    const guardada = guardarNoCooldown(depois, A);
+    expect(jogador(guardada, A).cooldown[1]).toContain('M02');
+    expect(jogador(guardada, A).cooldown[2]).not.toContain('M02');
   });
 
   it('MC03 Exaurida devolve um Feitiço do cooldown e encarece a volta dele', () => {
-    const inicial = duelo(mago(['M01', 'M02'], { cartasDeClasse: ['MC03', 'MC01'] }), guerreiro, A);
-    const primeira = jogar(inicial, A, { pedido: { carta: 'M01' as never } }).partida;
+    // O Feitiço precisa estar **na zona** para a Runa Exaurida alcançá-lo: uma
+    // carta jogada neste turno ainda está no campo (§11).
+    const primeira = comCartaEmCooldown(
+      duelo(mago(['M01', 'M02'], { cartasDeClasse: ['MC03', 'MC01'] }), guerreiro, A),
+      A,
+      'M01',
+      1,
+    );
     expect(jogador(primeira, A).cooldown[1]).toContain('M01');
 
     const { partida: depois } = jogar(primeira, A, {
@@ -395,14 +409,21 @@ describe('Mago — Ultimates', () => {
   });
 
   it('MU03 Sobrecarga Temporal deixa as Runas Prontas, devolve CD1 e dá 1 AP', () => {
-    const inicial = duelo(
-      mago(['M01', 'M11'], { ultimate: 'MU03', cartasDeClasse: ['MC01', 'MC02'] }),
-      guerreiro,
+    // M01 precisa estar **em CD1** para a Ultimate devolvê-lo: uma carta usada
+    // neste turno ainda está no campo (§11).
+    const inicial = comCartaEmCooldown(
+      duelo(
+        mago(['M01', 'M11'], { ultimate: 'MU03', cartasDeClasse: ['MC01', 'MC02'] }),
+        guerreiro,
+        A,
+      ),
       A,
+      'M01',
+      1,
     );
     const comRunas = jogar(inicial, A, {
       pedido: {
-        carta: 'M01' as never,
+        carta: 'M11' as never,
         cartasDeClasse: [
           { carta: 'MC01' as never, modo: 'ativar' },
           { carta: 'MC02' as never, modo: 'ativar' },
