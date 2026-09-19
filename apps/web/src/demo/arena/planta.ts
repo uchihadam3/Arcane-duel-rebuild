@@ -1,52 +1,62 @@
 import type { IndiceDeAcao, ZonaDeCooldown } from '@arcane-duel/shared-types';
 
 /*
- * A planta da arena V2.
+ * A planta definitiva do campo.
  *
- * Duas decisões de arquitetura moram aqui, e as duas vêm de erro medido na
- * Etapa 6.
+ * Três decisões moram aqui, e as três vieram de reprovação medida.
  *
  * **Primeira: a arena é SVG sob transformação 3D do CSS, e não WebGL.**
  *
- * A Etapa 6 foi reprovada por nitidez e por deformação. O caminho de lá —
- * desenhar a carta num canvas, virar textura, mapear num plano — obriga a
- * escolher uma resolução de textura, e qualquer escolha está errada em algum
- * aparelho. Aqui não existe textura: a carta é SVG, o tabuleiro é SVG, e quem
- * rasteriza é o navegador, no tamanho exato em que a coisa está na tela e na
- * densidade real do aparelho. Não há número de resolução a calibrar porque não
- * há resolução.
+ * A Etapa 6 foi reprovada por nitidez. Desenhar a carta num canvas e virar
+ * textura obriga a escolher uma resolução, e qualquer escolha está errada em
+ * algum aparelho. Aqui não existe textura: quem rasteriza é o navegador, no
+ * tamanho exato em que a coisa está na tela e na densidade real do aparelho.
  *
- * **Segunda: as peças moram dentro do tabuleiro transformado.**
+ * **Segunda: o tabuleiro físico contém somente cartas.**
  *
- * A Etapa 6 projetava coordenadas de mundo para a tela por conta própria, e foi
- * daí que veio o desencontro entre o que o WebGL desenhava e onde o dedo
- * tocava. Aqui a carta é filha do elemento que recebeu a transformação: ela
- * herda a perspectiva do pai, pelo navegador. O alinhamento deixa de ser uma
- * conta que pode estar errada e passa a ser uma propriedade da árvore.
+ * A composição anterior foi reprovada por misturar as camadas. Personagem,
+ * removidas, Resposta permanente, quarta Ação permanente e a mão moravam todos
+ * sobre a mesa, competindo com os treze lugares que importam. Aqui a mesa tem
+ * **treze zonas por jogador e nada mais** — e isso é conferido por teste, não
+ * por disciplina. HUD é informação e mora em coordenadas de tela; mão é da
+ * pessoa e mora em coordenadas de tela; mesa é objeto físico.
  *
- * Tudo abaixo está em **unidades de tabuleiro** — o sistema do SVG, 1300 × 900.
- * Y cresce para baixo, e para baixo é a direção do jogador humano. Isto é
- * literal e é o coração da perspectiva fixa: não existe função que espelhe o
- * campo, porque não existe o conceito de "o outro lado da mesa".
+ * **Terceira: existe uma metade, e a outra é derivada.**
+ *
+ * A metade da máquina não é escrita: ela é a do jogador girada 180° em torno
+ * do centro. Duas listas parecidas escritas à mão divergem — uma margem aqui,
+ * dois pixels ali — e é exatamente isso que faz uma composição parecer
+ * descuidada. Com a derivação, distância, margem, alinhamento, escala e ângulo
+ * são iguais porque **são o mesmo número**.
+ *
+ * Tudo abaixo está em unidades de tabuleiro. Y cresce para baixo, e para baixo
+ * é a direção do jogador humano — literal, e é o coração da perspectiva fixa.
  */
 
 /*
  * O tabuleiro é largo e raso.
  *
- * A primeira prova saiu com 1300 × 900 e um ângulo de 54°: o campo lia como
- * parede, e sobrava pedra vazia nos dois lados da fileira de choque. Mais largo
- * e mais baixo, com as colunas de Ação mais abertas, ele volta a ler como mesa.
+ * A proporção não é escolha de gosto: ela sai da tela. A zona da arena em
+ * 915×412 é uma faixa de 915×217, quase 4,2 para 1. Um tabuleiro inclinado
+ * projeta com proporção `(L · f) / (A · cos θ)` — então, para preencher essa
+ * faixa sem inclinar a mesa até ela virar parede, o tabuleiro precisa ser
+ * largo. 2600 × 1020, a 47°, projeta ocupando 93 % da largura disponível.
+ *
+ * A primeira prova saiu com 1700 × 820 e os seis pedestais de Ação colados na
+ * linha de centro: o corredor central sumiu, e ele não é decoração — é por
+ * onde golpe, projétil e magia atravessam.
  */
-export const TABULEIRO = { largura: 1240, altura: 820 } as const;
+export const TABULEIRO = { largura: 2600, altura: 1020 } as const;
 
-/** A linha que separa os dois lados. A rosa dos ventos mora nela. */
+/** A linha que separa as duas metades. O brasão do centro mora nela. */
 export const LINHA_DE_CENTRO = TABULEIRO.altura / 2;
 
 /**
  * Qual metade do tabuleiro.
  *
  * `jogador` é sempre a metade de baixo e `maquina` sempre a de cima, em toda
- * partida, do começo ao fim. Nenhum código troca as duas.
+ * partida, do começo ao fim. Nenhuma função aceita "de quem é a vez", e
+ * nenhuma função inverte o campo.
  */
 export type Metade = 'jogador' | 'maquina';
 
@@ -62,351 +72,301 @@ export const centroDe = (caixa: Retangulo): { readonly x: number; readonly y: nu
   y: caixa.y + caixa.altura / 2,
 });
 
+/**
+ * A rotação de 180° em torno do centro do tabuleiro.
+ *
+ * `(x, y) → (L − x, A − y)` para o **centro** da peça, mantendo o tamanho.
+ * É a única função que produz o lado da máquina, e é por isso que a simetria
+ * é exata: não há um segundo conjunto de números para divergir do primeiro.
+ *
+ * O tamanho não gira junto porque a carta não gira: uma carta em pé continua
+ * em pé nos dois lados da mesa. O que gira é **onde ela está**.
+ */
+export const girar = (caixa: Retangulo): Retangulo => ({
+  x: TABULEIRO.largura - caixa.x - caixa.largura,
+  y: TABULEIRO.altura - caixa.y - caixa.altura,
+  largura: caixa.largura,
+  altura: caixa.altura,
+});
+
+/** Aplica a rotação só quando a metade pedida é a de cima. */
+const naMetade = (metade: Metade, doJogador: Retangulo): Retangulo =>
+  metade === 'jogador' ? doJogador : girar(doJogador);
+
 /*
  * As medidas das peças.
  *
- * A carta guarda a proporção 5:7 do catálogo em qualquer lugar do campo; o que
- * muda é a escala. O pedestal de Ação é a maior peça da arena de propósito: os
- * três espaços de Ação são o ponto de choque, e o olho precisa achá-los antes
- * de qualquer outra coisa.
+ * A hierarquia é deliberada e é a leitura do campo: Ação é a maior peça da
+ * arena porque os três espaços de Ação são o ponto de choque e o olho precisa
+ * achá-los primeiro; Ultimate vem logo atrás porque é única; Classe e
+ * Cooldown são apoio; Passiva é a menor porque quatro peças numa fileira já
+ * pesam por quantidade.
  */
 export const CARTA = { largura: 120, altura: 168 } as const;
-export const PEDESTAL_DE_ACAO = { largura: 150, altura: 196 } as const;
-/**
- * A quarta Ação é menor porque é condicional.
- *
- * Ela precisa existir no campo sem competir com o trio: do mesmo tamanho, as
- * quatro colunas leem como quatro Ações iguais e o jogador perde a referência
- * que decorou.
- */
-export const PEDESTAL_DE_ACAO_EXTRA = { largura: 120, altura: 158 } as const;
-/**
- * A Resposta é claramente subordinada ao Ataque que ela apara.
- *
- * Na primeira prova ela tinha quase o tamanho do pedestal de Ação, e o centro
- * do campo virou oito retângulos parecidos. Menor e encostada, ela lê como
- * bandeja acoplada — que é o que ela é.
- */
-export const PEDESTAL_DE_RESPOSTA = { largura: 96, altura: 112 } as const;
+export const PEDESTAL_DE_ACAO = { largura: 176, altura: 200 } as const;
+export const SLOT_DE_ULTIMATE = { largura: 128, altura: 150 } as const;
+export const PEDESTAL_DE_CLASSE = { largura: 106, altura: 140 } as const;
+export const COMPARTIMENTO_DE_COOLDOWN = { largura: 98, altura: 130 } as const;
+export const ENCAIXE_DE_PASSIVA = { largura: 84, altura: 110 } as const;
 
 /**
- * O quanto a Resposta invade o pedestal que ela responde.
+ * A quarta Ação é menor porque é exceção.
  *
- * Ela **encosta** no Ataque, cobrindo a quina de baixo dele — que é o que um
- * aparo parece. Posta abaixo, sem tocar, ela vira uma segunda fileira de
- * pedestais e o centro do campo passa a ter oito retângulos parecidos, que foi
- * o erro da primeira prova.
+ * Ela não tem lugar permanente: o pedestal **surge** quando uma regra concede
+ * a Ação extra e some quando a concessão acaba. Do mesmo tamanho das três, ela
+ * desfaria a referência de "são três" que o jogador decorou no primeiro turno.
  */
-export const INVASAO_DA_RESPOSTA = 48;
+export const PEDESTAL_DE_ACAO_EXTRA = { largura: 132, altura: 170 } as const;
+
+/**
+ * A bandeja de Resposta é temporária e claramente subordinada.
+ *
+ * Ela não existe no campo vazio. Quando uma Ação recebe Resposta, a bandeja
+ * abre encostada nela — cobrindo a quina de baixo, que é o que um aparo
+ * parece — e fecha depois da resolução.
+ */
+export const BANDEJA_DE_RESPOSTA = { largura: 104, altura: 124 } as const;
+/** O quanto a bandeja invade o pedestal que ela responde. */
+export const INVASAO_DA_RESPOSTA = 54;
 /** E o quanto ela sai para o lado, para não cobrir o nome da carta atacante. */
-export const DESVIO_DA_RESPOSTA = 38;
-export const ENCAIXE_DE_PASSIVA = { largura: 62, altura: 84 } as const;
-export const PEDESTAL_DE_CLASSE = { largura: 82, altura: 112 } as const;
-export const SLOT_DE_ULTIMATE = { largura: 100, altura: 132 } as const;
-export const GAVETA_DE_COOLDOWN = { largura: 86, altura: 116 } as const;
+export const DESVIO_DA_RESPOSTA = 46;
 
 /*
- * As alturas de cada fileira, medidas do topo.
+ * As duas fileiras de cada metade, medidas do topo do tabuleiro.
  *
- * A leitura de cima para baixo é a da tarefa: apoio da máquina, choque no
- * meio, apoio do jogador. As fileiras de Resposta ficam **entre** as de Ação e
- * a linha de centro, encostadas no pedestal que elas respondem — é isso que
- * faz o par Ação/Resposta ler como uma peça só.
+ * Só existem duas, e é isso que mantém o centro livre:
+ *
+ *   máquina   retaguarda   64 ..214    Ultimate · Passivas
+ *             frente      248 ..448    Cooldown · Ações · Classe
+ *   ------ corredor livre, 448 .. 572, centro em 510 ------
+ *   jogador   frente      572 ..772    Classe · Ações · Cooldown
+ *             retaguarda  806 ..956    Ultimate · Passivas
+ *
+ * O corredor de 124 unidades no meio é **funcional**: nada pode ocupá-lo,
+ * porque é por ele que os efeitos atravessam. Um teste confere que nenhuma
+ * zona cruza a linha de centro, e outro que nenhuma chega perto demais dela.
+ *
+ * A margem de 64 na borda de trás existe porque a moldura tem 52 de espessura
+ * mais ornamento de canto: com menos que isso, a Ultimate fica **debaixo** da
+ * moldura — foi o que aconteceu na primeira prova.
  */
-/*
- * As alturas, medidas e conferidas.
- *
- * A primeira prova tinha as fileiras se atravessando: a Resposta do jogador
- * começava em 284 e o Ataque da máquina só terminava em 384, então o rótulo R1
- * aparecia dentro do pedestal de Ação. Os números abaixo têm as sobreposições
- * **escolhidas** — 48 unidades entre a Resposta e o Ataque que ela apara — e
- * nenhuma outra.
- *
- *   máquina   apoio     20 ..136
- *             Ação     152 ..348
- *   jogador   Resposta 300 ..412     invade o Ataque da máquina
- *   ---------------- linha de centro em 410 ----------------
- *   máquina   Resposta 408 ..520     invade o Ataque do jogador
- *   jogador   Ação     468 ..664
- *             apoio    680 ..796
- */
-const FILEIRA = {
-  apoioDaMaquina: 20,
-  acaoDaMaquina: 152,
-  respostaDaMaquina: 408,
-  respostaDoJogador: 300,
-  acaoDoJogador: 468,
-  apoioDoJogador: 680,
-} as const;
+const MARGEM_DA_MOLDURA = 64;
+/** A folga entre a linha de centro e o pedestal de Ação, de cada lado. */
+const CORREDOR_CENTRAL = 62;
+const FILEIRA_DA_FRENTE = TABULEIRO.altura / 2 + CORREDOR_CENTRAL;
+const FILEIRA_DE_RETAGUARDA = TABULEIRO.altura - MARGEM_DA_MOLDURA - SLOT_DE_ULTIMATE.altura;
 
-/** As três colunas de Ação. O centro do campo, em X. */
+/*
+ * O eixo X, da esquerda do jogador para a direita.
+ *
+ * As três Ações mandam: elas são o centro visual, então nascem centradas e
+ * igualmente espaçadas, e todo o resto se organiza em volta delas. Classe à
+ * esquerda, Cooldown à direita — como a planta congelada pede.
+ */
+const PASSO_ENTRE_ACOES = 300;
 const COLUNAS_DE_ACAO: readonly number[] = [
-  TABULEIRO.largura / 2 - 232,
+  TABULEIRO.largura / 2 - PASSO_ENTRE_ACOES,
   TABULEIRO.largura / 2,
-  TABULEIRO.largura / 2 + 232,
+  TABULEIRO.largura / 2 + PASSO_ENTRE_ACOES,
 ];
 
-/** A quarta coluna, fora do trio e à direita: ela anuncia que é exceção. */
-const COLUNA_EXTRA = TABULEIRO.largura / 2 + 452;
+/** A coluna da Ação extra: fora do trio, à direita, anunciando que é exceção. */
+const COLUNA_DA_ACAO_EXTRA = TABULEIRO.largura / 2 + PASSO_ENTRE_ACOES + 226;
+
+/** O passo entre os dois pedestais de Classe e entre os três compartimentos. */
+const PASSO_ENTRE_CLASSES = 130;
+const PASSO_ENTRE_COMPARTIMENTOS = 106;
+
+/** O centro do bloco de Classe e o do bloco de Cooldown, no eixo X. */
+const CENTRO_DAS_CLASSES = 320;
+const CENTRO_DO_COOLDOWN = TABULEIRO.largura - CENTRO_DAS_CLASSES;
 
 const caixaCentrada = (
   centroX: number,
-  topo: number,
+  centroY: number,
   tamanho: { readonly largura: number; readonly altura: number },
 ): Retangulo => ({
   x: centroX - tamanho.largura / 2,
-  y: topo,
+  y: centroY - tamanho.altura / 2,
   largura: tamanho.largura,
   altura: tamanho.altura,
 });
 
-/** O pedestal de Ação de índice `indice`, na metade pedida. */
+/* ---------------------------------------------------------------------------
+ * As treze zonas permanentes, escritas uma vez, para a metade do jogador.
+ * ------------------------------------------------------------------------- */
+
 export const ehAcaoExtra = (indice: IndiceDeAcao): boolean => indice >= 3;
 
-export const pedestalDeAcao = (metade: Metade, indice: IndiceDeAcao): Retangulo => {
-  /*
-   * A quarta Ação existe, e fica fora do trio.
-   *
-   * Ela é condicional: só uma carta a libera. Encaixá-la no meio das três
-   * desalinharia as colunas que o jogador decorou, então ela mora à direita,
-   * menor, anunciando por posição e por tamanho que é exceção.
-   */
-  const extra = ehAcaoExtra(indice);
-  const centroX = extra ? COLUNA_EXTRA : (COLUNAS_DE_ACAO[indice] ?? TABULEIRO.largura / 2);
-  const tamanho = extra ? PEDESTAL_DE_ACAO_EXTRA : PEDESTAL_DE_ACAO;
-  const base = metade === 'maquina' ? FILEIRA.acaoDaMaquina : FILEIRA.acaoDoJogador;
-  // A extra desce um pouco: alinhada pelo topo ela pareceria só um recorte.
-  const topo = base + (extra ? (PEDESTAL_DE_ACAO.altura - tamanho.altura) / 2 : 0);
-  return caixaCentrada(centroX, topo, tamanho);
-};
-
 /**
- * O espaço de Resposta acoplado a um pedestal de Ação.
+ * Os três pedestais de Ação, encostados na linha de centro.
  *
- * Ele pertence ao **defensor**: a Resposta de quem apanha entra aqui, colada
- * ao Ataque que ela apara. Por isso a Resposta de um Ataque da máquina fica na
- * metade do jogador, e vice-versa.
+ * Eles nascem com o topo na linha de centro e descem: é isso que faz o choque
+ * acontecer no meio da mesa, com os seis pedestais — três de cada lado —
+ * formando um bloco só. A quarta Ação, quando concedida, desce um pouco e vai
+ * para a direita, menor.
  */
-export const pedestalDeResposta = (metadeDoAtacante: Metade, indice: IndiceDeAcao): Retangulo => {
-  const base = ehAcaoExtra(indice)
-    ? COLUNA_EXTRA
-    : (COLUNAS_DE_ACAO[indice] ?? TABULEIRO.largura / 2);
-  const topo =
-    metadeDoAtacante === 'maquina' ? FILEIRA.respostaDoJogador : FILEIRA.respostaDaMaquina;
-  return caixaCentrada(base + DESVIO_DA_RESPOSTA, topo, PEDESTAL_DE_RESPOSTA);
+const acaoDoJogador = (indice: IndiceDeAcao): Retangulo => {
+  const extra = ehAcaoExtra(indice);
+  const centroX = extra ? COLUNA_DA_ACAO_EXTRA : (COLUNAS_DE_ACAO[indice] ?? TABULEIRO.largura / 2);
+  const tamanho = extra ? PEDESTAL_DE_ACAO_EXTRA : PEDESTAL_DE_ACAO;
+  return caixaCentrada(centroX, FILEIRA_DA_FRENTE + tamanho.altura / 2, tamanho);
 };
 
-/** Os quatro encaixes de Passiva, à esquerda da fileira de apoio. */
-export const encaixeDePassiva = (metade: Metade, indice: number): Retangulo => {
-  const topo = metade === 'maquina' ? FILEIRA.apoioDaMaquina : FILEIRA.apoioDoJogador;
-  return caixaCentrada(126 + indice * 70, topo + 20, ENCAIXE_DE_PASSIVA);
-};
+/** Os dois pedestais de Classe, à esquerda das Ações. */
+const classeDoJogador = (indice: number): Retangulo =>
+  caixaCentrada(
+    CENTRO_DAS_CLASSES + (indice - 0.5) * PASSO_ENTRE_CLASSES,
+    FILEIRA_DA_FRENTE + PEDESTAL_DE_ACAO.altura / 2,
+    PEDESTAL_DE_CLASSE,
+  );
 
-/** Os dois pedestais de Carta de Classe, ao centro da fileira de apoio. */
-export const pedestalDeClasse = (metade: Metade, indice: number): Retangulo => {
-  const topo = metade === 'maquina' ? FILEIRA.apoioDaMaquina : FILEIRA.apoioDoJogador;
-  return caixaCentrada(TABULEIRO.largura / 2 - 96 + indice * 98, topo + 4, PEDESTAL_DE_CLASSE);
-};
+/** Os três compartimentos da peça de cooldown, à direita das Ações. */
+const compartimentoDoJogador = (zona: ZonaDeCooldown): Retangulo =>
+  caixaCentrada(
+    CENTRO_DO_COOLDOWN + (zona - 2) * PASSO_ENTRE_COMPARTIMENTOS,
+    FILEIRA_DA_FRENTE + PEDESTAL_DE_ACAO.altura / 2,
+    COMPARTIMENTO_DE_COOLDOWN,
+  );
 
-/** O slot de Ultimate, logo à direita das Cartas de Classe. */
-export const slotDeUltimate = (metade: Metade): Retangulo => {
-  const topo = metade === 'maquina' ? FILEIRA.apoioDaMaquina : FILEIRA.apoioDoJogador;
-  return caixaCentrada(TABULEIRO.largura / 2 + 78, topo - 6, SLOT_DE_ULTIMATE);
-};
+/** Os quatro encaixes de Passiva, na retaguarda, centrados sob as Ações. */
+const PASSO_ENTRE_PASSIVAS = 180;
+const passivaDoJogador = (indice: number): Retangulo =>
+  caixaCentrada(
+    TABULEIRO.largura / 2 + (indice - 1.5) * PASSO_ENTRE_PASSIVAS,
+    FILEIRA_DE_RETAGUARDA + SLOT_DE_ULTIMATE.altura / 2,
+    ENCAIXE_DE_PASSIVA,
+  );
 
-/** O Personagem, à esquerda das Cartas de Classe. */
-export const pedestalDePersonagem = (metade: Metade): Retangulo => {
-  const topo = metade === 'maquina' ? FILEIRA.apoioDaMaquina : FILEIRA.apoioDoJogador;
-  return caixaCentrada(TABULEIRO.largura / 2 - 232, topo + 4, PEDESTAL_DE_CLASSE);
-};
+/** O slot de Ultimate: canto inferior esquerdo, do lado do jogador. */
+const ultimateDoJogador = (): Retangulo =>
+  caixaCentrada(
+    CENTRO_DAS_CLASSES,
+    FILEIRA_DE_RETAGUARDA + SLOT_DE_ULTIMATE.altura / 2,
+    SLOT_DE_ULTIMATE,
+  );
+
+/* ---------------------------------------------------------------------------
+ * A superfície pública: a metade pedida, derivada quando é a de cima.
+ * ------------------------------------------------------------------------- */
+
+export const pedestalDeAcao = (metade: Metade, indice: IndiceDeAcao): Retangulo =>
+  naMetade(metade, acaoDoJogador(indice));
+
+export const pedestalDeClasse = (metade: Metade, indice: number): Retangulo =>
+  naMetade(metade, classeDoJogador(indice));
+
+export const encaixeDePassiva = (metade: Metade, indice: number): Retangulo =>
+  naMetade(metade, passivaDoJogador(indice));
+
+export const slotDeUltimate = (metade: Metade): Retangulo => naMetade(metade, ultimateDoJogador());
 
 export const ZONAS_DE_COOLDOWN: readonly ZonaDeCooldown[] = [1, 2, 3];
 
 /**
- * As três gavetas de cooldown, à direita da fileira de apoio.
+ * Um compartimento da peça de cooldown.
  *
- * Gavetas, e não marcadores: a carta que resolve **entra** numa delas e, no
- * começo do turno, a de CD1 sai e volta para a mão enquanto as outras deslizam
- * uma casa. O jogador precisa entender isso sem ler texto nenhum, e para isso
- * os três compartimentos precisam ser objetos com lugar fixo.
+ * Do lado do jogador, CD1 → CD2 → CD3 correm da esquerda para a direita. Do
+ * lado da máquina a rotação inverte a leitura na tela, e isso é correto: é a
+ * mesma peça vista do outro lado da mesa.
  */
-export const gavetaDeCooldown = (metade: Metade, zona: ZonaDeCooldown): Retangulo => {
-  const topo = metade === 'maquina' ? FILEIRA.apoioDaMaquina : FILEIRA.apoioDoJogador;
-  return caixaCentrada(TABULEIRO.largura - 322 + (zona - 1) * 98, topo + 2, GAVETA_DE_COOLDOWN);
-};
+export const compartimentoDeCooldown = (metade: Metade, zona: ZonaDeCooldown): Retangulo =>
+  naMetade(metade, compartimentoDoJogador(zona));
 
-/** Onde a pilha de cartas removidas descansa. Informação, sem toque. */
-export const pilhaDeRemovidas = (metade: Metade): Retangulo => {
-  const topo = metade === 'maquina' ? FILEIRA.apoioDaMaquina : FILEIRA.apoioDoJogador;
-  return caixaCentrada(TABULEIRO.largura - 82, topo + 6, GAVETA_DE_COOLDOWN);
-};
-
-/*
- * O leque da mão.
+/**
+ * A peça inteira de cooldown: os três compartimentos num corpo só.
  *
- * A mão **não** é uma zona do tabuleiro: ela está na mão de quem joga, e não
- * sobre a mesa. Por isso ela vive fora da transformação 3D, em coordenadas de
- * tela — é o que a faz ficar de frente para o jogador enquanto o campo está
- * inclinado, exatamente como na referência.
+ * Três caixas soltas leem como três marcadores. Um corpo único com três
+ * divisões lê como gaveta — e gaveta é o que ela é, porque a carta **entra**
+ * num compartimento e depois anda de um para o outro.
  */
-export interface PosicaoNoLeque {
-  /** Deslocamento horizontal a partir do centro, em fração da largura útil. */
-  readonly deslocamento: number;
-  /** Quanto esta carta desce por estar longe do centro. */
-  readonly queda: number;
-  readonly giro: number;
-  readonly ordem: number;
-}
-
-export const LEQUE = {
-  /** Ângulo da carta mais afastada do centro, em graus. Discreto por decisão. */
-  giroMaximo: 11,
-  /** Quanto a carta da ponta desce, em fração da altura dela. */
-  quedaMaxima: 0.13,
-} as const;
-
-export const posicaoNoLeque = (indice: number, total: number): PosicaoNoLeque => {
-  if (total <= 1) return { deslocamento: 0, queda: 0, giro: 0, ordem: indice };
-  // −1 na ponta esquerda, +1 na direita.
-  const desvio = (indice / (total - 1)) * 2 - 1;
-  return {
-    deslocamento: desvio,
-    queda: Math.abs(desvio) ** 1.7 * LEQUE.quedaMaxima,
-    giro: desvio * LEQUE.giroMaximo,
-    ordem: indice,
+export const PECA_DE_COOLDOWN_FOLGA = 16;
+export const pecaDeCooldown = (metade: Metade): Retangulo => {
+  const primeiro = compartimentoDoJogador(1);
+  const ultimo = compartimentoDoJogador(3);
+  const corpo: Retangulo = {
+    x: primeiro.x - PECA_DE_COOLDOWN_FOLGA,
+    y: primeiro.y - PECA_DE_COOLDOWN_FOLGA,
+    largura: ultimo.x + ultimo.largura - primeiro.x + PECA_DE_COOLDOWN_FOLGA * 2,
+    altura: primeiro.altura + PECA_DE_COOLDOWN_FOLGA * 2,
   };
+  return naMetade(metade, corpo);
 };
 
-/*
- * A câmera.
- *
- * Fixa, e literalmente: é uma transformação CSS constante. Não existe função
- * que a mova, não existe estado que a gire, e o turno da máquina usa
- * exatamente o mesmo valor que o turno do jogador.
- *
- * A inclinação é o que decide quanto a profundidade encolhe. 54° deixa a
- * fileira do fundo curta o bastante para caber num telefone deitado e longa o
- * bastante para a carta lá continuar legível.
- */
-export const CAMERA = {
-  /*
-   * 46°, e não 54°.
-   *
-   * A primeira prova, mais inclinada, lia como parede: a fileira do fundo
-   * encolhia demais e a arena perdia a leitura de mesa. 46° mantém a
-   * profundidade e devolve a superfície.
-   */
-  inclinacaoEmGraus: 46,
-  /** Distância da perspectiva, em pixels de tela. Maior = lente mais longa. */
-  perspectiva: 2400,
-  /** Onde o ponto de fuga fica na altura da tela. */
-  origemVertical: 0.42,
-} as const;
-
 /**
- * O enquadramento do tabuleiro numa área de tela.
+ * A bandeja de Resposta acoplada a um pedestal de Ação.
  *
- * A primeira versão desta conta usava só o cosseno da inclinação, e errava: em
- * perspectiva a borda da frente vem **na direção de quem olha** e fica maior
- * que o cálculo ortográfico previa. O resultado foi o campo estourando pela
- * base e pelos lados na primeira prova.
- *
- * Agora a conta é a da própria transformação CSS, na mesma ordem em que o
- * navegador a aplica — escala, rotação, divisão por perspectiva:
- *
- *   z  = y · sen θ                    quanto o ponto avança na direção do olho
- *   f  = p / (p − z)                  o aumento que a perspectiva dá a ele
- *   x' = x · f      y' = y · cos θ · f
- *
- * Com isso a borda da frente e a do fundo são medidas separadamente, e o
- * deslocamento vertical recentraliza o que sobrou — sem ele o campo fica
- * pendurado para baixo, porque a metade da frente projeta mais alta que a do
- * fundo.
+ * Ela pertence ao **defensor**: a Resposta de quem apanha entra aqui, colada
+ * ao Ataque que ela apara. Por isso a Resposta a um Ataque da máquina abre na
+ * metade do jogador, e vice-versa. Nada disto existe no campo vazio.
  */
-export interface Enquadramento {
-  readonly escala: number;
-  /** Quanto subir o tabuleiro, em pixels de tela, para centrar o projetado. */
-  readonly deslocamentoY: number;
+export const bandejaDeResposta = (metadeDoAtacante: Metade, indice: IndiceDeAcao): Retangulo => {
+  const alvo = pedestalDeAcao(metadeDoAtacante, indice);
+  const paraBaixo = metadeDoAtacante === 'maquina';
+  const centroX =
+    alvo.x + alvo.largura / 2 + (paraBaixo ? DESVIO_DA_RESPOSTA : -DESVIO_DA_RESPOSTA);
+  const centroY = paraBaixo
+    ? alvo.y + alvo.altura - INVASAO_DA_RESPOSTA + BANDEJA_DE_RESPOSTA.altura / 2
+    : alvo.y + INVASAO_DA_RESPOSTA - BANDEJA_DE_RESPOSTA.altura / 2;
+  return caixaCentrada(centroX, centroY, BANDEJA_DE_RESPOSTA);
+};
+
+/* ---------------------------------------------------------------------------
+ * O inventário das zonas permanentes, para quem precisa percorrê-las.
+ * ------------------------------------------------------------------------- */
+
+export type EspecieDeZona = 'acao' | 'passiva' | 'classe' | 'cooldown' | 'ultimate';
+
+export interface ZonaPermanente {
+  readonly especie: EspecieDeZona;
+  readonly metade: Metade;
+  /** O índice dentro da espécie: 0..2 para Ação, 1..3 para Cooldown, e assim. */
+  readonly indice: number;
+  readonly caixa: Retangulo;
 }
 
 /**
- * O alcance vertical que precisa caber na tela, em coordenadas locais.
+ * As treze zonas permanentes de uma metade.
  *
- * Não é o tabuleiro: é o tabuleiro **mais as duas mãos**. A mão da máquina
- * paira acima da borda do fundo e a do jogador abaixo da borda da frente, e
- * enquadrar só o campo deixava as duas fora da tela — a do jogador inteira,
- * que é onde ele lê o que pode jogar.
- *
- * A base para em 540 de propósito: o pé das cartas da mão fica **fora** do
- * quadro. É assim na referência, e é o que permite que elas sejam grandes o
- * bastante para o nome ser legível num telefone.
+ * Treze, e é contado por teste: 3 Ações + 4 Passivas + 2 Classe + 3 Cooldown +
+ * 1 Ultimate. A Ação extra não entra porque não é permanente, a Resposta não
+ * entra porque não é permanente, e Personagem e removidas não entram porque
+ * deixaram de existir como peça física.
  */
-export const ALCANCE_VISIVEL = { topo: -556, base: 520 } as const;
+export const zonasPermanentes = (metade: Metade): readonly ZonaPermanente[] => [
+  ...([0, 1, 2] as const).map((indice) => ({
+    especie: 'acao' as const,
+    metade,
+    indice,
+    caixa: pedestalDeAcao(metade, indice),
+  })),
+  ...[0, 1, 2, 3].map((indice) => ({
+    especie: 'passiva' as const,
+    metade,
+    indice,
+    caixa: encaixeDePassiva(metade, indice),
+  })),
+  ...[0, 1].map((indice) => ({
+    especie: 'classe' as const,
+    metade,
+    indice,
+    caixa: pedestalDeClasse(metade, indice),
+  })),
+  ...ZONAS_DE_COOLDOWN.map((zona) => ({
+    especie: 'cooldown' as const,
+    metade,
+    indice: zona,
+    caixa: compartimentoDeCooldown(metade, zona),
+  })),
+  {
+    especie: 'ultimate' as const,
+    metade,
+    indice: 0,
+    caixa: slotDeUltimate(metade),
+  },
+];
 
-const projetar = (
-  yLocal: number,
-  escala: number,
-): { readonly fator: number; readonly y: number } => {
-  const radianos = (CAMERA.inclinacaoEmGraus * Math.PI) / 180;
-  const yEscalado = yLocal * escala;
-  const z = yEscalado * Math.sin(radianos);
-  const fator = CAMERA.perspectiva / (CAMERA.perspectiva - z);
-  return { fator, y: yEscalado * Math.cos(radianos) * fator };
-};
-
-/**
- * O enquadramento do tabuleiro numa área de tela.
- *
- * A primeira versão desta conta usava só o cosseno da inclinação, e errava: em
- * perspectiva a borda da frente vem **na direção de quem olha** e fica maior
- * que o cálculo ortográfico previa. O resultado foi o campo estourando pela
- * base e pelos lados.
- *
- * Agora a conta é a da própria transformação CSS, na mesma ordem em que o
- * navegador a aplica — escala, rotação, divisão por perspectiva:
- *
- *   z  = y · sen θ                    quanto o ponto avança na direção do olho
- *   f  = p / (p − z)                  o aumento que a perspectiva dá a ele
- *   x' = x · f      y' = y · cos θ · f
- *
- * A largura é medida no ponto mais próximo, que é o mais largo. O deslocamento
- * recentraliza o resultado: sem ele o campo fica pendurado para baixo, porque a
- * metade da frente projeta mais alta que a do fundo.
- */
-export const enquadrarTabuleiro = (
-  largura: number,
-  altura: number,
-  alcance: { readonly topo: number; readonly base: number } = ALCANCE_VISIVEL,
-): Enquadramento => {
-  if (largura <= 0 || altura <= 0) return { escala: 1, deslocamentoY: 0 };
-  const meiaLargura = TABULEIRO.largura / 2;
-
-  /*
-   * A escala sai de uma busca curta, e não de uma fórmula fechada.
-   *
-   * O fator de perspectiva depende da escala, que é o que se está procurando:
-   * a relação não se inverte de forma limpa. Multiplicar a escala pela razão
-   * entre o que se quer e o que se mediu é uma contração, e uma dúzia de
-   * passadas chega a menos de um milésimo.
-   */
-  let escala = Math.min(largura / TABULEIRO.largura, altura / (alcance.base - alcance.topo));
-  for (let passo = 0; passo < 16; passo += 1) {
-    const frente = projetar(alcance.base, escala);
-    const fundo = projetar(alcance.topo, escala);
-    const larguraProjetada = 2 * meiaLargura * escala * frente.fator;
-    const alturaProjetada = frente.y - fundo.y;
-    if (larguraProjetada <= 0 || alturaProjetada <= 0) break;
-    const folga = Math.min(largura / larguraProjetada, altura / alturaProjetada);
-    if (Math.abs(folga - 1) < 0.001) break;
-    escala *= folga;
-  }
-
-  const frente = projetar(alcance.base, escala);
-  const fundo = projetar(alcance.topo, escala);
-  // O meio do que aparece na tela, que não é o meio do tabuleiro.
-  return { escala, deslocamentoY: -(frente.y + fundo.y) / 2 };
-};
-
-/** A escala sozinha, para quem só precisa dela. */
-export const escalaDoTabuleiro = (largura: number, altura: number): number =>
-  enquadrarTabuleiro(largura, altura).escala;
+export const TODAS_AS_ZONAS: readonly ZonaPermanente[] = [
+  ...zonasPermanentes('maquina'),
+  ...zonasPermanentes('jogador'),
+];

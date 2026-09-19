@@ -4,9 +4,105 @@ Este documento descreve **um protótipo para aprovação**, e não a Etapa 6. A
 Etapa 6 continua aberta e continua reprovada; a batalha antiga segue no
 aplicativo, intacta, para a comparação ser possível lado a lado.
 
+A seção 0 descreve a **reconstrução da composição** pedida depois da primeira
+avaliação desta demo. A planta do campo foi fornecida pelo usuário e está
+congelada.
+
 O que a Demo V2 testa: se conseguimos atingir qualidade superior **desenhando
 tudo por código** — arena, cartas, HUD, efeitos, som e música —, com o jogador
 contra a IA e a câmera parada do lado dele.
+
+---
+
+## 0. A reconstrução da composição
+
+A primeira versão desta demo foi reprovada na **composição do campo**, e a
+razão é estrutural: HUD, mesa e mão dividiam o mesmo espaço e competiam por
+ele. Personagem, pilha de removidas, um slot permanente de Resposta e um
+quarto pedestal fixo ocupavam lugar de carta; a mão morava **dentro** do
+tabuleiro e desfazia a inclinação carta por carta, o que é truque e aparece
+como truque.
+
+A reconstrução parte de três separações que não dependem de disciplina:
+
+| Camada | Onde vive                    | O que contém                  |
+| ------ | ---------------------------- | ----------------------------- |
+| arena  | tabuleiro transformado em 3D | **somente cartas**            |
+| mãos   | coordenadas de tela          | as cartas que a pessoa segura |
+| HUD    | coordenadas de tela          | informação e comandos         |
+
+Cada uma recebe um retângulo de `layout/zonas.ts`, e `layout/zonas.test.ts`
+percorre os seis viewports alvo conferindo onze pares proibidos. **Se dois se
+cruzarem, o build falha.** A separação é impedida na geometria; `z-index` só
+decide quem fica na frente quando duas coisas _devem_ se sobrepor, como o clone
+em voo sobre a mesa.
+
+### A planta congelada
+
+Treze zonas permanentes por jogador, vinte e seis na arena, e nada mais:
+3 Ações · 4 Passivas · 2 Cartas de Classe · 3 Cooldowns · 1 Ultimate.
+`planta.test.ts` conta, e reprova qualquer zona a mais.
+
+A metade da máquina **não é escrita**: ela é a do jogador girada 180° em torno
+do centro, `(x, y) → (L − x, A − y)`. Duas listas parecidas escritas à mão
+divergem — uma margem aqui, dois pixels ali —, e é exatamente isso que faz uma
+composição parecer descuidada. Com a derivação, distância, margem, alinhamento,
+escala e ângulo são iguais porque **são o mesmo número**, e há teste conferindo
+igualdade exata.
+
+O corredor central de 124 unidades é funcional: é por onde golpe, projétil e
+magia atravessam. Nenhuma zona o cruza, e um teste mede a folga em vez de só
+conferir a linha — seis pedestais encostados nela formariam um bloco único e o
+corredor sumiria na prática, que foi o que a primeira prova mostrou.
+
+### O que deixou de ter lugar permanente
+
+- **Resposta** — a bandeja abre encostada na Ação que ela apara e fecha depois
+  da resolução.
+- **Quarta Ação** — o pedestal surge da lateral quando a regra a concede e some
+  quando acaba. Exceção de regra não polui a arena para sempre.
+- **Personagem e removidas** — eram informação ocupando lugar de carta. Foram
+  para o HUD ou deixaram de existir como peça.
+- **Defesa Inata** — não é carta, e não virou carta falsa.
+
+### O movimento
+
+Nenhuma carta teleporta. O motor resolve na hora — a regra nunca espera pela
+animação —, e `animacao/apresentacao.ts` compara o estado velho com o novo para
+descobrir **o que se moveu**. Cada mudança vira um movimento; a peça real some
+da origem e do destino, e um clone viaja numa camada global acima da arena e da
+mão.
+
+A ponte entre os dois espaços não é calculada: ela é **medida**. Origem e
+destino chegam como `DOMRect` lidos do próprio navegador, que já aplicou a
+perspectiva. Recalcular a projeção por conta própria foi o que deformou a
+Etapa 6; aqui a conta é do navegador e nós só perguntamos.
+
+O voo tem peso: a curva da travessia é uma Bézier com o pico de velocidade
+**antes** do meio, e o encaixe tem um quique só, amortecido. Simétrico lê como
+slide de apresentação; dois quiques leem como brinquedo. A carta atravessa de
+frente para quem olha e só deita nos últimos 350 ms — deitar cedo esconderia a
+arte durante a viagem, que é o momento em que o jogador quer ver o que foi
+jogado.
+
+Com `prefers-reduced-motion` o voo encurta para 45 % mas **continua existindo**:
+teleporte tira a informação de origem e destino.
+
+### A mão
+
+Fora do tabuleiro, na base da tela. Leque discreto — 9° na ponta —, com o topo
+da carta encostando na borda de cima da zona e o pé transbordando pela de
+baixo: é o que permite que a carta seja grande o bastante para o nome ser lido
+num telefone.
+
+O primeiro toque **inspeciona**: a carta descola do leque, sobe 62 % da própria
+altura, endireita, amplia 1,42× e ganha sombra e luz. O segundo toque na mesma
+carta **joga**. Não há botão solto porque não há lugar para ele — a faixa de
+baixo é do HUD à esquerda e dos controles de turno à direita —, então o selo
+`USAR` mora dentro da moldura da carta levantada.
+
+Focar **não desmancha a mão**: as vizinhas cedem um fio de espaço e escurecem,
+e a focada sobe por cima delas. Há teto por teste para isso.
 
 ---
 

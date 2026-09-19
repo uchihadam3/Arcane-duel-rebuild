@@ -1,8 +1,9 @@
 import type { CardId } from '@arcane-duel/shared-types';
 import { describe, expect, it } from 'vitest';
 
-import { CAMERA, TABULEIRO, pedestalDeAcao } from './arena/planta.js';
-import { montarCena } from './cena/montar.js';
+import { TABULEIRO, centroDe, pedestalDeAcao } from './arena/planta.js';
+import { cartasNaMaoDaMaquina, pecasDoCampo } from './cena/montar.js';
+import { CAMERA } from './layout/camera.js';
 import { HUMANO, MAQUINA, criarControladorDaDemo } from './sessao.js';
 
 /*
@@ -72,11 +73,17 @@ describe('a perspectiva é fixa', () => {
     for (let rodada = 0; rodada < 12; rodada += 1) {
       const estado = controlador.estado();
       if (estado.etapa.tipo === 'fim') break;
-      const cena = montarCena(estado.visao, String(HUMANO), -CAMERA.inclinacaoEmGraus);
-      const minhas = cena.pecas.filter((peca) => peca.lugar === 'mao' && peca.metade === 'jogador');
-      const dela = cena.pecas.filter((peca) => peca.lugar === 'mao' && peca.metade === 'maquina');
-      for (const peca of minhas) expect(peca.y).toBeGreaterThan(TABULEIRO.altura);
-      for (const peca of dela) expect(peca.y).toBeLessThan(0);
+      /*
+       * A mão saiu do tabuleiro nesta revisão: ela vive em coordenadas de
+       * tela. O que continua valendo, e é o que importa, é que **as peças do
+       * campo** do humano ficam na metade de baixo e as da máquina na de cima,
+       * em todo instante da partida.
+       */
+      for (const peca of pecasDoCampo(estado.visao, String(HUMANO))) {
+        const y = centroDe(peca.caixa).y;
+        if (peca.metade === 'jogador') expect(y).toBeGreaterThan(TABULEIRO.altura / 2);
+        else expect(y).toBeLessThan(TABULEIRO.altura / 2);
+      }
 
       if (estado.aguardando === MAQUINA) controlador.passoDaIa();
       else controlador.encerrarTurno();
@@ -87,22 +94,22 @@ describe('a perspectiva é fixa', () => {
 describe('a informação privada da máquina não chega à tela', () => {
   it('a mão dela vira peça sem carta e sem identificador', () => {
     const controlador = criar();
-    const cena = montarCena(controlador.estado().visao, String(HUMANO), -CAMERA.inclinacaoEmGraus);
-    const daMaquina = cena.pecas.filter(
-      (peca) => peca.lugar === 'mao' && peca.metade === 'maquina',
-    );
-    expect(daMaquina.length).toBeGreaterThan(0);
-    for (const peca of daMaquina) {
-      expect(peca.carta).toBeNull();
-      // A chave também não pode carregar identidade: ela vai para o DOM.
-      expect(peca.chave).not.toMatch(/^c:/);
-    }
+    /*
+     * A mão da máquina chega como **contagem**, e só.
+     *
+     * Não é que a identidade seja escondida: ela não existe neste dado. A
+     * projeção do humano traz a mão do adversário como cartas invisíveis, e o
+     * que a tela recebe é o tamanho da lista. Não há como vazar o que não
+     * chegou.
+     */
+    const quantas = cartasNaMaoDaMaquina(controlador.estado().visao, String(HUMANO));
+    expect(quantas).toBeGreaterThan(0);
+    expect(typeof quantas).toBe('number');
   });
 
   it('as Passivas ocultas dela também', () => {
     const controlador = criar();
-    const cena = montarCena(controlador.estado().visao, String(HUMANO), -CAMERA.inclinacaoEmGraus);
-    const ocultas = cena.pecas.filter(
+    const ocultas = pecasDoCampo(controlador.estado().visao, String(HUMANO)).filter(
       (peca) => peca.lugar === 'passiva' && peca.metade === 'maquina' && peca.carta === null,
     );
     for (const peca of ocultas) expect(peca.chave).not.toMatch(/^c:/);
@@ -118,7 +125,7 @@ describe('a informação privada da máquina não chega à tela', () => {
     const controlador = criar();
     deixarAMaquinaJogar(controlador);
     const estado = controlador.estado();
-    const cena = montarCena(estado.visao, String(HUMANO), -CAMERA.inclinacaoEmGraus);
+    const pecas = pecasDoCampo(estado.visao, String(HUMANO));
 
     const publicos = new Set<string>();
     const ela = estado.visao.jogadores.find((jogador) => jogador.id === MAQUINA);
@@ -136,7 +143,7 @@ describe('a informação privada da máquina não chega à tela', () => {
       if (passiva.carta.visivel) publicos.add(String(passiva.carta.carta));
     }
 
-    const daMaquinaNaCena = cena.pecas
+    const daMaquinaNaCena = pecas
       .filter((peca) => peca.metade === 'maquina' && peca.carta !== null)
       .map((peca) => String((peca.carta as { readonly id: CardId }).id));
 

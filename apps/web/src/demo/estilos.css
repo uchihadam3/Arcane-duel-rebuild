@@ -1,31 +1,44 @@
 /*
  * A Demo Visual V2.
  *
- * Toda a profundidade vem de uma transformação 3D **só**, aplicada ao
- * tabuleiro. Tudo o que mora na mesa é filho dele e herda a perspectiva pelo
- * navegador — é isso que faz o toque cair exatamente onde a carta está
- * desenhada, sem nenhuma conta de projeção nossa. A Etapa 6 errava justamente
- * aí.
+ * A folha inteira está organizada pelas quatro camadas da composição, e a
+ * ordem delas aqui é a ordem em que aparecem na tela:
  *
- * A mão fica **dentro** do tabuleiro, mas com a inclinação desfeita: assim ela
- * ocupa uma posição da mesa e ainda assim olha de frente para quem joga.
+ *   1. arena        — o tabuleiro, com a transformação 3D
+ *   2. mãos         — coordenadas de tela, fora da transformação
+ *   3. sobreposição — a camada global por onde a carta viaja
+ *   4. HUD          — informação, em retângulos próprios
+ *
+ * Nenhuma regra aqui resolve colisão. A separação entre as camadas é
+ * geométrica e vem de `layout/zonas.ts`; o `z-index` só decide quem fica por
+ * cima quando duas coisas **deveriam** se sobrepor, como o clone em voo sobre
+ * a mesa.
  */
 
 .v2 {
-  position: fixed;
+  position: absolute;
   inset: 0;
   overflow: hidden;
-  background: radial-gradient(120% 80% at 50% -10%, #1b1424 0%, #0b0810 46%, #050406 100%), #040305;
-  color: #d8cfbe;
-  font-family: 'Iowan Old Style', Palatino, Georgia, 'Times New Roman', serif;
+  background: radial-gradient(120% 90% at 50% 8%, #191622 0%, #0b0a10 55%, #050409 100%);
+  color: #e8dfcd;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
 }
 
-/* ------------------------------------------------------------------ */
-/* Palco                                                               */
-/* ------------------------------------------------------------------ */
+.v2__camadas {
+  position: absolute;
+  inset: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * 1 · a arena
+ * ------------------------------------------------------------------------ */
+
+.v2__arena {
+  position: absolute;
+  overflow: hidden;
+}
 
 .v2__palco {
   position: absolute;
@@ -35,13 +48,11 @@
 }
 
 /*
- * O tabuleiro é posicionado, e não alinhado por grade.
+ * O tabuleiro.
  *
- * Com `place-items: center` a coluna implícita da grade nascia do tamanho do
- * conteúdo — 1240 px — e transbordava para a direita a partir da borda
- * esquerda do palco. O item ficava centrado **na coluna**, não na tela, e o
- * campo aparecia deslocado em 177 px. Posicionar por metade e desfazer por
- * `translate(-50%, -50%)` não depende de nenhuma decisão de layout.
+ * `top/left: 50%` com `translate(-50%, -50%)` centraliza pelo **centro do
+ * elemento**, e não pela coluna implícita do grid — foi assim que o campo
+ * ficou deslocado 177 px para a direita numa prova anterior.
  */
 .v2__tabuleiro {
   position: absolute;
@@ -51,214 +62,432 @@
   height: var(--v2-altura);
   transform: translate(-50%, -50%) translateY(var(--v2-deslocamento)) rotateX(var(--v2-inclinacao))
     scale(var(--v2-escala));
-  transform-origin: 50% 50%;
   transform-style: preserve-3d;
-  /*
-   * A sombra do tabuleiro sobre o nada.
-   *
-   * Ela é o que separa a mesa do fundo. Sem ela o campo flutua, que foi
-   * exatamente a leitura reprovada na etapa anterior.
-   */
-  filter: drop-shadow(0 40px 60px rgb(0 0 0 / 85%));
-}
-
-/*
- * A camada de efeitos mora no plano do campo.
- *
- * Ela é filha do tabuleiro transformado, então um golpe que atravessa o campo
- * atravessa o campo de verdade — em perspectiva — e não um plano colado na
- * tela. `pointer-events: none` porque efeito não é comando.
- */
-.v2-efeitos {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  will-change: transform;
 }
 
 .v2-tabuleiro__svg {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  display: block;
 }
 
-/* ------------------------------------------------------------------ */
-/* Peças                                                               */
-/* ------------------------------------------------------------------ */
+/*
+ * A quarta Ação surge e some.
+ *
+ * Ela nasce da lateral e cresce no lugar — não aparece pronta. Uma exceção de
+ * regra que se materializa de repente lê como bug; uma que **chega** lê como
+ * concessão.
+ */
+.v2-acao-extra {
+  animation: v2-surgir 420ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+@keyframes v2-surgir {
+  from {
+    opacity: 0;
+    transform: translateX(46px) scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.v2-efeitos {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 40;
+}
 
 /*
- * Uma peça.
+ * Uma peça sobre a mesa.
  *
- * A ordem das transformações importa: posição, depois altura sobre a mesa,
- * depois a inclinação que a levanta em direção à câmera, depois o giro no
- * plano, e só então a escala. Trocar as duas últimas faria a carta crescer na
- * diagonal errada quando estivesse girada.
+ * Ela é **filha** do elemento transformado, então herda a perspectiva pelo
+ * navegador. É por isso que o toque cai onde a carta está desenhada: é o mesmo
+ * elemento. O alinhamento deixa de ser uma conta que pode errar e passa a ser
+ * uma propriedade da árvore.
  */
 .v2-peca {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--v2-carta-largura);
-  height: var(--v2-carta-altura);
-  margin-top: calc(var(--v2-carta-altura) / -2);
-  margin-left: calc(var(--v2-carta-largura) / -2);
-  transform: translate3d(var(--px), var(--py), var(--pz)) rotateX(var(--inclinacao))
-    rotate(var(--giro)) scale(var(--escala));
-  transform-style: preserve-3d;
-  will-change: transform;
-  opacity: var(--presenca);
-}
-
-.v2-peca__face,
-.v2-peca__verso {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.v2-peca__face svg,
-.v2-peca__verso svg {
   display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  transition: opacity 140ms linear;
+}
+
+.v2-peca svg {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 60%));
+  display: block;
+  filter: drop-shadow(0 3px 6px rgb(0 0 0 / 60%));
 }
 
-/* A sombra de contato: ela cresce e desbota conforme a carta sobe. */
-.v2-peca__sombra {
+/* Ativada deita a carta: é o vocabulário de Ativar, e nunca de Exaurir. */
+.v2-peca--classe,
+.v2-peca--passiva {
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    opacity 140ms linear;
+}
+
+/*
+ * O verso é discreto no campo.
+ *
+ * A arte do verso tem um selo luminoso no centro, e em tamanho de encaixe ele
+ * vira um ponto brilhante que puxa o olho para o lugar errado: uma Passiva
+ * oculta não é o assunto da tela.
+ */
+.v2-peca--passiva svg {
+  filter: drop-shadow(0 2px 5px rgb(0 0 0 / 65%)) brightness(0.55) saturate(0.6);
+}
+
+/*
+ * A mão da máquina é informação, não assunto.
+ *
+ * O selo do verso é luminoso, e oito deles em fileira no topo da tela puxam o
+ * olho para longe da arena — que é onde tudo acontece. O que o jogador precisa
+ * da mão dela é a **contagem**, e para contar basta a silhueta.
+ */
+.v2-leque--maquina .v2-leque__carta svg {
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 70%)) brightness(0.4) saturate(0.45) contrast(0.85);
+}
+
+.v2-peca--cooldown svg {
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 70%)) saturate(0.7) brightness(0.78);
+}
+
+.v2-peca--ultimate svg {
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--v2-energia) 45%, transparent))
+    drop-shadow(0 4px 8px rgb(0 0 0 / 65%));
+}
+
+/* --------------------------------------------------------------------------
+ * 2 · as mãos, em coordenadas de tela
+ * ------------------------------------------------------------------------ */
+
+.v2-leque {
   position: absolute;
-  inset: 6%;
-  z-index: -1;
-  transform: translateZ(calc(var(--pz) * -1)) scale(var(--sombra-escala));
-  border-radius: 12px;
-  background: radial-gradient(60% 55% at 50% 55%, rgb(0 0 0 / 70%), rgb(0 0 0 / 0%) 72%);
-  opacity: var(--sombra-opacidade);
+  pointer-events: none;
+  z-index: 60;
 }
 
-.v2-peca--tocavel {
-  cursor: pointer;
+.v2-leque--maquina {
+  z-index: 55;
 }
 
-/* O realce de carta jogável: um fio de luz na borda, e nada mais. */
-.v2-peca--jogavel .v2-peca__face svg {
-  filter: drop-shadow(0 0 7px var(--v2-energia)) drop-shadow(0 6px 10px rgb(0 0 0 / 60%));
-}
-
-.v2-peca--focada .v2-peca__face svg {
-  filter: drop-shadow(0 0 16px var(--v2-energia)) drop-shadow(0 12px 22px rgb(0 0 0 / 70%));
-}
-
-/* O alvo de toque, invisível e grande: o dedo não erra por causa do desenho. */
-.v2-peca__toque {
-  position: absolute;
-  inset: -8%;
-  border: 0;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.v2-peca__toque:focus-visible {
-  outline: 3px solid #ffd166;
-  outline-offset: 4px;
-}
-
-/* O encaixe aceso: para onde a carta escolhida pode ir. */
-.v2-alvo {
+.v2-leque__carta {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translate3d(var(--px), var(--py), 2px);
-  margin-top: calc(var(--alvo-altura) / -2);
-  margin-left: calc(var(--alvo-largura) / -2);
-  width: var(--alvo-largura);
-  height: var(--alvo-altura);
-  border: 0;
-  border-radius: 14px;
-  background: none;
   padding: 0;
-  box-shadow:
-    inset 0 0 0 3px var(--v2-energia),
-    0 0 24px color-mix(in srgb, var(--v2-energia) 60%, transparent);
-  animation: v2-alvo-pulsa 1.5s ease-in-out infinite;
+  border: 0;
+  background: none;
   cursor: pointer;
+  pointer-events: auto;
+  transform-origin: 50% 82%;
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.9, 0.25, 1),
+    filter 200ms ease-out;
+  will-change: transform;
 }
 
-@keyframes v2-alvo-pulsa {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-
-  50% {
-    opacity: 1;
-  }
+.v2-leque__carta svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 4px 9px rgb(0 0 0 / 65%));
 }
 
-/* ------------------------------------------------------------------ */
-/* Camada de interface                                                 */
-/* ------------------------------------------------------------------ */
+/*
+ * A carta focada.
+ *
+ * Ela levanta sobre as vizinhas, ganha sombra maior e uma luz suave. O
+ * deslocamento e a escala vêm do JavaScript, porque são conta de layout; o que
+ * mora aqui é só o acabamento.
+ */
+.v2-leque__carta--focada svg {
+  filter: drop-shadow(0 16px 30px rgb(0 0 0 / 72%))
+    drop-shadow(0 0 16px color-mix(in srgb, var(--v2-energia) 32%, transparent));
+}
 
-.v2__interface {
+.v2-leque__carta--bloqueada {
+  cursor: default;
+}
+
+.v2-leque__carta--bloqueada svg {
+  filter: drop-shadow(0 3px 7px rgb(0 0 0 / 60%)) saturate(0.55) brightness(0.72);
+}
+
+.v2-leque--maquina .v2-leque__carta {
+  cursor: default;
+  pointer-events: none;
+  transform-origin: 50% 18%;
+}
+
+/* --------------------------------------------------------------------------
+ * 3 · a camada global de animação
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Acima da arena e da mão, abaixo dos painéis.
+ *
+ * A carta viaja entre duas camadas com contextos de empilhamento diferentes;
+ * animar dentro de qualquer uma delas faria a carta sumir atrás da borda do
+ * campo ou passar por baixo do HUD.
+ */
+.v2-sobreposicao {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 200;
+  perspective: 1400px;
 }
 
-.v2__interface > * {
-  pointer-events: auto;
+.v2-clone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  will-change: transform, filter;
 }
+
+.v2-clone__face {
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.v2-clone__face svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+ * 4 · o HUD
+ * ------------------------------------------------------------------------ */
 
 .v2-hud {
   position: absolute;
-  width: min(34vw, 272px);
-  filter: drop-shadow(0 10px 20px rgb(0 0 0 / 70%));
+  z-index: 300;
+  pointer-events: none;
 }
 
-.v2-hud__svg {
-  display: block;
+.v2-hud svg {
   width: 100%;
-  height: auto;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 55%));
 }
 
-.v2-hud--maquina {
-  inset-block-start: max(8px, env(safe-area-inset-top));
-  inset-inline-start: max(8px, env(safe-area-inset-left));
+.v2-hud--da-vez svg {
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 55%))
+    drop-shadow(0 0 12px color-mix(in srgb, var(--v2-energia) 30%, transparent));
 }
 
-.v2-hud--jogador {
-  inset-block-end: max(8px, env(safe-area-inset-bottom));
-  inset-inline-start: max(8px, env(safe-area-inset-left));
-}
-
-.v2-hud--da-vez .v2-hud__svg {
-  filter: drop-shadow(0 0 10px var(--v2-energia));
-}
-
-/* O comando: encerrar turno e o que resta de AP. */
-.v2__comando {
+/* "IA pensando" é HUD, e mora junto do HUD do adversário. Nunca no campo. */
+.v2-hud__pensando {
   position: absolute;
-  inset-block-end: max(10px, env(safe-area-inset-bottom));
-  inset-inline-end: max(10px, env(safe-area-inset-right));
-  display: grid;
-  gap: 8px;
-  justify-items: end;
+  right: 10px;
+  bottom: -14px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.v2-hud__ponto {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--v2-energia);
+  opacity: 0.35;
+  animation: v2-pulsar 1.1s ease-in-out infinite;
+}
+
+.v2-hud__ponto:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.v2-hud__ponto:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes v2-pulsar {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.v2-controles {
+  position: absolute;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--v2-energia) 34%, #4a3814);
+  border-radius: 11px;
+  background: linear-gradient(180deg, #2a2632 0%, #17151d 55%, #100e15 100%);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 55%);
+}
+
+.v2-controles__medidores {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.v2-controles__ap {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.v2-controles__rotulo {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  color: #8d8478;
+}
+
+.v2-controles__numero {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f4eee2;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--v2-energia) 45%, transparent);
+}
+
+.v2-controles__menores {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9.5px;
+  letter-spacing: 1.3px;
+  color: #8d8478;
+}
+
+.v2-controles__menores b {
+  color: #e8dfcd;
+  font-size: 11px;
+}
+
+.v2-controles__encerrar {
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--v2-energia) 55%, #6b5a33);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #37313f 0%, #1d1a24 100%);
+  color: #f0e9db;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  cursor: pointer;
+}
+
+.v2-controles__encerrar:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.v2-controles__encerrar:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+/*
+ * A pergunta da Resposta mora no bloco de controles.
+ *
+ * No meio da arena ela cobriria o pedestal com a carta que está sendo
+ * perguntada — a primeira prova mostrou o painel tapando a Técnica que ele
+ * anunciava. Aqui ela fica onde o polegar já está.
+ */
+.v2-controles--pergunta {
+  border-color: var(--v2-energia);
+  box-shadow:
+    0 6px 16px rgb(0 0 0 / 55%),
+    0 0 20px color-mix(in srgb, var(--v2-energia) 40%, transparent);
+  animation: v2-chamar 1.6s ease-in-out infinite;
+}
+
+.v2-controles__pergunta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.v2-controles__aviso {
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  color: var(--v2-energia);
+  text-align: center;
+}
+
+@keyframes v2-chamar {
+  0%,
+  100% {
+    box-shadow:
+      0 6px 16px rgb(0 0 0 / 55%),
+      0 0 14px color-mix(in srgb, var(--v2-energia) 26%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 6px 16px rgb(0 0 0 / 55%),
+      0 0 26px color-mix(in srgb, var(--v2-energia) 55%, transparent);
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 5 · os painéis contextuais
+ * ------------------------------------------------------------------------ */
+
+.v2__sair {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 320;
+  padding: 3px 9px;
+  border: 1px solid #45404e;
+  border-radius: 6px;
+  background: rgb(10 9 14 / 70%);
+  color: #a79e90;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  cursor: pointer;
 }
 
 .v2__botao {
-  border: 1px solid color-mix(in srgb, var(--v2-energia) 65%, #6b5a33);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgb(32 28 24 / 95%), rgb(14 12 11 / 98%));
-  padding: 10px 18px;
-  min-height: 44px;
-  color: #f0e4c8;
-  font-family: inherit;
-  font-size: 15px;
+  padding: 8px 16px;
+  border: 1px solid #6b5a33;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #332d3c 0%, #1b1822 100%);
+  color: #ece4d5;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 13px;
   letter-spacing: 1.4px;
   cursor: pointer;
+}
+
+.v2__botao--forte {
+  border-color: var(--v2-energia);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--v2-energia) 40%, transparent);
 }
 
 .v2__botao:disabled {
@@ -266,190 +495,157 @@
   cursor: default;
 }
 
-.v2__botao--forte {
-  border-color: var(--v2-energia);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--v2-energia) 45%, transparent);
-}
-
-.v2__sair {
+/*
+ * O selo da carta levantada.
+ *
+ * Ele mora **dentro** da moldura da carta focada, e não num botão solto: a
+ * faixa de baixo já é do HUD à esquerda e dos controles de turno à direita, e
+ * um botão flutuante no meio cairia sobre a própria mão. Dentro da carta, o
+ * alvo de toque é a carta — que é o que o segundo toque aciona.
+ */
+.v2-leque__selo {
   position: absolute;
-  inset-block-start: max(8px, env(safe-area-inset-top));
-  inset-inline-end: max(8px, env(safe-area-inset-right));
-  border: 0;
-  background: none;
-  padding: 10px 14px;
-  min-height: 44px;
-  color: #8e8474;
-  font-family: inherit;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-/* O aviso de que a máquina está decidindo. */
-.v2__pensando {
-  position: absolute;
-  inset-block-start: 14%;
-  inset-inline: 0;
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  color: #cbbfa6;
-  font-size: 15px;
-  letter-spacing: 3px;
+  left: 50%;
+  top: 6%;
+  padding: 3px 10px;
+  border: 1px solid var(--v2-energia);
+  border-radius: 999px;
+  background: rgb(8 7 12 / 88%);
+  color: #f2ece0;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 2.2px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--v2-energia) 55%, transparent);
   pointer-events: none;
 }
 
-.v2__pensando-pontos {
-  display: flex;
-  gap: 6px;
-}
-
-.v2__pensando-ponto {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--v2-energia-maquina);
-  animation: v2-pensa 1s ease-in-out infinite;
-}
-
-.v2__pensando-ponto:nth-child(2) {
-  animation-delay: 0.16s;
-}
-
-.v2__pensando-ponto:nth-child(3) {
-  animation-delay: 0.32s;
-}
-
-@keyframes v2-pensa {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-
-  50% {
-    opacity: 1;
-    transform: translateY(-4px);
-  }
-}
-
-/* O painel de decisão: usar a carta focada, ou responder. */
-.v2__painel {
+.v2-leque__carta {
   position: absolute;
-  inset-block-end: 22%;
-  inset-inline: 0;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
 }
 
 .v2__aviso {
-  position: absolute;
-  inset-block-start: 26%;
-  inset-inline: 0;
-  text-align: center;
-  color: #ffd9a0;
-  font-size: 18px;
+  margin: 0;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 13px;
   letter-spacing: 2px;
-  text-shadow: 0 2px 10px rgb(0 0 0 / 90%);
-  pointer-events: none;
+  color: var(--v2-energia);
 }
 
-/* ------------------------------------------------------------------ */
-/* Fim de partida                                                      */
-/* ------------------------------------------------------------------ */
+.v2__painel {
+  display: flex;
+  gap: 8px;
+}
+
+.v2__painel--escolha {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 310;
+  transform: translate(-50%, -50%);
+  padding: 12px;
+  border-radius: 12px;
+  background: rgb(8 7 12 / 90%);
+}
 
 .v2__fim {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-content: center;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 18px;
-  justify-items: center;
-  background: radial-gradient(70% 60% at 50% 50%, rgb(0 0 0 / 55%), rgb(0 0 0 / 88%));
+  background: rgb(5 4 9 / 88%);
 }
 
 .v2__fim-titulo {
   margin: 0;
-  color: var(--v2-energia);
-  font-size: clamp(28px, 7vw, 54px);
-  letter-spacing: 10px;
-  text-shadow: 0 0 30px color-mix(in srgb, var(--v2-energia) 60%, transparent);
-}
-
-/* ------------------------------------------------------------------ */
-/* Escolha de classe                                                   */
-/* ------------------------------------------------------------------ */
-
-.v2-escolha {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 20px;
-  background: radial-gradient(120% 80% at 50% -10%, #1b1424 0%, #0b0810 46%, #050406 100%);
-  padding: 20px;
-  overflow-y: auto;
-  color: #d8cfbe;
   font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 38px;
+  letter-spacing: 9px;
+  color: var(--v2-energia);
+  text-shadow: 0 0 34px color-mix(in srgb, var(--v2-energia) 60%, transparent);
 }
 
-.v2-escolha__titulo {
-  margin: 0;
-  font-size: clamp(20px, 5vw, 30px);
-  letter-spacing: 6px;
-}
+/* --------------------------------------------------------------------------
+ * Retrato
+ * ------------------------------------------------------------------------ */
 
-.v2-escolha__linha {
+/*
+ * A batalha é só deitada.
+ *
+ * Achatar esta composição num telefone em pé produziria algo pior que uma
+ * mensagem honesta: a arena é uma faixa larga, e espremê-la tiraria justamente
+ * a legibilidade que a revisão cobrou.
+ */
+.v2--retrato {
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
 }
 
-.v2-escolha__opcao {
-  display: grid;
-  gap: 8px;
-  justify-items: center;
-  border: 1px solid rgb(150 120 70 / 45%);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgb(28 25 22 / 95%), rgb(12 11 10 / 98%));
-  padding: 16px 22px;
-  min-width: 160px;
-  min-height: 44px;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+.v2__girar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #a79e90;
+  text-align: center;
 }
 
-.v2-escolha__opcao[aria-pressed='true'] {
-  border-color: var(--v2-energia);
-  box-shadow: 0 0 20px color-mix(in srgb, var(--v2-energia) 45%, transparent);
+.v2__girar svg {
+  width: 74px;
+  height: 74px;
+  animation: v2-girar 2.4s ease-in-out infinite;
 }
 
-.v2-escolha__nome {
-  font-size: 20px;
-  letter-spacing: 3px;
+.v2__girar p {
+  margin: 0;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+  font-size: 15px;
+  letter-spacing: 1.6px;
 }
 
-.v2-escolha__receita {
-  color: #8e8474;
-  font-size: 13px;
-  letter-spacing: 1px;
+@keyframes v2-girar {
+  0%,
+  45% {
+    transform: rotate(0deg);
+  }
+  70%,
+  100% {
+    transform: rotate(-90deg);
+  }
 }
 
-/* ------------------------------------------------------------------ */
-/* Acessibilidade                                                      */
-/* ------------------------------------------------------------------ */
+/* --------------------------------------------------------------------------
+ * Movimento reduzido
+ * ------------------------------------------------------------------------ */
 
+/*
+ * Encurta, mas não apaga.
+ *
+ * O voo continua existindo em movimento reduzido — quem o encurta é o `ritmo`
+ * no JavaScript. O que sai daqui são as transições decorativas e os pulsos,
+ * que é o que de fato incomoda quem pediu movimento reduzido.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .v2-peca {
-    will-change: auto;
+  .v2-leque__carta,
+  .v2-peca,
+  .v2-peca--classe,
+  .v2-peca--passiva {
+    transition-duration: 90ms;
   }
 
-  .v2-alvo,
-  .v2__pensando-ponto {
+  .v2-hud__ponto,
+  .v2-controles--pergunta,
+  .v2__girar svg {
     animation: none;
+  }
+
+  .v2-acao-extra {
+    animation-duration: 140ms;
   }
 }

@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CardId, ClassId } from '@arcane-duel/shared-types';
+import type { ClassId, VisaoDeJogador } from '@arcane-duel/shared-types';
 import { acoesLegais, ameacaDaAcao, respostasLegais } from '@arcane-duel/gameplay';
 import type { PedidoDeResposta } from '@arcane-duel/gameplay/jogo';
 
+import { Sobreposicao } from './animacao/Sobreposicao.jsx';
+import { useVoos } from './animacao/useVoos.js';
+import { Tabuleiro } from './arena/Tabuleiro.jsx';
+import type { Metade } from './arena/planta.js';
+import { CARTA, TABULEIRO } from './arena/planta.js';
 import { CartaVetorial, VersoVetorial } from './carta/CartaVetorial.jsx';
 import { corDaClasse } from './carta/paleta.js';
-import { Tabuleiro } from './arena/Tabuleiro.jsx';
-import { CAMERA, CARTA, TABULEIRO, enquadrarTabuleiro, pedestalDeAcao } from './arena/planta.js';
-import { montarCena } from './cena/montar.js';
-import { useCena } from './cena/useCena.js';
+import { cartasNaMaoDaMaquina, maoDoJogador, pecasDoCampo } from './cena/montar.js';
+import { ControlesDeTurno } from './hud/ControlesDeTurno.jsx';
 import { HudV2 } from './hud/HudV2.jsx';
+import { Leque } from './mao/Leque.jsx';
+import { CAMERA, enquadrarTabuleiro } from './layout/camera.js';
+import { ehDeitado, zonasDaTela } from './layout/zonas.js';
 import type { EstadoDaDemo } from './sessao.js';
 import { HUMANO, MAQUINA, criarControladorDaDemo } from './sessao.js';
 import { criarPalco } from './som/palco.js';
@@ -20,17 +26,25 @@ import './estilos.css';
 /*
  * A Demo Visual V2: uma pessoa contra a IA, com a câmera parada.
  *
- * O que esta tela prova, e o que ela não prova.
+ * **A arquitetura em camadas**, que é a correção estrutural desta revisão:
  *
- * **Prova**: que a perspectiva pode ser fixa. Não existe aqui nenhuma variável
- * de "lado de quem olha", nenhuma inversão de campo e nenhuma troca de
- * aparelho. A metade de baixo é do humano da primeira linha de código à
- * última. Durante o turno da máquina a única coisa que muda é **quem** está
- * movendo carta.
+ *   1. **arena** — o tabuleiro, transformado em 3D. Contém somente cartas.
+ *   2. **mãos** — em coordenadas de tela, fora da transformação, uma embaixo
+ *      e uma em cima. Nenhuma delas é filha do tabuleiro.
+ *   3. **sobreposição** — a camada global por onde a carta viaja entre as
+ *      duas anteriores, acima das duas e abaixo dos painéis.
+ *   4. **HUD** — informação, em retângulos próprios que não encostam em nada.
  *
- * **Não prova**: que o jogo inteiro está pronto. Quatro cartas têm arte e
- * efeito próprios; as outras usam o sigilo neutro, de propósito, para ninguém
- * confundir "ainda não foi feito" com "foi feito assim".
+ * Cada camada recebe um retângulo de `layout/zonas.ts`, e um teste geométrico
+ * percorre os seis viewports alvo e falha o build se dois deles se cruzarem. A
+ * separação não depende de `z-index`: ela é impedida na geometria.
+ *
+ * **O que esta tela prova**: que a perspectiva pode ser fixa. Não existe aqui
+ * nenhuma variável de "lado de quem olha", nenhuma inversão de campo e nenhuma
+ * troca de aparelho. A metade de baixo é do humano da primeira linha à última.
+ *
+ * **O que ela não prova**: que o jogo inteiro está pronto. Quatro cartas têm
+ * arte e efeito próprios; as outras usam o sigilo neutro, de propósito.
  */
 
 export interface DemoVisualProps {
@@ -45,7 +59,7 @@ interface Medida {
   readonly altura: number;
 }
 
-/** Mede a área disponível. O enquadramento do campo depende dela. */
+/** Mede a área disponível. Toda a composição depende dela. */
 const useMedida = (): [Medida, (elemento: HTMLDivElement | null) => void] => {
   const [medida, definir] = useState<Medida>({ largura: 915, altura: 412 });
   const referencia = useRef<HTMLDivElement | null>(null);
@@ -72,6 +86,24 @@ const useMedida = (): [Medida, (elemento: HTMLDivElement | null) => void] => {
   return [medida, guardar];
 };
 
+/** O sistema pediu movimento reduzido? */
+const useMovimentoReduzido = (): boolean => {
+  const [reduzido, definir] = useState(false);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const consulta = matchMedia('(prefers-reduced-motion: reduce)');
+    definir(consulta.matches);
+    const ouvir = (): void => {
+      definir(consulta.matches);
+    };
+    consulta.addEventListener('change', ouvir);
+    return () => {
+      consulta.removeEventListener('change', ouvir);
+    };
+  }, []);
+  return reduzido;
+};
+
 export const DemoVisual = ({
   classeDoHumano,
   classeDaIa,
@@ -84,9 +116,11 @@ export const DemoVisual = ({
   );
 
   const [estado, definirEstado] = useState<EstadoDaDemo>(() => controlador.estado());
-  const [focada, definirFocada] = useState<CardId | null>(null);
+  const [focada, definirFocada] = useState<number | null>(null);
   const [pensando, definirPensando] = useState(false);
   const [medida, medir] = useMedida();
+  const raiz = useRef<HTMLDivElement | null>(null);
+  const movimentoReduzido = useMovimentoReduzido();
 
   const palco = useMemo(() => criarPalco(), []);
 
@@ -106,9 +140,8 @@ export const DemoVisual = ({
    * O turno da máquina.
    *
    * Ela já decidiu quando este efeito roda — o que acontece aqui é só a
-   * apresentação da decisão. O aviso fica no ar pelo tempo que a decisão
-   * mereceu, e só então o comando é aplicado. Nenhuma regra espera este
-   * relógio: se o navegador congelar, a partida continua correta.
+   * apresentação da decisão. Nenhuma regra espera este relógio: se o navegador
+   * congelar, a partida continua correta.
    */
   useEffect(() => {
     if (estado.etapa.tipo === 'fim') return;
@@ -127,7 +160,6 @@ export const DemoVisual = ({
     };
   }, [controlador, estado]);
 
-  /* Som: a partida toca por cima do que o estado publica. */
   useEffect(() => {
     palco.reagir(estado);
   }, [palco, estado]);
@@ -138,28 +170,63 @@ export const DemoVisual = ({
   const coresDoJogador = corDaClasse(classeDoHumano);
   const coresDaMaquina = corDaClasse(classeDaIa);
 
+  const zonas = useMemo(() => zonasDaTela(medida), [medida]);
   const enquadramento = useMemo(
-    () => enquadrarTabuleiro(medida.largura, medida.altura),
-    [medida.largura, medida.altura],
+    () => enquadrarTabuleiro(zonas.arena.largura, zonas.arena.altura),
+    [zonas.arena.largura, zonas.arena.altura],
   );
 
-  const alvoDaCena = useMemo(
-    () => montarCena(estado.visao, String(HUMANO), -CAMERA.inclinacaoEmGraus),
+  const pecas = useMemo(() => pecasDoCampo(estado.visao, String(HUMANO)), [estado.visao]);
+
+  /*
+   * Quem ganhou a quarta Ação agora.
+   *
+   * `indisponivel` é o estado normal do quarto slot: ele não existe. Quando
+   * uma regra o concede, o pedestal surge; quando a concessão acaba, some.
+   */
+  const acoesExtras = useMemo(() => {
+    const metades: Metade[] = [];
+    const quarta = (jogador: VisaoDeJogador | undefined): boolean =>
+      jogador?.acoes.find((slot) => slot.indice === 3)?.situacao !== 'indisponivel';
+    if (quarta(ela)) metades.push('maquina');
+    if (quarta(eu)) metades.push('jogador');
+    return metades;
+  }, [eu, ela]);
+  const mao = useMemo(() => maoDoJogador(estado.visao, String(HUMANO)), [estado.visao]);
+  const versosDaMaquina = useMemo(
+    () => cartasNaMaoDaMaquina(estado.visao, String(HUMANO)),
     [estado.visao],
   );
 
-  const pecas = useCena(alvoDaCena, {
-    inclinacaoDaMao: -CAMERA.inclinacaoEmGraus,
-    ritmo: 1,
-    movimentoReduzido: false,
-  });
-
   /*
-   * O efeito da carta que acabou de resolver.
+   * A cena para o diretor de movimento.
    *
-   * Ele lê o log de eventos, e não a tela: quando o primeiro beat começa, o
-   * motor já aplicou Dano, Guarda e Ruptura. O efeito conta o que houve.
+   * O lugar de uma carta no cooldown carrega a zona, porque sem isso o avanço
+   * CD3 → CD2 seria "continuou no cooldown" e as cartas trocariam de casa sem
+   * nada se mover.
    */
+  const cenaParaVoo = useMemo(
+    () => ({
+      pecas: pecas.map((peca) => ({
+        chave: peca.chave,
+        lugar: peca.lugar === 'cooldown' ? `cooldown:${String(peca.indice)}` : peca.lugar,
+      })),
+      mao: mao.map((item) => item.chave),
+      maoDaMaquina: versosDaMaquina,
+      cartaDe: (chave: string) =>
+        pecas.find((peca) => peca.chave === chave)?.carta ??
+        mao.find((item) => item.chave === chave)?.carta ??
+        null,
+    }),
+    [pecas, mao, versosDaMaquina],
+  );
+
+  const aoEncaixar = useCallback(() => {
+    palco.tocarInterface('soltar');
+  }, [palco]);
+
+  const { clones, emVoo } = useVoos({ cena: cenaParaVoo, raiz, movimentoReduzido, aoEncaixar });
+
   const efeito = useEfeito({
     eventos: estado.eventos,
     lote: estado.lote,
@@ -192,22 +259,15 @@ export const DemoVisual = ({
     };
   }, [estado]);
 
-  const tocar = useCallback(
-    (carta: CardId | null) => {
-      if (carta === null) return;
-      palco.tocarInterface('pegar');
-      definirFocada((atual) => (atual === carta ? null : carta));
-    },
-    [palco],
+  const chavesJogaveis = useMemo(
+    () =>
+      respostas === null
+        ? new Set([...jogaveis.keys()].map((id) => `c:${id}`))
+        : new Set([...respostas.cartas.keys()].map((id) => `c:${id}`)),
+    [jogaveis, respostas],
   );
 
-  const usar = useCallback(() => {
-    if (focada === null) return;
-    const candidata = jogaveis.get(String(focada));
-    if (candidata === undefined) return;
-    palco.tocarInterface('soltar');
-    controlador.declarar(candidata.pedido);
-  }, [controlador, focada, jogaveis, palco]);
+  const selo = respostas === null ? 'USAR' : 'REAGIR';
 
   const responder = useCallback(
     (pedido: PedidoDeResposta) => {
@@ -217,12 +277,99 @@ export const DemoVisual = ({
     [controlador, palco],
   );
 
+  /*
+   * A gramática de toque, e ela precisa ser previsível.
+   *
+   * **Primeiro toque inspeciona**: a carta se descola do leque, sobe, cresce e
+   * fica legível. **Segundo toque na mesma carta joga**. Um botão solto
+   * exigiria um lugar próprio na tela, e não há: o HUD ocupa a esquerda da
+   * faixa de baixo e os controles de turno a direita. O selo dentro da carta
+   * levantada diz o que o segundo toque vai fazer.
+   */
+  const tocarNaMao = useCallback(
+    (indice: number) => {
+      const carta = mao[indice]?.carta?.id ?? null;
+
+      if (focada !== indice) {
+        palco.tocarInterface('pegar');
+        definirFocada(indice);
+        return;
+      }
+
+      if (carta === null) {
+        definirFocada(null);
+        return;
+      }
+
+      if (respostas !== null) {
+        const reacao = respostas.cartas.get(String(carta));
+        if (reacao !== undefined) {
+          responder(reacao.pedido);
+          return;
+        }
+        definirFocada(null);
+        return;
+      }
+
+      const candidata = jogaveis.get(String(carta));
+      if (candidata === undefined) {
+        // Não dá para jogar: o segundo toque devolve a carta ao leque.
+        definirFocada(null);
+        return;
+      }
+      palco.tocarInterface('soltar');
+      controlador.declarar(candidata.pedido);
+    },
+    [controlador, focada, jogaveis, mao, palco, respostas, responder],
+  );
+
   if (eu === undefined || ela === undefined) {
-    return <div className="v2" />;
+    return <div className="v2" ref={medir} />;
+  }
+
+  /*
+   * Retrato pede para girar.
+   *
+   * Achatar esta composição num telefone em pé produziria algo pior que uma
+   * mensagem honesta: a arena é uma faixa larga, e espremê-la tiraria
+   * justamente a legibilidade que a revisão cobrou.
+   */
+  if (!ehDeitado(medida)) {
+    return (
+      <div className="v2 v2--retrato" ref={medir} data-teste="pedir-para-girar">
+        <div className="v2__girar">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect
+              x="18"
+              y="6"
+              width="28"
+              height="52"
+              rx="5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+            />
+            <path
+              d="M 8 46 a 22 22 0 0 0 14 12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <path d="M 22 58 l -8 -2 l 2 8 Z" fill="currentColor" />
+          </svg>
+          <p>Gire o aparelho para jogar.</p>
+          <button type="button" className="v2__botao" onClick={aoSair}>
+            Voltar
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const vencedor = estado.visao.desfecho?.vencedor ?? null;
   const ganhei = vencedor === HUMANO;
+  const acoesUsadas = eu.acoesRealizadasNoTurno;
 
   const variaveis = {
     ['--v2-largura' as string]: `${String(TABULEIRO.largura)}px`,
@@ -238,236 +385,174 @@ export const DemoVisual = ({
     ['--v2-energia-maquina' as string]: coresDaMaquina.energia,
   };
 
+  const versosEmVoo = new Set([...emVoo].filter((chave) => chave.startsWith('v:maquina:mao')));
+
   return (
-    <div className="v2" style={variaveis} data-teste="demo-v2">
-      <div className="v2__palco" ref={medir}>
-        <div className="v2__tabuleiro" data-teste="tabuleiro-v2">
-          <Tabuleiro
-            energiaDoJogador={coresDoJogador.energia}
-            energiaDaMaquina={coresDaMaquina.energia}
-          />
-
-          {efeito !== null && (
-            <CamadaDeEfeitos
-              beats={efeito.beats}
-              origem={efeito.origem}
-              coluna={efeito.coluna}
-              energia={
-                efeito.origem === 'jogador' ? coresDoJogador.energia : coresDaMaquina.energia
-              }
-              energiaClara={
-                efeito.origem === 'jogador'
-                  ? coresDoJogador.energiaClara
-                  : coresDaMaquina.energiaClara
-              }
-            />
-          )}
-
-          {/* Os encaixes acesos: para onde a carta escolhida pode ir. */}
-          {focada !== null &&
-            jogaveis.has(String(focada)) &&
-            eu.acoes
-              .filter((slot) => slot.situacao === 'vazio')
-              .slice(0, 1)
-              .map((slot) => {
-                const caixa = pedestalDeAcao('jogador', slot.indice);
-                return (
-                  <button
-                    key={slot.indice}
-                    type="button"
-                    className="v2-alvo"
-                    data-teste={`alvo-acao-${String(slot.indice)}`}
-                    aria-label="Jogar aqui"
-                    style={{
-                      ['--px' as string]: `${String(caixa.x + caixa.largura / 2)}px`,
-                      ['--py' as string]: `${String(caixa.y + caixa.altura / 2)}px`,
-                      ['--alvo-largura' as string]: `${String(caixa.largura)}px`,
-                      ['--alvo-altura' as string]: `${String(caixa.altura)}px`,
-                    }}
-                    onClick={usar}
-                  />
-                );
-              })}
-
-          {pecas.map((peca) => {
-            const ehJogavel = peca.carta !== null && jogaveis.has(String(peca.carta.id));
-            const estaFocada = peca.carta !== null && focada === peca.carta.id;
-            const altura = peca.pose.altura;
-            const classes = [
-              'v2-peca',
-              peca.interativa ? 'v2-peca--tocavel' : '',
-              ehJogavel ? 'v2-peca--jogavel' : '',
-              estaFocada ? 'v2-peca--focada' : '',
-            ]
-              .filter((item) => item !== '')
-              .join(' ');
-
-            return (
-              <div
-                key={peca.chave}
-                className={classes}
-                data-teste={`peca-${peca.chave}`}
-                data-lugar={peca.lugar}
-                data-metade={peca.metade}
-                style={{
-                  ['--px' as string]: `${String(peca.pose.x)}px`,
-                  ['--py' as string]: `${String(peca.pose.y)}px`,
-                  ['--pz' as string]: `${String(altura)}px`,
-                  ['--giro' as string]: `${String(peca.pose.giro)}deg`,
-                  ['--inclinacao' as string]: `${String(peca.pose.inclinacao)}deg`,
-                  ['--escala' as string]: String(peca.pose.escala * (estaFocada ? 1.3 : 1)),
-                  ['--presenca' as string]: String(peca.presenca),
-                  ['--sombra-escala' as string]: String(1 + altura / 260),
-                  ['--sombra-opacidade' as string]: String(Math.max(0, 0.85 - altura / 360)),
-                  zIndex: peca.ordem + (estaFocada ? 200 : 0),
-                }}
-              >
-                <div className="v2-peca__sombra" />
-                {peca.virada >= 0.5 && peca.carta !== null ? (
-                  <div className="v2-peca__face">
-                    <CartaVetorial carta={peca.carta} comTexto={peca.lugar === 'mao'} />
-                  </div>
-                ) : (
-                  <div className="v2-peca__verso">
-                    <VersoVetorial />
-                  </div>
-                )}
-                {peca.interativa && peca.carta !== null && (
-                  <button
-                    type="button"
-                    className="v2-peca__toque"
-                    data-teste={`tocar-${String(peca.carta.id)}`}
-                    aria-label={peca.carta.nome}
-                    onClick={() => {
-                      tocar(peca.carta?.id ?? null);
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="v2__interface">
-        <HudV2
-          jogador={ela}
-          rotulo="Adversário"
-          detalhado={false}
-          daVez={estado.aguardando === MAQUINA}
-          posicao="maquina"
-          dadoDeTeste="hud-maquina"
-        />
-
-        <HudV2
-          jogador={eu}
-          rotulo="Você"
-          detalhado
-          daVez={estado.aguardando === HUMANO}
-          posicao="jogador"
-          dadoDeTeste="hud-jogador"
-        />
-
-        <button type="button" className="v2__sair" onClick={aoSair} data-teste="sair-da-demo">
-          Sair
-        </button>
-
-        {pensando && (
-          <div className="v2__pensando" data-teste="pensando">
-            <span>ADVERSÁRIO PENSANDO</span>
-            <span className="v2__pensando-pontos">
-              <i className="v2__pensando-ponto" />
-              <i className="v2__pensando-ponto" />
-              <i className="v2__pensando-ponto" />
-            </span>
-          </div>
-        )}
-
-        {estado.etapa.tipo === 'acao' && estado.aguardando === HUMANO && (
-          <div className="v2__comando">
-            <button
-              type="button"
-              className="v2__botao v2__botao--forte"
-              data-teste="usar-carta"
-              disabled={focada === null || !jogaveis.has(String(focada))}
-              onClick={usar}
-            >
-              Usar
-            </button>
-            <button
-              type="button"
-              className="v2__botao"
-              data-teste="encerrar-turno"
-              onClick={() => {
-                controlador.encerrarTurno();
-              }}
-            >
-              Encerrar turno
-            </button>
-          </div>
-        )}
-
-        {respostas !== null && (
-          <>
-            <p className="v2__aviso" data-teste="janela-de-resposta">
-              {respostas.ameaca.ehTecnica
-                ? 'TÉCNICA INIMIGA — RESPONDER?'
-                : `ATAQUE: ${String(respostas.ameaca.dano)} D / ${String(respostas.ameaca.impacto)} I`}
-            </p>
-            <div className="v2__painel">
-              {focada !== null && respostas.cartas.has(String(focada)) && (
-                <button
-                  type="button"
-                  className="v2__botao v2__botao--forte"
-                  data-teste="usar-reacao"
-                  onClick={() => {
-                    const item = respostas.cartas.get(String(focada));
-                    if (item !== undefined) responder(item.pedido);
+    <div className="v2" style={variaveis} data-teste="demo-v2" ref={medir}>
+      <div className="v2__camadas" ref={raiz}>
+        {/* 1 · a arena */}
+        <div
+          className="v2__arena"
+          style={{
+            left: `${String(zonas.arena.x)}px`,
+            top: `${String(zonas.arena.y)}px`,
+            width: `${String(zonas.arena.largura)}px`,
+            height: `${String(zonas.arena.altura)}px`,
+          }}
+        >
+          <div className="v2__palco">
+            <div className="v2__tabuleiro" data-teste="tabuleiro-v2">
+              <Tabuleiro
+                energiaDoJogador={coresDoJogador.energia}
+                energiaDaMaquina={coresDaMaquina.energia}
+                acoesExtras={acoesExtras}
+              />
+              {pecas.map((peca) => (
+                <div
+                  key={peca.chave}
+                  className={`v2-peca v2-peca--${peca.lugar}`}
+                  data-chave={peca.chave}
+                  data-teste={`peca-${peca.chave}`}
+                  style={{
+                    left: `${String(peca.caixa.x)}px`,
+                    top: `${String(peca.caixa.y)}px`,
+                    width: `${String(peca.caixa.largura)}px`,
+                    height: `${String(peca.caixa.altura)}px`,
+                    transform: `rotate(${String(peca.giro)}deg)`,
+                    zIndex: peca.ordem,
+                    opacity: emVoo.has(peca.chave) ? 0 : 1,
                   }}
                 >
-                  Usar reação
-                </button>
+                  {peca.carta === null ? (
+                    <VersoVetorial />
+                  ) : (
+                    <CartaVetorial carta={peca.carta} comTexto={false} />
+                  )}
+                </div>
+              ))}
+              {efeito !== null && (
+                <CamadaDeEfeitos
+                  beats={efeito.beats}
+                  origem={efeito.origem}
+                  coluna={efeito.coluna}
+                  energia={
+                    efeito.origem === 'jogador' ? coresDoJogador.energia : coresDaMaquina.energia
+                  }
+                  energiaClara={
+                    efeito.origem === 'jogador'
+                      ? coresDoJogador.energiaClara
+                      : coresDaMaquina.energiaClara
+                  }
+                />
               )}
-              <button
-                type="button"
-                className="v2__botao"
-                data-teste="sem-resposta"
-                onClick={() => {
-                  responder({ tipo: 'sem-resposta' });
-                }}
-              >
-                Sem resposta
-              </button>
             </div>
-          </>
-        )}
-
-        {estado.etapa.tipo === 'escolha-pendente' && estado.etapa.escolha.jogador === HUMANO && (
-          <div className="v2__painel" data-teste="escolha-pendente">
-            {estado.etapa.escolha.opcoes.slice(0, 4).map((opcao) => (
-              <button
-                key={String(opcao)}
-                type="button"
-                className="v2__botao"
-                onClick={() => {
-                  controlador.resolverEscolha(opcao);
-                }}
-              >
-                {String(opcao)}
-              </button>
-            ))}
           </div>
-        )}
+        </div>
 
-        {estado.etapa.tipo === 'fim' && (
-          <div className="v2__fim" data-teste="fim-da-demo">
-            <h2 className="v2__fim-titulo">{ganhei ? 'VITÓRIA' : 'DERROTA'}</h2>
-            <button type="button" className="v2__botao v2__botao--forte" onClick={aoSair}>
-              Voltar
-            </button>
-          </div>
-        )}
+        {/* 2 · as mãos, em coordenadas de tela */}
+        <Leque
+          zona={zonas.maoDaMaquina}
+          invertido
+          cartas={Array.from({ length: versosDaMaquina }, (_, indice) => ({
+            chave: `v:maquina:mao:${String(indice)}`,
+            carta: null,
+            indice,
+          }))}
+          focada={null}
+          emVoo={versosEmVoo}
+          dadoDeTeste="mao-da-maquina"
+        />
+        <Leque
+          zona={zonas.maoDoJogador}
+          cartas={mao}
+          focada={focada}
+          emVoo={emVoo}
+          jogaveis={chavesJogaveis}
+          selo={selo}
+          aoTocar={tocarNaMao}
+          dadoDeTeste="mao-do-jogador"
+        />
+
+        {/* 3 · a camada global de animação */}
+        <Sobreposicao clones={clones} />
       </div>
+
+      {/* 4 · o HUD, em retângulos próprios */}
+      <HudV2
+        jogador={ela}
+        caixa={zonas.hudDaMaquina}
+        daVez={estado.aguardando === MAQUINA}
+        posicao="maquina"
+        pensando={pensando}
+        dadoDeTeste="hud-maquina"
+      />
+      <HudV2
+        jogador={eu}
+        caixa={zonas.hudDoJogador}
+        daVez={estado.aguardando === HUMANO}
+        posicao="jogador"
+        dadoDeTeste="hud-jogador"
+      />
+      <ControlesDeTurno
+        jogador={eu}
+        caixa={zonas.controlesDeTurno}
+        acoesUsadas={acoesUsadas}
+        acoesPermitidas={eu.acoes.length}
+        podeEncerrar={estado.etapa.tipo === 'acao' && estado.aguardando === HUMANO}
+        aoEncerrar={() => {
+          controlador.encerrarTurno();
+        }}
+        pergunta={
+          respostas === null
+            ? null
+            : {
+                texto: respostas.ameaca.ehTecnica
+                  ? 'TÉCNICA INIMIGA'
+                  : `ATAQUE ${String(respostas.ameaca.dano)} D / ${String(respostas.ameaca.impacto)} I`,
+                aoDispensar: () => {
+                  responder({ tipo: 'sem-resposta' });
+                },
+              }
+        }
+      />
+
+      <button type="button" className="v2__sair" onClick={aoSair} data-teste="sair-da-demo">
+        Sair
+      </button>
+
+      {/*
+       * 5 · os painéis contextuais.
+       *
+       * A janela de Resposta é o único painel que aparece no meio da tela, e
+       * ela é curta de propósito: fica **acima** do campo, na faixa da arena,
+       * e some assim que a pessoa decide. O comando de jogar não é painel — é
+       * o segundo toque na própria carta.
+       */}
+      {estado.etapa.tipo === 'escolha-pendente' && estado.etapa.escolha.jogador === HUMANO && (
+        <div className="v2__painel v2__painel--escolha" data-teste="escolha-pendente">
+          {estado.etapa.escolha.opcoes.slice(0, 4).map((opcao) => (
+            <button
+              key={String(opcao)}
+              type="button"
+              className="v2__botao"
+              onClick={() => {
+                controlador.resolverEscolha(opcao);
+              }}
+            >
+              {String(opcao)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {estado.etapa.tipo === 'fim' && (
+        <div className="v2__fim" data-teste="fim-da-demo">
+          <h2 className="v2__fim-titulo">{ganhei ? 'VITÓRIA' : 'DERROTA'}</h2>
+          <button type="button" className="v2__botao v2__botao--forte" onClick={aoSair}>
+            Voltar
+          </button>
+        </div>
+      )}
     </div>
   );
 };
