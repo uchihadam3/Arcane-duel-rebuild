@@ -145,6 +145,8 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
   const antesPorChave = new Map(antes.pecas.map((peca) => [peca.chave, peca.lugar]));
   const naMaoAntes = new Set(antes.mao);
   const naMaoDepois = new Set(depois.mao);
+  /** As peças viradas já consumidas por uma revelação. */
+  const vistas = new Set<string>();
 
   for (const peca of depois.pecas) {
     const lugarAntes = antesPorChave.get(peca.chave);
@@ -162,6 +164,38 @@ export const movimentosDaDiferenca = (diferenca: DiferencaDeCena): readonly Movi
         atrasoMs: 0,
       });
       continue;
+    }
+
+    /*
+     * Uma Passiva que revela **não voa**: ela gira no lugar.
+     *
+     * A carta já estava no encaixe, virada. Quando a regra a torna pública, a
+     * chave muda de `v:…passiva:N` para `c:…` — e, para quem só compara
+     * chaves, isso parece uma carta nova aparecendo no campo. Sem esta
+     * exceção, revelar uma Passiva dispararia um voo vindo da mão da máquina,
+     * que é uma mentira sobre o que aconteceu.
+     */
+    if (lugarAntes === undefined && peca.lugar.startsWith('passiva')) {
+      const virada = antes.pecas.find(
+        (anterior) =>
+          anterior.lugar === peca.lugar &&
+          anterior.chave.startsWith('v:') &&
+          !vistas.has(anterior.chave),
+      );
+      if (virada !== undefined) {
+        vistas.add(virada.chave);
+        movimentos.push({
+          id: `revela:${peca.chave}`,
+          especie: 'passiva-revela',
+          de: ancoraDoCampo(virada.chave),
+          para: ancoraDoCampo(peca.chave),
+          carta: null,
+          vira: true,
+          metade: 'jogador',
+          atrasoMs: 0,
+        });
+        continue;
+      }
     }
 
     /*

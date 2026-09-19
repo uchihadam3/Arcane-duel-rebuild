@@ -121,6 +121,64 @@ describe('a carta que resolve vai fisicamente para o cooldown', () => {
   });
 });
 
+describe('uma Passiva que revela gira no lugar, e não voa', () => {
+  /*
+   * A carta já estava no encaixe, virada. Quando a regra a torna pública, a
+   * chave muda de `v:…passiva:N` para `c:…`. Para quem só compara chaves, isso
+   * parece uma carta nova no campo — e sem a exceção o diretor emitia um voo
+   * vindo da mão da máquina, que é uma mentira sobre o que aconteceu.
+   */
+  it('a troca de verso por frente no mesmo encaixe vira uma revelação', () => {
+    const movimentos = movimentosDaDiferenca({
+      antes: cena([['v:maquina:passiva:1', 'passiva']], []),
+      depois: cena([['c:MP02', 'passiva']], []),
+    });
+    expect(movimentos).toHaveLength(1);
+    expect(movimentos[0]?.especie).toBe('passiva-revela');
+    expect(movimentos[0]?.vira).toBe(true);
+    // Origem e destino são o mesmo encaixe: ela não atravessa nada.
+    expect(movimentos[0]?.de.chave).toBe('v:maquina:passiva:1');
+    expect(movimentos[0]?.para.chave).toBe('c:MP02');
+  });
+
+  it('e não é confundida com a carta que a máquina joga da mão', () => {
+    const movimentos = movimentosDaDiferenca({
+      antes: cena([['v:maquina:passiva:0', 'passiva']], []),
+      depois: cena(
+        [
+          ['c:MP02', 'passiva'],
+          ['c:M02', 'acao'],
+        ],
+        [],
+      ),
+    });
+    const especies = movimentos.map((m) => m.especie).sort();
+    expect(especies).toEqual(['maquina-para-campo', 'passiva-revela']);
+  });
+
+  it('cada verso só é consumido por uma revelação', () => {
+    const movimentos = movimentosDaDiferenca({
+      antes: cena(
+        [
+          ['v:maquina:passiva:0', 'passiva'],
+          ['v:maquina:passiva:1', 'passiva'],
+        ],
+        [],
+      ),
+      depois: cena(
+        [
+          ['c:MP01', 'passiva'],
+          ['c:MP02', 'passiva'],
+        ],
+        [],
+      ),
+    });
+    const origens = movimentos.map((m) => m.de.chave);
+    expect(new Set(origens).size).toBe(origens.length);
+    expect(movimentos.every((m) => m.especie === 'passiva-revela')).toBe(true);
+  });
+});
+
 describe('Exaurir tira a carta do campo de verdade', () => {
   it('a Carta de Classe que some produz um movimento de saída', () => {
     const movimentos = movimentosDaDiferenca({

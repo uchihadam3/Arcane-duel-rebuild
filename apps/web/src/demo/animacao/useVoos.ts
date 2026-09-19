@@ -56,6 +56,8 @@ export interface VooRenderizado {
   readonly origem: Caixa;
   readonly pose: Pose;
   readonly vira: boolean;
+  /** Menor que 1 quando a carta está saindo do jogo. */
+  readonly opacidade: number;
 }
 
 const daRect = (rect: DOMRect, raiz: DOMRect): Caixa => ({
@@ -159,9 +161,23 @@ export const useVoos = ({
             atuais.get(CENTRO_DA_MAO_DA_MAQUINA))
           : anteriores.get(movimento.de.chave);
 
+      /*
+       * Exaurir tira a carta do campo **de verdade**.
+       *
+       * Ela levanta, vem para a frente e sai por cima — não apaga no lugar.
+       * Apagar seria indistinguível de um bug de renderização, e Exaurir é
+       * definitivo: o encaixe fica vazio para o resto da partida.
+       */
       const destino =
         movimento.para.tipo === 'fora'
-          ? (anteriores.get(movimento.de.chave) ?? origem)
+          ? origem === undefined
+            ? undefined
+            : {
+                x: origem.x,
+                y: origem.y - origem.altura * 1.6,
+                largura: origem.largura * 1.35,
+                altura: origem.altura * 1.35,
+              }
           : atuais.get(movimento.para.chave);
 
       if (origem === undefined || destino === undefined) continue;
@@ -252,6 +268,11 @@ export const useVoos = ({
       origem: voo.origem,
       pose,
       vira: voo.movimento.vira,
+      // A carta exaurida se dissolve na segunda metade da saída.
+      opacidade:
+        voo.movimento.especie === 'classe-exaure'
+          ? Math.max(0, 1 - Math.max(0, pose.progresso - 0.45) / 0.55)
+          : 1,
     });
   }
 

@@ -38,6 +38,8 @@ export interface CloneEmVoo {
    * máquina. Antes da virada o clone mostra o verso; depois, a frente.
    */
   readonly vira: boolean;
+  /** Menor que 1 quando a carta está saindo do jogo — é o vocabulário de Exaurir. */
+  readonly opacidade?: number;
 }
 
 export interface SobreposicaoProps {
@@ -73,6 +75,7 @@ export const Sobreposicao = ({ clones }: SobreposicaoProps): React.JSX.Element =
           style={{
             width: `${String(clone.origem.largura)}px`,
             height: `${String(clone.origem.altura)}px`,
+            opacity: clone.opacidade ?? 1,
             transform: [
               `translate3d(${String(pose.x - clone.origem.largura / 2)}px,`,
               `${String(pose.y - clone.origem.altura / 2)}px, 0)`,
