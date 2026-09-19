@@ -105,6 +105,20 @@
   animation: zona-pulsa 1.1s ease-in-out infinite;
 }
 
+/*
+ * Com a cena no ar, quem acende a zona é o WebGL.
+ *
+ * O contorno em CSS é um retângulo alinhado à tela; a laje é um trapézio em
+ * perspectiva. Desenhar os dois somava duas marcas desencontradas sobre o
+ * mesmo encaixe e produzia a mancha neon que a revisão visual reprovou. Sem a
+ * cena, o contorno volta a ser o único que existe.
+ */
+.arena__interacao:not(.arena__interacao--sem-cena) .zona--valida,
+.arena__interacao:not(.arena__interacao--sem-cena) .zona--esperando {
+  animation: none;
+  box-shadow: none;
+}
+
 @keyframes zona-pulsa {
   0%,
   100% {

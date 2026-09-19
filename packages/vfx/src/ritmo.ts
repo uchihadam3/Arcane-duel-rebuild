@@ -118,40 +118,65 @@ export interface OrcamentoVisual {
   readonly sombras: boolean;
   readonly luzesDinamicas: number;
   readonly brilho: boolean;
-  /** Multiplicador da resolução do canvas, limitado ao `devicePixelRatio`. */
-  readonly escalaDeRenderizacao: number;
+  /**
+   * Teto do `devicePixelRatio` com que a cena é desenhada.
+   *
+   * É **teto**, não escala: o renderizador usa o menor entre este número e a
+   * densidade real da tela, então num aparelho de DPR 2 nada muda ao subir
+   * para Alta. O que este número evita é o caso oposto — pedir 3× de
+   * resolução num telefone que não dá conta.
+   */
+  readonly tetoDeResolucao: number;
 }
 
+/**
+ * O que cada nível de qualidade gasta.
+ *
+ * A primeira entrega errou a ordem do sacrifício: Alta desenhava a 1,75× num
+ * aparelho de DPR 3, e cada degrau para baixo tirava resolução junto com
+ * sombra. O resultado foi carta e HUD borrados por escolha nossa.
+ *
+ * A ordem agora é explícita e está nos números: **sombra sai primeiro,
+ * partícula depois, luz depois, e resolução por último**. Alta e Média
+ * desenham na densidade real da tela; só Baixa — o último recurso, para um
+ * aparelho que já perdeu sombra, partícula e luz e ainda não acompanha —
+ * encosta em nitidez. Nitidez de carta e de HUD é informação competitiva, não
+ * enfeite, e por isso é a última coisa a ceder.
+ */
 export const ORCAMENTO_VISUAL: Readonly<Record<QualidadeDeVfx, OrcamentoVisual>> = {
   alta: {
     particulasPorEfeito: 90,
     sombras: true,
     luzesDinamicas: 3,
     brilho: true,
-    escalaDeRenderizacao: 1.75,
+    tetoDeResolucao: 3,
   },
   /*
    * Sombra é o item mais caro da cena, e é o primeiro a sair.
    *
    * Sem ela a arena perde profundidade, e não legibilidade: a laje continua
    * com relevo, material e luz. Trocar sombra por quadros é a troca certa num
-   * jogo em que o jogador está esperando a vez dele.
+   * jogo em que o jogador está esperando a vez dele — e note que a resolução
+   * não se mexe aqui.
    */
   media: {
     particulasPorEfeito: 42,
     sombras: false,
     luzesDinamicas: 2,
     brilho: false,
-    escalaDeRenderizacao: 1.25,
+    tetoDeResolucao: 3,
   },
   baixa: {
     particulasPorEfeito: 16,
     sombras: false,
     luzesDinamicas: 1,
     brilho: false,
-    escalaDeRenderizacao: 1,
+    tetoDeResolucao: 2,
   },
 };
+
+/** Os níveis, do mais caro ao mais barato. A queda automática anda por aqui. */
+export const ESCADA_DE_QUALIDADE: readonly QualidadeDeVfx[] = ['alta', 'media', 'baixa'];
 
 /**
  * A velocidade que corresponde a cada modo escolhido pelo jogador.

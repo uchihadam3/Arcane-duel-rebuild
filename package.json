@@ -33,7 +33,8 @@
     "clean": "rm -rf packages/*/dist apps/*/dist apps/web/public/assets packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo",
     "check": "npm run format:check && npm run lint && npm run assets:check && npm run build && npm run verify:sw && npm run test",
     "verify:sw": "node scripts/verificar-service-worker.mjs",
-    "verify:arena": "node scripts/verificar-arena.mjs"
+    "verify:arena": "node scripts/verificar-arena.mjs",
+    "ficha:visual": "node scripts/ficha-visual.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",

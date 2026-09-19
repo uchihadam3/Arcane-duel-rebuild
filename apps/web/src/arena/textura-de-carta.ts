@@ -1,4 +1,4 @@
-import { CanvasTexture, LinearFilter, SRGBColorSpace } from 'three';
+import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter, SRGBColorSpace } from 'three';
 import type { Texture } from 'three';
 
 import type { CartaVisivel } from '../partida/apresentacao.js';
@@ -21,8 +21,32 @@ import { desenharSigilo, sigiloDaCarta } from './sigilo.js';
  * diferentes — por isso os números estão nomeados, num lugar só.
  */
 
-/** Proporção mestre do catálogo: 5:7. */
-export const TAMANHO_DA_TEXTURA = { largura: 512, altura: 717 } as const;
+/*
+ * Uma resolução por uso, e não uma para tudo.
+ *
+ * A primeira entrega tinha um número só — 512 × 717 — servindo à mão, ao
+ * campo e à carta em foco. A moldura aprovada tem 1060 × 1484: era 48 % da
+ * resolução linear e **23 % da área**, e ainda por cima ampliada na hora de
+ * inspecionar. Nome e texto de regra ficavam borrados justamente quando o
+ * jogador precisava lê-los.
+ *
+ * Agora a textura é escolhida pelo tamanho que a carta tem na tela. Nenhum dos
+ * níveis amplia a arte: `foco` é exatamente o tamanho do arquivo aprovado.
+ * Todos mantêm a proporção mestre 5:7 do catálogo.
+ */
+export const NIVEIS_DE_TEXTURA = {
+  /** Carta assentada numa laje: pequena, e sempre acompanhada do HUD. */
+  campo: { largura: 512, altura: 717 },
+  /** A mão é a maior coisa da tela, e é onde se lê antes de decidir. */
+  mao: { largura: 768, altura: 1075 },
+  /** Foco e inspeção: a moldura aprovada, em tamanho nativo. */
+  foco: { largura: 1060, altura: 1484 },
+} as const;
+
+export type NivelDeTextura = keyof typeof NIVEIS_DE_TEXTURA;
+
+/** O nível de campo, que é o menor. Serve de padrão a quem não escolhe. */
+export const TAMANHO_DA_TEXTURA = NIVEIS_DE_TEXTURA.campo;
 
 const REGIOES = {
   arte: { esquerda: 0.13, direita: 0.87, topo: 0.18, base: 0.55 },
@@ -120,7 +144,16 @@ export const desenharCarta = (
   moldura: CanvasImageSource | null,
   opcoes: OpcoesDaCarta = {},
 ): void => {
-  const { largura, altura } = TAMANHO_DA_TEXTURA;
+  /*
+   * O tamanho vem do canvas, não de uma constante.
+   *
+   * Todas as regiões abaixo são fração, e todo corpo de letra é proporção da
+   * altura — então a mesma função desenha os três níveis sem um único número
+   * duplicado. É isso que garante que a carta da mão e a carta em foco sejam a
+   * mesma carta, e não duas artes que podem divergir.
+   */
+  const largura = contexto.canvas.width;
+  const altura = contexto.canvas.height;
   contexto.clearRect(0, 0, largura, altura);
 
   /* A janela de arte vai por baixo da moldura, que tem recorte próprio. */
@@ -171,10 +204,11 @@ export const desenharCarta = (
   const larguraDoNome = (REGIOES.nome.direita - REGIOES.nome.esquerda) * largura;
   contexto.fillStyle = '#2a1a12';
   let corpoDoNome = Math.round(altura * 0.056);
+  const menorCorpo = Math.round(altura * 0.026);
   contexto.font = `800 ${String(corpoDoNome)}px ${FAMILIA}`;
   let linhasDoNome = linhasQueCabem(contexto, carta.nome, larguraDoNome, 2);
-  while (linhasDoNome.length > 2 && corpoDoNome > 18) {
-    corpoDoNome -= 2;
+  while (linhasDoNome.length > 2 && corpoDoNome > menorCorpo) {
+    corpoDoNome -= Math.max(1, Math.round(altura * 0.003));
     contexto.font = `800 ${String(corpoDoNome)}px ${FAMILIA}`;
     linhasDoNome = linhasQueCabem(contexto, carta.nome, larguraDoNome, 2);
   }
@@ -240,7 +274,8 @@ export const desenharVerso = (
   contexto: CanvasRenderingContext2D,
   verso: CanvasImageSource | null,
 ): void => {
-  const { largura, altura } = TAMANHO_DA_TEXTURA;
+  const largura = contexto.canvas.width;
+  const altura = contexto.canvas.height;
   contexto.clearRect(0, 0, largura, altura);
   if (verso === null) {
     contexto.fillStyle = '#1b1712';
@@ -259,21 +294,33 @@ export const desenharVerso = (
  */
 export interface FabricaDeTexturas {
   /** `null` quando não há canvas — fora do navegador, e só lá. */
-  readonly daCarta: (carta: CartaVisivel, opcoes?: OpcoesDaCarta) => Texture | null;
-  readonly doVerso: () => Texture | null;
+  readonly daCarta: (
+    carta: CartaVisivel,
+    nivel: NivelDeTextura,
+    opcoes?: OpcoesDaCarta,
+  ) => Texture | null;
+  readonly doVerso: (nivel: NivelDeTextura) => Texture | null;
   readonly aoCarregarMoldura: (aviso: () => void) => void;
   readonly descartar: () => void;
 }
 
-const criarCanvas = (): HTMLCanvasElement | null => {
+const criarCanvas = (nivel: NivelDeTextura): HTMLCanvasElement | null => {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = TAMANHO_DA_TEXTURA.largura;
-  canvas.height = TAMANHO_DA_TEXTURA.altura;
+  canvas.width = NIVEIS_DE_TEXTURA[nivel].largura;
+  canvas.height = NIVEIS_DE_TEXTURA[nivel].altura;
   return canvas;
 };
 
-export const criarFabricaDeTexturas = (contexto: ContextoDeTextura): FabricaDeTexturas => {
+export interface OpcoesDaFabrica {
+  /** A anisotropia real do aparelho. Carta na mão é vista bem de lado. */
+  readonly anisotropiaMaxima: number;
+}
+
+export const criarFabricaDeTexturas = (
+  contexto: ContextoDeTextura,
+  opcoesDaFabrica: OpcoesDaFabrica = { anisotropiaMaxima: 4 },
+): FabricaDeTexturas => {
   const molduras = new Map<string, HTMLImageElement>();
   const texturas = new Map<string, CanvasTexture>();
   const avisos = new Set<() => void>();
@@ -296,12 +343,13 @@ export const criarFabricaDeTexturas = (contexto: ContextoDeTextura): FabricaDeTe
 
   const desenhar = (
     chave: string,
+    nivel: NivelDeTextura,
     pintar: (ctx: CanvasRenderingContext2D) => void,
   ): Texture | null => {
     const existente = texturas.get(chave);
     if (existente !== undefined) return existente;
 
-    const canvas = criarCanvas();
+    const canvas = criarCanvas(nivel);
     const ctx = canvas?.getContext('2d') ?? null;
     // Sem canvas não há textura, e quem chama desenha pela camada em DOM. A
     // cena nunca é montada nesse caso, então isto é defesa, não caminho.
@@ -309,28 +357,37 @@ export const criarFabricaDeTexturas = (contexto: ContextoDeTextura): FabricaDeTe
     pintar(ctx);
     const textura = new CanvasTexture(canvas);
     textura.colorSpace = SRGBColorSpace;
-    textura.minFilter = LinearFilter;
+    /*
+     * Mipmap e anisotropia, e não filtragem linear crua.
+     *
+     * Uma carta na mão fica inclinada 66° em relação à câmera: sem mipmap ela
+     * cintila a cada quadro, e sem anisotropia o mipmap escolhe o nível pelo
+     * eixo mais comprimido e apaga o nome. Os dois juntos são o que torna o
+     * texto legível numa carta deitada.
+     */
+    textura.generateMipmaps = true;
+    textura.minFilter = LinearMipmapLinearFilter;
     textura.magFilter = LinearFilter;
-    textura.anisotropy = 4;
+    textura.anisotropy = opcoesDaFabrica.anisotropiaMaxima;
     texturas.set(chave, textura);
     return textura;
   };
 
   return {
-    daCarta: (carta, opcoes = {}) => {
+    daCarta: (carta, nivel, opcoes = {}) => {
       const assetId = MOLDURA_DO_TIPO[carta.tipo];
       const moldura = molduraDe(assetId);
-      const chave = `${String(carta.id)}:${opcoes.comTexto === true ? 'texto' : 'curto'}:${
+      const chave = `${String(carta.id)}:${nivel}:${opcoes.comTexto === true ? 'texto' : 'curto'}:${
         moldura === null ? 'sem-moldura' : 'com-moldura'
       }`;
-      return desenhar(chave, (ctx) => {
+      return desenhar(chave, nivel, (ctx) => {
         desenharCarta(ctx, carta, moldura, opcoes);
       });
     },
 
-    doVerso: () => {
+    doVerso: (nivel) => {
       const verso = molduraDe('card-back');
-      return desenhar(`verso:${verso === null ? 'sem' : 'com'}`, (ctx) => {
+      return desenhar(`verso:${nivel}:${verso === null ? 'sem' : 'com'}`, nivel, (ctx) => {
         desenharVerso(ctx, verso);
       });
     },

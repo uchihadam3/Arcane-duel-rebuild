@@ -70,10 +70,10 @@ describe('níveis de qualidade', () => {
     const chaves = Object.keys(ORCAMENTO_VISUAL.alta).sort();
     expect(chaves).toEqual([
       'brilho',
-      'escalaDeRenderizacao',
       'luzesDinamicas',
       'particulasPorEfeito',
       'sombras',
+      'tetoDeResolucao',
     ]);
   });
 
@@ -82,9 +82,21 @@ describe('níveis de qualidade', () => {
       const acima = ORCAMENTO_VISUAL[niveis[indice - 1]!];
       const abaixo = ORCAMENTO_VISUAL[niveis[indice]!];
       expect(abaixo.particulasPorEfeito).toBeLessThan(acima.particulasPorEfeito);
-      expect(abaixo.escalaDeRenderizacao).toBeLessThanOrEqual(acima.escalaDeRenderizacao);
+      expect(abaixo.tetoDeResolucao).toBeLessThanOrEqual(acima.tetoDeResolucao);
       expect(abaixo.luzesDinamicas).toBeLessThanOrEqual(acima.luzesDinamicas);
     }
+  });
+
+  it('só sacrificam resolução no último degrau', () => {
+    /*
+     * A regra que a reprovação visual escreveu: nitidez é informação
+     * competitiva, e cede depois de sombra, partícula e luz — nunca antes.
+     * Alta e Média desenham na densidade real da tela.
+     */
+    expect(ORCAMENTO_VISUAL.media.tetoDeResolucao).toBe(ORCAMENTO_VISUAL.alta.tetoDeResolucao);
+    expect(ORCAMENTO_VISUAL.media.sombras).toBe(false);
+    expect(ORCAMENTO_VISUAL.alta.tetoDeResolucao).toBeGreaterThanOrEqual(3);
+    expect(ORCAMENTO_VISUAL.baixa.tetoDeResolucao).toBeGreaterThanOrEqual(2);
   });
 
   it('não encostam na duração de nenhum beat', () => {

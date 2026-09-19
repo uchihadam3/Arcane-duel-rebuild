@@ -26,10 +26,17 @@ const DIST = join(RAIZ, 'apps', 'web', 'dist');
 /** As capturas de trabalho: uma por resolução, regeneradas a cada execução. */
 const CAPTURAS = join(RAIZ, 'capturas');
 /**
- * A referência de regressão visual, versionada.
+ * A referência de regressão visual.
  *
  * São os momentos do **nosso** jogo, em 844×390 e escala 1. A comparação é
  * sempre contra nós mesmos: nada aqui é comparado com o jogo do vídeo.
+ *
+ * Estes arquivos **não entram no repositório**: `capturas/` está no
+ * `.gitignore` e pega este diretório também. São doze megabytes de PNG por
+ * execução, num repositório que é a própria fonte do GitHub Pages — versioná-
+ * los faria cada clone e cada publicação carregarem isso. Quem quiser a
+ * referência roda o comando; comentar que ela é "versionada" quando não é seria
+ * pior do que não ter.
  */
 const REFERENCIA = join(RAIZ, 'docs', 'capturas');
 const PORTA = 4399;

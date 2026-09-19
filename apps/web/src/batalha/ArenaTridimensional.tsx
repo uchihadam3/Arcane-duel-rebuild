@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { PerspectiveCamera } from 'three';
 import type { MomentoEmCena, QualidadeDeVfx } from '@arcane-duel/vfx';
+import { ESCADA_DE_QUALIDADE } from '@arcane-duel/vfx';
 import { useResolvedorDeAssets } from '@arcane-duel/ui';
 
 import { cameraParaViewport } from '../arena/camera.js';
@@ -86,6 +87,7 @@ export const ArenaTridimensional = ({
     const cena: CenaDaArena = criarCena({
       qualidade: preferencias.qualidade,
       contextoDeTextura: { url: (assetId) => resolvedor.url(assetId) },
+      anisotropiaMaxima: renderizador.anisotropiaMaxima,
       aoPrecisarDeQuadro: () => undefined,
     });
     const efeitos: DiretorDeEfeitos = criarDiretorDeEfeitos(cena.grupoDeEfeitos, {
@@ -107,6 +109,7 @@ export const ArenaTridimensional = ({
       // A câmera é refeita, não movida: o enquadramento depende da tela, a
       // posição não. Nenhum gesto do jogador passa por aqui.
       camera = cameraParaViewport({ largura, altura });
+      cena.ajustarProfundidade(camera.position.length());
       renderizador.redimensionar(largura, altura);
     };
 
@@ -122,43 +125,103 @@ export const ArenaTridimensional = ({
     }
 
     /*
-     * Qualidade que cede antes dos quadros.
+     * Qualidade que cede antes dos quadros — devagar, e com volta.
      *
-     * O nível escolhido pelo jogador é o **teto**, não uma promessa: num
-     * aparelho fraco, insistir em sombra e resolução alta troca fluidez por
-     * enfeite, e fluidez é o que um jogo competitivo precisa. A queda é só
-     * para baixo e só acontece depois de um segundo inteiro ruim, para um
-     * engasgo isolado não rebaixar a cena.
+     * A primeira versão descia um degrau depois de **um único segundo** acima
+     * de 33 ms, e o degrau levava a resolução junto. Na prática o jogador
+     * escolhia Alta, abria a partida e em poucos segundos estava vendo a cena
+     * borrada sem ter pedido nada: um engasgo de carregamento bastava, e não
+     * havia caminho de volta.
      *
-     * Nada disso toca informação, regra ou duração de beat.
+     * Agora a decisão é tomada sobre uma janela longa, pela **mediana** — que
+     * ignora o quadro perdido isolado, coisa que a média não faz —, com faixa
+     * morta entre descer e subir, com carência depois de cada troca e com
+     * subida permitida. O nível escolhido continua sendo teto: a auto-queda
+     * nunca sobe acima dele.
+     *
+     * O que cada degrau custa está em `ORCAMENTO_VISUAL`, e lá a ordem é
+     * sombra, partícula, luz e — só no último — resolução.
      */
-    const ESCADA: readonly QualidadeDeVfx[] = ['alta', 'media', 'baixa'];
-    let degrau = ESCADA.indexOf(preferencias.qualidade);
-    let somaDeQuadros = 0;
-    let quadrosMedidos = 0;
+    const JANELA_MS = 3000;
+    /** Acima disto a arena já não acompanha o dedo: 30 fps. */
+    const LIMITE_PARA_DESCER_MS = 33;
+    /** Abaixo disto sobra folga de verdade: 50 fps. Entre os dois, nada muda. */
+    const LIMITE_PARA_SUBIR_MS = 20;
+    /** Depois de trocar, espera-se uma janela inteira antes de trocar de novo. */
+    const CARENCIA_MS = 6000;
+    /** Duas janelas boas seguidas para subir; uma ruim já basta para descer. */
+    const JANELAS_BOAS_PARA_SUBIR = 2;
+
+    const teto = Math.max(0, ESCADA_DE_QUALIDADE.indexOf(preferencias.qualidade));
+    let degrau = teto;
+    let janela: number[] = [];
+    let inicioDaJanela = 0;
     let anterior = 0;
+    let bloqueadoAte = 0;
+    let janelasBoas = 0;
+
+    /*
+     * O nível em vigor fica escrito no canvas.
+     *
+     * Não é enfeite de depuração: é como a ficha de nitidez sabe se a cena
+     * está em 2× porque o aparelho cedeu ou porque alguém limitou a resolução
+     * no código. Sem isso a medição não distingue as duas coisas — e foi
+     * justamente um limite escondido no código que borrou a primeira entrega.
+     */
+    const anunciarQualidade = (nivel: QualidadeDeVfx): void => {
+      alvo.dataset.qualidade = nivel;
+    };
+    anunciarQualidade(preferencias.qualidade);
+
+    const aplicarDegrau = (indice: number): void => {
+      degrau = indice;
+      const nivel = ESCADA_DE_QUALIDADE[indice] ?? 'baixa';
+      renderizador.definirQualidade(nivel);
+      cena.definirQualidade(nivel);
+      efeitos.definirQualidade(nivel);
+      renderizador.redimensionar(larguraAtual, alturaAtual);
+      anunciarQualidade(nivel);
+    };
+
+    const mediana = (amostras: readonly number[]): number => {
+      const ordenadas = [...amostras].sort((a, b) => a - b);
+      const meio = Math.floor(ordenadas.length / 2);
+      return ordenadas[meio] ?? 0;
+    };
 
     const ajustarQualidade = (tempoMs: number): void => {
-      if (anterior !== 0) {
-        somaDeQuadros += tempoMs - anterior;
-        quadrosMedidos += 1;
+      if (anterior === 0 || inicioDaJanela === 0) {
+        anterior = tempoMs;
+        inicioDaJanela = tempoMs;
+        return;
       }
+      janela.push(tempoMs - anterior);
       anterior = tempoMs;
-      if (somaDeQuadros < 1000) return;
+      if (tempoMs - inicioDaJanela < JANELA_MS) return;
 
-      const medio = somaDeQuadros / quadrosMedidos;
-      somaDeQuadros = 0;
-      quadrosMedidos = 0;
-      // 33 ms é o quadro de 30 fps: abaixo disso a arena já não acompanha o
-      // dedo, e é hora de abrir mão de enfeite.
-      if (medio <= 33 || degrau >= ESCADA.length - 1) return;
+      const tipico = mediana(janela);
+      janela = [];
+      inicioDaJanela = tempoMs;
+      if (tempoMs < bloqueadoAte) return;
 
-      degrau += 1;
-      const proxima = ESCADA[degrau] ?? 'baixa';
-      renderizador.definirQualidade(proxima);
-      cena.definirQualidade(proxima);
-      efeitos.definirQualidade(proxima);
-      renderizador.redimensionar(larguraAtual, alturaAtual);
+      if (tipico > LIMITE_PARA_DESCER_MS) {
+        janelasBoas = 0;
+        if (degrau >= ESCADA_DE_QUALIDADE.length - 1) return;
+        aplicarDegrau(degrau + 1);
+        bloqueadoAte = tempoMs + CARENCIA_MS;
+        return;
+      }
+
+      if (tipico < LIMITE_PARA_SUBIR_MS && degrau > teto) {
+        janelasBoas += 1;
+        if (janelasBoas < JANELAS_BOAS_PARA_SUBIR) return;
+        janelasBoas = 0;
+        aplicarDegrau(degrau - 1);
+        bloqueadoAte = tempoMs + CARENCIA_MS;
+        return;
+      }
+
+      janelasBoas = 0;
     };
 
     let ativo = true;

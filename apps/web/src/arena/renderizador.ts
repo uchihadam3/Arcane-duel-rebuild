@@ -17,6 +17,10 @@ export interface Renderizador {
   readonly redimensionar: (largura: number, altura: number) => void;
   readonly desenhar: (scene: Scene, camera: PerspectiveCamera) => void;
   readonly definirQualidade: (qualidade: QualidadeDeVfx) => void;
+  /** A anisotropia que este aparelho aceita. Quem monta textura pergunta aqui. */
+  readonly anisotropiaMaxima: number;
+  /** A densidade com que a cena está sendo desenhada agora. A guarda mede isto. */
+  readonly densidade: () => number;
   readonly descartar: () => void;
 }
 
@@ -42,7 +46,7 @@ export const criarRenderizador = (opcoes: OpcoesDoRenderizador): Renderizador | 
 
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 1.15;
   renderer.shadowMap.type = PCFSoftShadowMap;
 
   let orcamento = ORCAMENTO_VISUAL[opcoes.qualidade];
@@ -54,14 +58,26 @@ export const criarRenderizador = (opcoes: OpcoesDoRenderizador): Renderizador | 
   };
   opcoes.canvas.addEventListener('webglcontextlost', aoPerder);
 
+  /*
+   * A densidade real da tela, e não uma fração dela.
+   *
+   * A versão reprovada desenhava a `min(1,75, devicePixelRatio)`: num telefone
+   * de DPR 3 a cena saía a 1,75× e era esticada para 3×. Isso é borrão
+   * escolhido por nós, permanente, em cima de nome de carta e número de HUD.
+   *
+   * Agora o teto de qualidade só entra se for **menor** que a tela, que é o
+   * caso de um aparelho fraco em Baixa. No resto, manda o aparelho.
+   */
   const pixelRatio = (): number =>
     Math.min(
-      orcamento.escalaDeRenderizacao,
+      orcamento.tetoDeResolucao,
       typeof window === 'undefined' ? 1 : window.devicePixelRatio,
     );
 
   return {
     canvas: opcoes.canvas,
+    anisotropiaMaxima: renderer.capabilities.getMaxAnisotropy(),
+    densidade: () => renderer.getPixelRatio(),
 
     redimensionar: (largura, altura) => {
       renderer.setPixelRatio(pixelRatio());
