@@ -4,6 +4,7 @@ import { acoesLegais, ameacaDaAcao, respostasLegais } from '@arcane-duel/gamepla
 import type { PedidoDeResposta } from '@arcane-duel/gameplay/jogo';
 
 import { Sobreposicao } from './animacao/Sobreposicao.jsx';
+import { Cenario } from './arena/Cenario.jsx';
 import type { EfeitoDoLote } from './animacao/apresentacao.js';
 import type { Andamento } from './animacao/ritmo.js';
 import { PASSO_DA_CASCATA_MS } from './animacao/ritmo.js';
@@ -242,6 +243,8 @@ export const DemoVisual = ({
         pecas.find((peca) => peca.chave === chave)?.carta ??
         mao.find((item) => item.chave === chave)?.carta ??
         null,
+      // A mão vive em coordenadas de tela e repousa a 0°; o campo dita o resto.
+      giroDe: (chave: string) => pecas.find((peca) => peca.chave === chave)?.giro ?? 0,
     }),
     [estado.lote, pecas, mao, versosDaMaquina],
   );
@@ -455,6 +458,12 @@ export const DemoVisual = ({
   return (
     <div className="v2" style={variaveis} data-teste="demo-v2" ref={medir}>
       <div className="v2__camadas" ref={raiz}>
+        {/* 0 · o salão em volta da mesa, que dá lugar e escala à partida */}
+        <Cenario
+          energiaDoJogador={coresDoJogador.energia}
+          energiaDaMaquina={coresDaMaquina.energia}
+        />
+
         {/* 1 · a arena */}
         <div
           className="v2__arena"

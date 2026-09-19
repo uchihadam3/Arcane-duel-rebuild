@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AUMENTO_DA_PASSIVA,
+  ENCAIXE_DE_PASSIVA,
+  MEDIDAS_ANTERIORES,
+  PEDESTAL_DE_ACAO,
+  REDUCAO_DA_ACAO,
   type Metade,
   type Retangulo,
   TABULEIRO,
@@ -408,5 +413,56 @@ ${svg}</body></html>`;
     fs.mkdirSync(caminho.dirname(destino), { recursive: true });
     fs.writeFileSync(destino, html, 'utf8');
     expect(html).toContain('<svg');
+  });
+});
+
+describe('o reequilíbrio das proporções', () => {
+  /*
+   * A revisão foi específica: a Passiva cresce entre 25 % e 35 %, e a Ação
+   * encolhe entre 8 % e 15 %. Os limites estão aqui porque um ajuste futuro
+   * que saia deles desfaz exatamente a leitura que esta revisão consertou —
+   * quatro Passivas ilegíveis de um lado, uma fileira da frente apertada do
+   * outro.
+   */
+  it('a Passiva cresce dentro da faixa pedida', () => {
+    expect(AUMENTO_DA_PASSIVA).toBeGreaterThanOrEqual(1.25);
+    expect(AUMENTO_DA_PASSIVA).toBeLessThanOrEqual(1.35);
+    expect(ENCAIXE_DE_PASSIVA.largura / MEDIDAS_ANTERIORES.passiva.largura).toBeGreaterThan(1.25);
+    expect(ENCAIXE_DE_PASSIVA.altura / MEDIDAS_ANTERIORES.passiva.altura).toBeGreaterThan(1.25);
+  });
+
+  it('a Ação encolhe dentro da faixa pedida', () => {
+    expect(REDUCAO_DA_ACAO).toBeLessThanOrEqual(0.92);
+    expect(REDUCAO_DA_ACAO).toBeGreaterThanOrEqual(0.85);
+    expect(PEDESTAL_DE_ACAO.largura).toBeLessThan(MEDIDAS_ANTERIORES.acao.largura);
+    expect(PEDESTAL_DE_ACAO.altura).toBeLessThan(MEDIDAS_ANTERIORES.acao.altura);
+  });
+
+  it('a Ação continua sendo a maior peça da arena', () => {
+    // A hierarquia de leitura não muda: o choque acontece nas Ações.
+    expect(PEDESTAL_DE_ACAO.altura).toBeGreaterThan(ENCAIXE_DE_PASSIVA.altura);
+    expect(PEDESTAL_DE_ACAO.largura).toBeGreaterThan(ENCAIXE_DE_PASSIVA.largura);
+  });
+
+  it('o que a Ação devolveu virou folga, e não outra peça', () => {
+    const antes = MEDIDAS_ANTERIORES.acao.altura;
+    const agora = PEDESTAL_DE_ACAO.altura;
+    const acao = pedestalDeAcao('jogador', 0);
+    const passiva = encaixeDePassiva('jogador', 0);
+    const folga = passiva.y - (acao.y + acao.altura);
+    expect(agora).toBeLessThan(antes);
+    // A folga entre a fileira da frente e a retaguarda cresceu pelo mesmo tanto.
+    expect(folga).toBeGreaterThanOrEqual(antes - agora);
+  });
+
+  it('e a simetria continua derivada, não reescrita', () => {
+    for (const indice of [0, 1, 2, 3]) {
+      expect(encaixeDePassiva('maquina', indice)).toEqual(
+        girar(encaixeDePassiva('jogador', indice)),
+      );
+    }
+    for (const indice of [0, 1, 2] as const) {
+      expect(pedestalDeAcao('maquina', indice)).toEqual(girar(pedestalDeAcao('jogador', indice)));
+    }
   });
 });

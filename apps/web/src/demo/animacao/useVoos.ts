@@ -42,6 +42,15 @@ export interface CenaParaVoo {
   readonly maoDaMaquina: number;
   /** Como achar a carta, quando o observador pode conhecê-la. */
   readonly cartaDe: (chave: string) => CartaVisivel | null;
+  /**
+   * O giro de repouso de uma peça, em graus.
+   *
+   * O clone precisa **pousar** na orientação em que a peça real está. Sem
+   * isso a carta da máquina atravessava de pé e trocava para 180° no quadro
+   * em que o clone sumia — um salto no fim de um voo que existe justamente
+   * para não haver saltos.
+   */
+  readonly giroDe: (chave: string) => number;
 }
 
 export interface VooAtivo {
@@ -52,6 +61,8 @@ export interface VooAtivo {
   readonly inicioMs: number;
   /** Quanto este movimento leva, já com o andamento aplicado. */
   readonly duracaoMs: number;
+  readonly giroDeOrigem: number;
+  readonly giroDeDestino: number;
   readonly carta: CartaVisivel | null;
 }
 
@@ -134,6 +145,9 @@ export interface ResultadoDosVoos {
   readonly marcos: MarcosDoLote;
 }
 
+/** Quanto a apresentação pode ficar atrás do motor antes de encostar nele. */
+export const ATRASO_MAXIMO_MS = 6000;
+
 const SEM_MARCOS: MarcosDoLote = {
   lote: -1,
   efeitoMs: null,
@@ -160,6 +174,20 @@ export const useVoos = ({
   const [marcos, definirMarcos] = useState<MarcosDoLote>(SEM_MARCOS);
   const [agora, definirAgora] = useState(0);
   const encaixados = useRef<Set<string>>(new Set());
+  /*
+   * Quando a apresentação em curso termina.
+   *
+   * O motor manda o lance em **lotes**: a declaração num, a resolução no
+   * seguinte. Se cada lote começasse a contar do zero, o efeito do segundo
+   * sairia por cima do voo do primeiro — que foi exatamente o que apareceu na
+   * primeira captura desta revisão: a carta ainda no ar e o número do HUD já
+   * caído.
+   *
+   * O próximo lote começa onde o anterior acabou. É a mesma regra da fila,
+   * agora entre lotes: **um beat principal por vez**, e o motor não espera
+   * por isso — ele já terminou.
+   */
+  const fimDaApresentacao = useRef(0);
 
   const ritmo = movimentoReduzido ? RITMO_REDUZIDO : 1;
 
@@ -197,7 +225,16 @@ export const useVoos = ({
     const roteiro = apresentar(crus, { efeito, andamento });
     const movimentos = roteiro.movimentos;
 
-    const relogio = performance.now();
+    const agora = performance.now();
+    /*
+     * O teto do atraso acumulado.
+     *
+     * Sem ele, uma sequência longa da máquina empilharia lotes até a
+     * apresentação ficar minutos atrás do estado. Com ele, o atraso para de
+     * crescer e a fila volta a encostar no motor — o que se perde é a folga
+     * entre lances, nunca um beat.
+     */
+    const relogio = Math.min(Math.max(agora, fimDaApresentacao.current), agora + ATRASO_MAXIMO_MS);
     const novos: VooAtivo[] = [];
 
     for (const movimento of movimentos) {
@@ -242,6 +279,11 @@ export const useVoos = ({
         destino,
         inicioMs: relogio + movimento.atrasoMs * ritmo,
         duracaoMs: movimento.duracaoMs * ritmo,
+        giroDeOrigem: cena.giroDe(movimento.de.chave),
+        giroDeDestino:
+          movimento.para.tipo === 'fora'
+            ? cena.giroDe(movimento.de.chave)
+            : cena.giroDe(movimento.para.chave),
         carta: cena.cartaDe(movimento.para.chave) ?? cena.cartaDe(movimento.de.chave),
       });
     }
@@ -254,8 +296,19 @@ export const useVoos = ({
     };
 
     if (novos.length > 0) {
-      encaixados.current = new Set();
-      definirAtivos(novos);
+      /*
+       * Os voos se **somam**, e não se substituem.
+       *
+       * Com os lotes encadeados, o voo do lote anterior pode ainda estar no
+       * ar quando o seguinte é agendado. Trocar a lista faria a carta sumir
+       * do meio da tela — um teleporte, que é o que esta camada inteira
+       * existe para evitar. Cada voo tem identidade própria, então os
+       * terminados saem e os novos entram.
+       */
+      definirAtivos((anteriores) => [
+        ...anteriores.filter((voo) => agora < voo.inicioMs + voo.duracaoMs),
+        ...novos,
+      ]);
     }
 
     /*
@@ -277,9 +330,10 @@ export const useVoos = ({
         janelaDoEfeitoMs: roteiro.janelaDoEfeitoMs * ritmo,
         fimMs: relogio + roteiro.duracaoMs * ritmo,
       });
+      fimDaApresentacao.current = relogio + roteiro.duracaoMs * ritmo;
     }
 
-    if (novos.length > 0) definirAgora(relogio);
+    if (novos.length > 0) definirAgora(agora);
   }, [andamento, cena, efeito, marcos.lote, raiz, ritmo]);
 
   /* O relógio: um rAF enquanto houver voo, e nenhum quando não houver. */
@@ -330,8 +384,8 @@ export const useVoos = ({
       {
         origem: voo.origem,
         destino: voo.destino,
-        giroDeOrigem: 0,
-        giroDeDestino: 0,
+        giroDeOrigem: voo.giroDeOrigem,
+        giroDeDestino: voo.giroDeDestino,
         inclinacaoDoCampo: 0,
         inicioMs: voo.inicioMs,
         ritmo: voo.duracaoMs / MARCOS.assenta,

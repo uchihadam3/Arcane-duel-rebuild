@@ -26,17 +26,40 @@ import { TABULEIRO } from './planta.js';
  *      luz direcional — não de brilho. Só o sulco arcano emite luz, e pouca.
  */
 
+/*
+ * A paleta, depois da reprovação por cor.
+ *
+ * O veredito do aparelho real foi "tudo cinza e preto", e ele estava certo: a
+ * paleta anterior tinha um único eixo — do quase-preto ao cinza-arroxeado — e
+ * nenhuma temperatura. Uma pedra real nunca é monocromática: ela tem áreas
+ * frias onde a luz não chega e áreas quentes onde o calor assentou, e é o
+ * contraste **entre as duas** que faz o olho ler material em vez de superfície
+ * pintada.
+ *
+ * As entradas abaixo passam a ter os dois lados. `pedraQuente` e `pedraFria`
+ * são as manchas que a superfície ganha por cima da base; bronze e ouro
+ * ficaram mais saturados para parecerem metal envelhecido em vez de cinza
+ * amarelado; o ferro escureceu e ganhou um traço quente, porque ferro velho
+ * não é cinza neutro.
+ *
+ * Nada disto vira neon: o teto de saturação continua baixo, e o único material
+ * que emite luz é o sulco arcano.
+ */
 export const PALETA = {
-  pedraProfunda: '#100d13',
-  pedra: '#252029',
-  pedraClara: '#3c343f',
-  metal: '#312b33',
-  metalClaro: '#574c58',
-  metalEscuro: '#17141a',
-  ouro: '#8a6c2e',
-  ouroClaro: '#d9b871',
-  ouroEscuro: '#4a3814',
-  bronze: '#6b5333',
+  pedraProfunda: '#120d12',
+  pedra: '#2b2329',
+  pedraClara: '#453a42',
+  /** A mancha quente: onde o calor da arena assentou na pedra. */
+  pedraQuente: '#4b3a30',
+  /** A mancha fria: pedra arroxeada, na sombra. */
+  pedraFria: '#2a2740',
+  metal: '#352e30',
+  metalClaro: '#6a5c56',
+  metalEscuro: '#191419',
+  ouro: '#a07c30',
+  ouroClaro: '#f0cf86',
+  ouroEscuro: '#533c12',
+  bronze: '#7d5f35',
   sulco: '#3b3550',
 } as const;
 
@@ -47,10 +70,62 @@ export const PALETA = {
  * duas arenas na mesma página — a folha de prova é exatamente isso — fariam a
  * segunda usar os gradientes da primeira.
  */
-export const Materiais = ({ sufixo }: { readonly sufixo: string }): React.JSX.Element => {
+export interface MateriaisProps {
+  readonly sufixo: string;
+  /** A cor de classe da metade de baixo, para a luz de ambiente dela. */
+  readonly energiaDoJogador?: string;
+  /** E a da metade de cima. */
+  readonly energiaDaMaquina?: string;
+}
+
+/**
+ * O quanto a luz de classe pinta a pedra.
+ *
+ * Extremamente pouco, e o número está aqui para o teste poder cobrá-lo. A
+ * revisão pediu presença de classe **sem pintar metades**: acima de uns 12 %
+ * a arena deixa de ser uma mesa de pedra iluminada e vira um campo laranja de
+ * um lado e roxo do outro, que é o oposto do que se pediu.
+ */
+export const OPACIDADE_DA_LUZ_DE_CLASSE = 0.085;
+
+/**
+ * Até onde ela alcança, em fração da altura do tabuleiro.
+ *
+ * Menos de meia metade: a luz nasce na retaguarda de cada lado e **morre
+ * antes do corredor central**. É isso que impede que ela leia como pintura de
+ * metade — no meio da mesa as duas já sumiram, e a pedra é a mesma pedra.
+ */
+export const ALCANCE_DA_LUZ_DE_CLASSE = 0.4;
+
+export const Materiais = ({
+  sufixo,
+  energiaDoJogador = '#ff6a2a',
+  energiaDaMaquina = '#7a6bff',
+}: MateriaisProps): React.JSX.Element => {
   const id = (nome: string): string => `${nome}${sufixo}`;
   return (
     <defs>
+      {/*
+       * A luz de classe, uma por metade.
+       *
+       * Ela nasce atrás da fileira de retaguarda — de onde um lampião ou um
+       * braseiro estaria — e cai rápido. O Guerreiro traz âmbar e brasa; o
+       * Mago, violeta e azul arcano. A revisão foi explícita em que isto não
+       * pode virar duas metades pintadas, e por isso o alcance é curto e a
+       * opacidade é baixa: o que se vê é a **temperatura** de cada lado, não
+       * a cor dele.
+       */}
+      <radialGradient id={id('luzDoJogador')} cx="0.5" cy="1" r={String(ALCANCE_DA_LUZ_DE_CLASSE)}>
+        <stop offset="0" stopColor={energiaDoJogador} stopOpacity="0.85" />
+        <stop offset="0.55" stopColor={energiaDoJogador} stopOpacity="0.28" />
+        <stop offset="1" stopColor={energiaDoJogador} stopOpacity="0" />
+      </radialGradient>
+
+      <radialGradient id={id('luzDaMaquina')} cx="0.5" cy="0" r={String(ALCANCE_DA_LUZ_DE_CLASSE)}>
+        <stop offset="0" stopColor={energiaDaMaquina} stopOpacity="0.85" />
+        <stop offset="0.55" stopColor={energiaDaMaquina} stopOpacity="0.28" />
+        <stop offset="1" stopColor={energiaDaMaquina} stopOpacity="0" />
+      </radialGradient>
       {/*
        * A pedra.
        *
@@ -61,10 +136,63 @@ export const Materiais = ({ sufixo }: { readonly sufixo: string }): React.JSX.El
        */}
       <linearGradient id={id('pedraBase')} x1="0.08" y1="0" x2="0.92" y2="1">
         <stop offset="0" stopColor={PALETA.pedraClara} />
-        <stop offset="0.28" stopColor="#2f2833" />
+        <stop offset="0.28" stopColor="#332a30" />
         <stop offset="0.62" stopColor={PALETA.pedra} />
         <stop offset="1" stopColor={PALETA.pedraProfunda} />
       </linearGradient>
+
+      {/*
+       * As manchas de temperatura.
+       *
+       * Duas passagens de ruído muito largo, uma quente e uma fria, por cima
+       * da base. Elas não desenham forma nenhuma: mudam o **tom** da pedra em
+       * regiões grandes e irregulares, que é o que separa granito de papel
+       * cinza. A frequência é baixa de propósito — mancha pequena lê como
+       * sujeira, mancha grande lê como pedra.
+       */}
+      <filter
+        colorInterpolationFilters="sRGB"
+        id={id('manchaQuente')}
+        x="-5%"
+        y="-5%"
+        width="110%"
+        height="110%"
+      >
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.0021 0.0034"
+          numOctaves="3"
+          seed="13"
+          result="n"
+        />
+        <feColorMatrix
+          in="n"
+          type="matrix"
+          values="0 0 0 0 0.47  0 0 0 0 0.31  0 0 0 0 0.19  0 0 0 0.62 -0.24"
+        />
+      </filter>
+
+      <filter
+        colorInterpolationFilters="sRGB"
+        id={id('manchaFria')}
+        x="-5%"
+        y="-5%"
+        width="110%"
+        height="110%"
+      >
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.0027 0.0019"
+          numOctaves="3"
+          seed="61"
+          result="n"
+        />
+        <feColorMatrix
+          in="n"
+          type="matrix"
+          values="0 0 0 0 0.20  0 0 0 0 0.18  0 0 0 0 0.33  0 0 0 0.58 -0.22"
+        />
+      </filter>
 
       <filter
         colorInterpolationFilters="sRGB"

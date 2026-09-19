@@ -31,6 +31,24 @@
   inset: 0;
 }
 
+/*
+ * O salão, atrás de tudo.
+ *
+ * Ele é o **primeiro** filho das camadas, e por isso fica por baixo sem
+ * precisar de `z-index`: a mesa, as mãos e o HUD são desenhados depois. A
+ * opacidade é o freio — o cenário existe para dar lugar e escala à partida, e
+ * no instante em que alguém reparar numa coluna antes de reparar numa carta
+ * ele passou do ponto.
+ */
+.v2-cenario {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 /* --------------------------------------------------------------------------
  * 1 · a arena
  * ------------------------------------------------------------------------ */

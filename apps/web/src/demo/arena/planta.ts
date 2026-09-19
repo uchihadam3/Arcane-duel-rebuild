@@ -103,11 +103,49 @@ const naMetade = (metade: Metade, doJogador: Retangulo): Retangulo =>
  * pesam por quantidade.
  */
 export const CARTA = { largura: 120, altura: 168 } as const;
-export const PEDESTAL_DE_ACAO = { largura: 176, altura: 200 } as const;
+
+/*
+ * O reequilíbrio pedido na revisão do aparelho real.
+ *
+ * Duas medidas estavam erradas ao mesmo tempo, e cada uma pelo motivo oposto.
+ * A Passiva era pequena demais: quatro cartas de 84 unidades numa fileira
+ * viravam quatro manchas, e a pessoa não conseguia ler qual Passiva estava no
+ * campo sem inspecionar uma a uma — informação permanente exige leitura
+ * permanente. O pedestal de Ação era grande demais: ocupava tanto da faixa da
+ * frente que a fileira inteira ficava apertada contra o corredor.
+ *
+ * Os dois fatores estão aqui, e não embutidos nos números, porque é a razão
+ * entre as medidas que o teste confere. Um ajuste futuro que saia da faixa
+ * pedida — Passiva entre +25 % e +35 %, Ação entre −8 % e −15 % — quebra o
+ * build em vez de passar despercebido.
+ *
+ * O espaço que a Ação devolve **não** é redistribuído para outra peça: ele
+ * vira folga. A fileira da frente termina 24 unidades mais cedo, e essas 24
+ * unidades são ar entre ela e a retaguarda.
+ */
+export const AUMENTO_DA_PASSIVA = 1.3;
+export const REDUCAO_DA_ACAO = 0.88;
+
+const escalar = (
+  tamanho: { readonly largura: number; readonly altura: number },
+  fator: number,
+): { readonly largura: number; readonly altura: number } => ({
+  largura: Math.round(tamanho.largura * fator),
+  altura: Math.round(tamanho.altura * fator),
+});
+
+/** As medidas antes da revisão. Ficam à vista para a razão ser conferível. */
+export const MEDIDAS_ANTERIORES = {
+  acao: { largura: 176, altura: 200 },
+  passiva: { largura: 84, altura: 110 },
+  acaoExtra: { largura: 132, altura: 170 },
+} as const;
+
+export const PEDESTAL_DE_ACAO = escalar(MEDIDAS_ANTERIORES.acao, REDUCAO_DA_ACAO);
 export const SLOT_DE_ULTIMATE = { largura: 128, altura: 150 } as const;
 export const PEDESTAL_DE_CLASSE = { largura: 106, altura: 140 } as const;
 export const COMPARTIMENTO_DE_COOLDOWN = { largura: 98, altura: 130 } as const;
-export const ENCAIXE_DE_PASSIVA = { largura: 84, altura: 110 } as const;
+export const ENCAIXE_DE_PASSIVA = escalar(MEDIDAS_ANTERIORES.passiva, AUMENTO_DA_PASSIVA);
 
 /**
  * A quarta Ação é menor porque é exceção.
@@ -116,7 +154,7 @@ export const ENCAIXE_DE_PASSIVA = { largura: 84, altura: 110 } as const;
  * a Ação extra e some quando a concessão acaba. Do mesmo tamanho das três, ela
  * desfaria a referência de "são três" que o jogador decorou no primeiro turno.
  */
-export const PEDESTAL_DE_ACAO_EXTRA = { largura: 132, altura: 170 } as const;
+export const PEDESTAL_DE_ACAO_EXTRA = escalar(MEDIDAS_ANTERIORES.acaoExtra, REDUCAO_DA_ACAO);
 
 /**
  * A bandeja de Resposta é temporária e claramente subordinada.

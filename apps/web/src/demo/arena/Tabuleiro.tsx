@@ -1,6 +1,6 @@
 import { useId } from 'react';
 
-import { Materiais, PALETA } from './materiais.jsx';
+import { Materiais, OPACIDADE_DA_LUZ_DE_CLASSE, PALETA } from './materiais.jsx';
 import type { Metade, Retangulo } from './planta.js';
 import {
   COMPARTIMENTO_DE_COOLDOWN,
@@ -576,56 +576,106 @@ const Moldura = ({ url }: Pincel): React.JSX.Element => {
 const BrasaoDoCentro = ({ url }: Pincel): React.JSX.Element => {
   const cx = TABULEIRO.largura / 2;
   const cy = LINHA_DE_CENTRO;
+  /*
+   * O brasão é **grande**.
+   *
+   * Na primeira versão ele cabia inteiro dentro do corredor, e por isso lia
+   * como um adorno pequeno perdido num vazio. Um emblema de arena é gravado no
+   * chão e passa por baixo do que estiver em cima dele: aqui ele é desenhado
+   * antes das treze zonas, então os pedestais o cobrem em parte, que é
+   * exatamente o que faz uma marca de piso parecer marca de piso.
+   *
+   * O achatamento é o que o mantém legível sob a inclinação da câmera: visto
+   * a 47°, uma elipse com esta razão volta a parecer um círculo.
+   */
+  const RAIOS = [430, 336, 214] as const;
+  const ACHATAMENTO = 0.42;
+  const raioDasRunas = 384;
   return (
-    <g opacity="0.34">
+    <g opacity="0.3" data-teste="brasao-do-centro">
       {/* As linhas gravadas que correm para os lados, sumindo nas pontas. */}
       <path
-        d={`M 120 ${String(cy)} H ${String(cx - 210)}`}
+        d={`M 120 ${String(cy)} H ${String(cx - RAIOS[0] - 40)}`}
         stroke={url('sulco')}
         strokeWidth="3.2"
       />
       <path
-        d={`M ${String(cx + 210)} ${String(cy)} H ${String(TABULEIRO.largura - 120)}`}
+        d={`M ${String(cx + RAIOS[0] + 40)} ${String(cy)} H ${String(TABULEIRO.largura - 120)}`}
         stroke={url('sulco')}
         strokeWidth="3.2"
       />
-      {[168, 132, 84].map((raio, indice) => (
+      {RAIOS.map((raio, indice) => (
         <ellipse
           key={raio}
           cx={cx}
           cy={cy}
           rx={raio}
-          ry={raio * 0.58}
+          ry={raio * ACHATAMENTO}
           fill="none"
           stroke={indice === 0 ? PALETA.ouro : PALETA.sulco}
           strokeOpacity={indice === 0 ? 0.6 : 0.8}
-          strokeWidth={indice === 0 ? 2.6 : 1.6}
+          strokeWidth={indice === 0 ? 3.4 : 2}
         />
       ))}
-      {/* Oito runas curtas no anel. Abstratas, e de propósito. */}
-      {Array.from({ length: 8 }, (_, indice) => (indice * 360) / 8).map((angulo) => {
+      {/* Doze runas curtas no anel. Abstratas, e de propósito. */}
+      {Array.from({ length: 12 }, (_, indice) => (indice * 360) / 12).map((angulo) => {
         const radianos = (angulo * Math.PI) / 180;
         return (
           <path
             key={angulo}
-            transform={`translate(${String(cx + Math.cos(radianos) * 150)} ${String(cy + Math.sin(radianos) * 150 * 0.58)}) rotate(${String(angulo)})`}
-            d="M -9 -10 L 9 -10 M 0 -10 L 0 10 M -7 6 L 7 6"
+            transform={`translate(${String(cx + Math.cos(radianos) * raioDasRunas)} ${String(cy + Math.sin(radianos) * raioDasRunas * ACHATAMENTO)}) rotate(${String(angulo)})`}
+            d="M -14 -16 L 14 -16 M 0 -16 L 0 16 M -11 10 L 11 10"
             stroke={PALETA.ouroClaro}
-            strokeOpacity="0.5"
-            strokeWidth="2"
+            strokeOpacity="0.45"
+            strokeWidth="2.6"
             strokeLinecap="round"
             fill="none"
           />
         );
       })}
-      <path
-        d={`M ${String(cx)} ${String(cy - 38)} l 29 38 l -29 38 l -29 -38 Z`}
-        fill={PALETA.ouro}
-        fillOpacity="0.22"
-        stroke={PALETA.ouroClaro}
-        strokeOpacity="0.4"
-        strokeWidth="1.2"
-      />
+      {/*
+       * O nome, gravado no centro.
+       *
+       * Ele é a razão de o brasão existir: a mesa é de um jogo, e o jogo tem
+       * nome. O contraste é o mínimo que ainda se lê — acima disso ele
+       * competiria com o efeito que atravessa este mesmo corredor.
+       */}
+      <text
+        x={cx}
+        y={cy - 8}
+        textAnchor="middle"
+        fontSize="72"
+        letterSpacing="26"
+        fill={PALETA.ouroClaro}
+        fillOpacity="0.18"
+        fontFamily="'Iowan Old Style', Palatino, Georgia, serif"
+      >
+        ARCANE
+      </text>
+      <text
+        x={cx}
+        y={cy + 62}
+        textAnchor="middle"
+        fontSize="72"
+        letterSpacing="26"
+        fill={PALETA.ouroClaro}
+        fillOpacity="0.18"
+        fontFamily="'Iowan Old Style', Palatino, Georgia, serif"
+      >
+        DUEL
+      </text>
+      {/* O losango, agora nas pontas do eixo, onde ele não cobre o nome. */}
+      {[-1, 1].map((lado) => (
+        <path
+          key={lado}
+          d={`M ${String(cx + lado * 262)} ${String(cy - 44)} l ${String(lado * 30)} 44 l ${String(-lado * 30)} 44 l ${String(-lado * 30)} -44 Z`}
+          fill={PALETA.ouro}
+          fillOpacity="0.22"
+          stroke={PALETA.ouroClaro}
+          strokeOpacity="0.4"
+          strokeWidth="1.4"
+        />
+      ))}
     </g>
   );
 };
@@ -676,7 +726,11 @@ export const Tabuleiro = ({
       preserveAspectRatio="none"
       aria-hidden="true"
     >
-      <Materiais sufixo={sufixo} />
+      <Materiais
+        sufixo={sufixo}
+        energiaDoJogador={energiaDoJogador}
+        energiaDaMaquina={energiaDaMaquina}
+      />
 
       {/* 1 · a pedra */}
       <rect width={TABULEIRO.largura} height={TABULEIRO.altura} fill={url('pedraBase')} />
@@ -699,11 +753,60 @@ export const Tabuleiro = ({
         mask={`url(#bordasApenas${sufixo})`}
         opacity="0.6"
       />
+      {/*
+       * As manchas de temperatura, entre o veio e a granulação.
+       *
+       * Elas entram **antes** da granulação de propósito: o grão precisa
+       * passar por cima das manchas, e não ao contrário, ou a pedra ganha um
+       * aspecto de tinta aplicada sobre textura.
+       */}
+      <rect
+        data-camada="luz"
+        width={TABULEIRO.largura}
+        height={TABULEIRO.altura}
+        filter={url('manchaQuente')}
+        opacity="0.3"
+        style={{ mixBlendMode: 'soft-light' }}
+      />
+      <rect
+        data-camada="luz"
+        width={TABULEIRO.largura}
+        height={TABULEIRO.altura}
+        filter={url('manchaFria')}
+        opacity="0.26"
+        style={{ mixBlendMode: 'soft-light' }}
+      />
       <rect
         width={TABULEIRO.largura}
         height={TABULEIRO.altura}
         filter={url('granulacao')}
-        opacity="0.7"
+        opacity="0.85"
+      />
+
+      {/*
+       * A luz de classe de cada lado, ainda por baixo das peças.
+       *
+       * Ela é ambiente: ilumina a **pedra**, e não as cartas. Por isso entra
+       * aqui, antes das treze zonas, e não na camada de luz do fim — lá ela
+       * pintaria as peças junto e a arena viraria duas metades coloridas.
+       */}
+      <rect
+        data-camada="luz"
+        data-teste="luz-de-classe-maquina"
+        width={TABULEIRO.largura}
+        height={TABULEIRO.altura}
+        fill={url('luzDaMaquina')}
+        opacity={String(OPACIDADE_DA_LUZ_DE_CLASSE)}
+        style={{ mixBlendMode: 'screen' }}
+      />
+      <rect
+        data-camada="luz"
+        data-teste="luz-de-classe-jogador"
+        width={TABULEIRO.largura}
+        height={TABULEIRO.altura}
+        fill={url('luzDoJogador')}
+        opacity={String(OPACIDADE_DA_LUZ_DE_CLASSE)}
+        style={{ mixBlendMode: 'screen' }}
       />
 
       {/* 2 · o centro livre, desenhado antes das peças para ficar por baixo */}

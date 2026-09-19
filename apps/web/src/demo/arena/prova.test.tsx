@@ -9,7 +9,9 @@ import { corDaClasse } from '../carta/paleta.js';
 import { CAMERA, enquadrarTabuleiro } from '../layout/camera.js';
 import { VIEWPORTS_ALVO, zonasDaTela } from '../layout/zonas.js';
 
+import { Cenario, OPACIDADE_DO_CENARIO } from './Cenario.jsx';
 import { Tabuleiro } from './Tabuleiro.jsx';
+import { ALCANCE_DA_LUZ_DE_CLASSE, OPACIDADE_DA_LUZ_DE_CLASSE, PALETA } from './materiais.jsx';
 import { TABULEIRO, TODAS_AS_ZONAS } from './planta.js';
 
 /*
@@ -100,12 +102,16 @@ describe('a arena é desenhada por código', () => {
     ]) {
       expect(textos, proibido).not.toContain(proibido);
     }
-    // O único texto do campo é a marca dos pedestais — I, II e III, e mais
-    // nada. Cada uma sai duas vezes por pedestal: o traço de fundo e o de luz.
+    /*
+     * O texto do campo é a marca dos pedestais — I, II e III — mais o nome do
+     * jogo gravado no brasão do centro, e nada além disso. O brasão é a
+     * exceção deliberada: é a marca de piso da arena, desenhada antes das
+     * peças e com o contraste mínimo que ainda se lê.
+     */
     const distintos = [
       ...new Set([...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((achado) => achado[1] ?? '')),
     ].sort();
-    expect(distintos).toEqual(['I', 'II', 'III']);
+    expect(distintos).toEqual(['ARCANE', 'DUEL', 'I', 'II', 'III']);
   });
 
   /*
@@ -266,5 +272,132 @@ de ${String(CAMERA.inclinacaoEmGraus)}°.</p>
     writeFileSync(destino, html, 'utf8');
     expect(html).toContain('<svg');
     expect(TODAS_AS_ZONAS.length).toBe(26);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * A cor, depois da reprovação por "tudo cinza e preto".
+ * ------------------------------------------------------------------------- */
+
+/** O canal máximo menos o mínimo: o quanto uma cor se afasta do cinza. */
+const cromaDe = (hex: string): number => {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const canais = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return Math.max(...canais) - Math.min(...canais);
+};
+
+describe('a pedra tem temperatura, e não só tom', () => {
+  /*
+   * O veredito do aparelho real foi literal: "tudo cinza e preto". Um cinza
+   * é uma cor cujos três canais são quase iguais — então a falha é medível, e
+   * este teste a mede em vez de confiar em olho.
+   */
+  it('a paleta tem uma mancha quente e uma fria, e as duas têm croma', () => {
+    expect(cromaDe(PALETA.pedraQuente)).toBeGreaterThan(20);
+    expect(cromaDe(PALETA.pedraFria)).toBeGreaterThan(20);
+    // E elas são de temperaturas opostas: vermelho manda numa, azul na outra.
+    const quente = Number.parseInt(PALETA.pedraQuente.slice(1), 16);
+    const fria = Number.parseInt(PALETA.pedraFria.slice(1), 16);
+    expect((quente >> 16) & 255).toBeGreaterThan(quente & 255);
+    expect(fria & 255).toBeGreaterThan((fria >> 16) & 255);
+  });
+
+  it('o ouro é metal saturado, e não cinza amarelado', () => {
+    expect(cromaDe(PALETA.ouro)).toBeGreaterThan(80);
+    expect(cromaDe(PALETA.ouroClaro)).toBeGreaterThan(80);
+    expect(cromaDe(PALETA.bronze)).toBeGreaterThan(60);
+  });
+
+  it('as duas manchas entram na superfície, e o grão passa por cima delas', () => {
+    const svg = desenhar();
+    expect(svg).toContain('manchaQuente');
+    expect(svg).toContain('manchaFria');
+    expect(svg.indexOf('manchaQuente') < svg.lastIndexOf('granulacao')).toBe(true);
+  });
+});
+
+describe('a luz de classe não pinta metades', () => {
+  it('as duas luzes existem, uma por metade', () => {
+    const svg = desenhar();
+    expect(svg).toContain('luz-de-classe-jogador');
+    expect(svg).toContain('luz-de-classe-maquina');
+    expect(svg).toContain(GUERREIRO.energia);
+    expect(svg).toContain(MAGO.energia);
+  });
+
+  /*
+   * O limite é o que separa "presença de classe" de "campo laranja contra
+   * campo roxo". A revisão pediu a primeira coisa e proibiu a segunda, então
+   * os dois números que a garantem ficam travados aqui.
+   */
+  it('ela é fraca o bastante para continuar sendo pedra', () => {
+    expect(OPACIDADE_DA_LUZ_DE_CLASSE).toBeLessThanOrEqual(0.12);
+    expect(OPACIDADE_DA_LUZ_DE_CLASSE).toBeGreaterThan(0.02);
+  });
+
+  it('e morre antes do corredor central: o meio da mesa é neutro', () => {
+    // O gradiente nasce na borda de cada lado, então alcance < 0,5 significa
+    // que ele se apaga antes da linha de centro.
+    expect(ALCANCE_DA_LUZ_DE_CLASSE).toBeLessThan(0.5);
+  });
+
+  it('ela ilumina a pedra, e não as cartas: entra antes das treze zonas', () => {
+    const svg = desenhar();
+    expect(svg.indexOf('luz-de-classe-jogador')).toBeLessThan(svg.indexOf('>I<'));
+  });
+});
+
+describe('o salão em volta da mesa', () => {
+  const salao = (): string =>
+    renderToStaticMarkup(
+      <Cenario energiaDoJogador={GUERREIRO.energia} energiaDaMaquina={MAGO.energia} />,
+    );
+
+  it('tem colunas, névoa, luz distante e poeira', () => {
+    const svg = salao();
+    for (const parte of ['coluna', 'nevoa', 'claraboia', 'poeira']) {
+      expect(svg, parte).toContain(parte);
+    }
+  });
+
+  it('é desenhado, e não uma imagem', () => {
+    const svg = salao();
+    expect(svg).not.toContain('<image');
+    expect(svg).not.toContain('.png');
+  });
+
+  /*
+   * A regra que o cenário não pode quebrar: não competir com as cartas. O
+   * desfoque é o que garante isso — contorno nítido de coluna puxa o olho
+   * tanto quanto a borda de uma carta.
+   */
+  it('está desfocado de verdade, e não apenas com pouco detalhe', () => {
+    const svg = salao();
+    expect(svg).toContain('feGaussianBlur');
+    const desvio = /stdDeviation="(\d+(?:\.\d+)?)"/.exec(svg);
+    expect(Number(desvio?.[1] ?? 0)).toBeGreaterThanOrEqual(5);
+  });
+
+  it('e fica discreto: acima disto ele rouba a cena', () => {
+    expect(OPACIDADE_DO_CENARIO).toBeLessThanOrEqual(0.6);
+  });
+});
+
+describe('o brasão do centro', () => {
+  it('é grande, e não um adorno perdido no meio da mesa', () => {
+    const svg = desenhar();
+    const brasao = svg.slice(svg.indexOf('brasao-do-centro'));
+    const raios = [...brasao.slice(0, 4000).matchAll(/rx="(\d+)"/g)].map((a) => Number(a[1]));
+    // O anel externo cobre boa parte do corredor central, e passa por baixo
+    // dos pedestais: marca de piso, e não medalha.
+    expect(Math.max(...raios)).toBeGreaterThan(TABULEIRO.largura * 0.14);
+  });
+
+  it('e continua de contraste baixo: o corredor é por onde o efeito passa', () => {
+    const svg = desenhar();
+    const brasao = svg.slice(svg.indexOf('brasao-do-centro'));
+    const opacidade = /opacity="([\d.]+)"/.exec(svg.slice(svg.indexOf('brasao-do-centro') - 60));
+    expect(Number(opacidade?.[1] ?? 1)).toBeLessThanOrEqual(0.35);
+    expect(brasao).toContain('ARCANE');
   });
 });

@@ -70,6 +70,28 @@ export interface PecaDoCampo {
 const escalaPara = (caixa: Retangulo): number =>
   Math.min(caixa.largura / CARTA.largura, caixa.altura / CARTA.altura) * 0.9;
 
+/*
+ * A orientação física da carta.
+ *
+ * Uma carta assentada no campo está virada para o dono dela, como estaria numa
+ * mesa de verdade. As da máquina ficam a 180°: de cabeça para baixo para quem
+ * olha daqui. Isto não é decoração — é a informação de **quem pôs a carta ali**,
+ * e desenhá-las todas a 0° fazia as duas metades parecerem uma coleção só.
+ *
+ * O critério é o dono, e não a metade geométrica do tabuleiro. A bandeja de
+ * Resposta é o caso que obriga a distinguir os dois: ela fica encostada no
+ * pedestal do **atacante**, mas a carta que entra nela é do defensor — e ela
+ * fica virada para o defensor, que foi quem a jogou.
+ *
+ * Ativar continua sendo o giro de um quarto de volta, e ele se **soma** a esta
+ * base: a Carta de Classe ativada da máquina fica a 270°, que é o quarto de
+ * volta visto do lado dela.
+ */
+const REPOUSO: Readonly<Record<Metade, number>> = { jogador: 0, maquina: 180 };
+
+/** O giro de Ativar: um quarto de volta, a partir do repouso do dono. */
+export const GIRO_DE_ATIVAR = 90;
+
 const noEncaixe = (
   chave: string,
   caixa: Retangulo,
@@ -87,7 +109,7 @@ const noEncaixe = (
     x: centro.x,
     y: centro.y,
     escala: escalaPara(caixa),
-    giro: extras.giro ?? 0,
+    giro: REPOUSO[metade] + (extras.giro ?? 0),
     ordem: extras.ordem ?? 10,
     interativa: extras.interativa ?? true,
     metade,
@@ -162,7 +184,10 @@ const pecasDeUmLado = (jogador: VisaoDeJogador, metade: Metade): readonly PecaDo
           metade,
           'passiva',
           indice,
-          { giro: passiva.estado === 'ativada' ? 90 : 0, interativa: metade === 'jogador' },
+          {
+            giro: passiva.estado === 'ativada' ? GIRO_DE_ATIVAR : 0,
+            interativa: metade === 'jogador',
+          },
         ),
       );
       return;
@@ -186,7 +211,10 @@ const pecasDeUmLado = (jogador: VisaoDeJogador, metade: Metade): readonly PecaDo
         metade,
         'classe',
         indice,
-        { giro: equipada.estado === 'ativada' ? 90 : 0, interativa: metade === 'jogador' },
+        {
+          giro: equipada.estado === 'ativada' ? GIRO_DE_ATIVAR : 0,
+          interativa: metade === 'jogador',
+        },
       ),
     );
   });
