@@ -9,7 +9,9 @@ import { VELOCIDADE_DO_MODO } from '@arcane-duel/vfx';
  * Três eixos, e os três só mexem em aparência:
  *
  * - **modo** (normal / rápido) encurta as animações;
- * - **qualidade** (alta / média / baixa) mexe em partículas, sombra e brilho;
+ * - **qualidade** (alta / média / baixa) mexe em partículas, sombra, luz e,
+ *   só no último degrau, resolução — nessa ordem, porque nitidez de carta e de
+ *   HUD é informação competitiva e cede por último;
  * - **movimento reduzido** corta deslocamento e zoom.
  *
  * Nenhum deles altera regra, informação ou o que o jogador pode fazer. Baixar
