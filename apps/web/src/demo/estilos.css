@@ -139,6 +139,15 @@
   padding: 0;
   border: 0;
   background: none;
+
+  /*
+   * O padrão é **não** receber toque, e a exceção é ser legível.
+   *
+   * Uma peça virada não tem identidade para mostrar, e deixá-la capturar o
+   * toque só produziria um gesto que não faz nada. A regra fica escrita nos
+   * dois sentidos: aqui o padrão, e em `--legivel` a exceção.
+   */
+  pointer-events: none;
   transition: opacity 140ms linear;
 }
 
@@ -694,4 +703,57 @@
   .v2-acao-extra {
     animation-duration: 140ms;
   }
+}
+
+/* --------------------------------------------------------------------------
+ * 6 · a inspeção
+ * ------------------------------------------------------------------------ */
+
+/*
+ * A peça legível aceita toque.
+ *
+ * O defeito que a revisão pegou era este: a carta do adversário virada para
+ * cima — cuja identidade o jogador conhece — não recebia o toque, porque a
+ * camada inteira estava com `pointer-events: none`. Conhecer e comandar são
+ * coisas diferentes, e só a segunda depende de quem é o dono.
+ */
+.v2-peca--legivel {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.v2-inspetor {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+}
+
+/*
+ * O fundo escurece sem apagar.
+ *
+ * A arena continua visível por trás: inspecionar é um gesto dentro da
+ * partida, e não uma tela separada. O próprio fundo é o botão de fechar —
+ * um "X" num canto exigiria mira, e a tela inteira não exige nada.
+ */
+.v2-inspetor__fundo {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: radial-gradient(120% 100% at 50% 50%, #0a0810 0%, #04030700 100%), #05040a;
+  cursor: pointer;
+}
+
+.v2-inspetor__copia {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  filter: drop-shadow(0 22px 40px rgb(0 0 0 / 70%));
+}
+
+.v2-inspetor__copia > * {
+  width: 100%;
+  height: 100%;
 }

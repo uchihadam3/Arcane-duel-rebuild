@@ -59,8 +59,28 @@ export interface PecaDoCampo {
   readonly escala: number;
   readonly giro: number;
   readonly ordem: number;
-  /** A peça aceita toque? Cooldown é informação, não comando. */
-  readonly interativa: boolean;
+  /*
+   * As três perguntas que substituíram `interativa`.
+   *
+   * Um único booleano misturava coisas diferentes, e a mistura produziu o
+   * defeito que a revisão pegou: a carta do adversário virada para cima —
+   * cuja identidade o jogador **conhece** — não aceitava toque, porque "não é
+   * minha" tinha sido escrito como "não é interativa". Conhecer uma carta e
+   * poder comandá-la são fatos distintos, e agora são campos distintos.
+   */
+  /** O observador conhece a identidade desta carta? */
+  readonly identidadePublica: boolean;
+  /** Dá para abrir a inspeção dela? Só quando a identidade é pública. */
+  readonly podeInspecionar: boolean;
+  /**
+   * Dá para comandar esta peça daqui?
+   *
+   * Hoje nenhum comando nasce do tabuleiro nesta demo — jogar acontece na
+   * mão, e Ativar/Exaurir ainda não têm gesto próprio. O campo existe mesmo
+   * assim porque é ele que impede a volta do erro: inspecionável não implica
+   * comandável, e é preciso um lugar para dizer isso.
+   */
+  readonly podeJogar: boolean;
   /** De qual metade ela é. Só para efeito e cor; nunca para posicionar. */
   readonly metade: Metade;
   readonly lugar: LugarDaPeca;
@@ -99,23 +119,54 @@ const noEncaixe = (
   metade: Metade,
   lugar: LugarDaPeca,
   indice: number,
-  extras: { readonly interativa?: boolean; readonly ordem?: number; readonly giro?: number } = {},
+  extras: {
+    readonly ordem?: number;
+    readonly giro?: number;
+    readonly deslocamentoX?: number;
+  } = {},
 ): PecaDoCampo => {
   const centro = centroDe(caixa);
+  const publica = carta !== null;
   return {
     chave,
     carta,
-    caixa,
-    x: centro.x,
+    caixa: { ...caixa, x: caixa.x + (extras.deslocamentoX ?? 0) },
+    x: centro.x + (extras.deslocamentoX ?? 0),
     y: centro.y,
     escala: escalaPara(caixa),
     giro: REPOUSO[metade] + (extras.giro ?? 0),
     ordem: extras.ordem ?? 10,
-    interativa: extras.interativa ?? true,
+    /*
+     * A identidade vem do **dado**, e não de uma decisão de tela.
+     *
+     * Quando a projeção não trouxe a carta, `carta` é `null` e não existe
+     * identificador nenhum nesta peça. Por isso "é pública" e "dá para
+     * inspecionar" são a mesma pergunta: não há como abrir o que não chegou.
+     */
+    identidadePublica: publica,
+    podeInspecionar: publica,
+    podeJogar: false,
     metade,
     lugar,
     indice,
   };
+};
+
+/**
+ * O desvio de uma carta dentro da pilha de um compartimento.
+ *
+ * Uma carta só fica centrada. Duas ou mais abrem em leque horizontal, e a
+ * abertura é proporcional: o que importa é que cada carta deixe uma faixa
+ * visível larga o bastante para ser tocada e reconhecida. A ordem segue a
+ * metade, porque a pilha da máquina é a mesma pilha vista do outro lado.
+ */
+export const ABERTURA_DA_PILHA = 30;
+
+export const desvioNaPilha = (posicao: number, total: number, metade: Metade): number => {
+  if (total <= 1) return 0;
+  const centro = (total - 1) / 2;
+  const sentido = metade === 'jogador' ? 1 : -1;
+  return (posicao - centro) * ABERTURA_DA_PILHA * sentido;
 };
 
 /** A chave de uma carta pública. Estável enquanto a carta for a mesma. */
@@ -184,19 +235,14 @@ const pecasDeUmLado = (jogador: VisaoDeJogador, metade: Metade): readonly PecaDo
           metade,
           'passiva',
           indice,
-          {
-            giro: passiva.estado === 'ativada' ? GIRO_DE_ATIVAR : 0,
-            interativa: metade === 'jogador',
-          },
+          { giro: passiva.estado === 'ativada' ? GIRO_DE_ATIVAR : 0 },
         ),
       );
       return;
     }
     // Oculta é oculta: verso, e nenhum identificador em lugar nenhum.
     pecas.push(
-      noEncaixe(chaveVirada(metade, 'passiva', indice), caixa, null, metade, 'passiva', indice, {
-        interativa: false,
-      }),
+      noEncaixe(chaveVirada(metade, 'passiva', indice), caixa, null, metade, 'passiva', indice),
     );
   });
 
@@ -211,10 +257,7 @@ const pecasDeUmLado = (jogador: VisaoDeJogador, metade: Metade): readonly PecaDo
         metade,
         'classe',
         indice,
-        {
-          giro: equipada.estado === 'ativada' ? GIRO_DE_ATIVAR : 0,
-          interativa: metade === 'jogador',
-        },
+        { giro: equipada.estado === 'ativada' ? GIRO_DE_ATIVAR : 0 },
       ),
     );
   });
@@ -228,25 +271,38 @@ const pecasDeUmLado = (jogador: VisaoDeJogador, metade: Metade): readonly PecaDo
         metade,
         'ultimate',
         0,
-        { interativa: metade === 'jogador', ordem: 14 },
+        { ordem: 14 },
       ),
     );
   }
 
+  /*
+   * O cooldown mostra a pilha **inteira**, e não só a primeira carta.
+   *
+   * Todas elas são públicas — o cooldown é informação aberta —, e desenhar
+   * uma só escondia as outras atrás de um número que não existia. A revisão
+   * foi explícita: cada carta pública precisa poder ser lida. Elas abrem em
+   * leque dentro do compartimento, com uma faixa visível de cada uma, e cada
+   * faixa é um alvo de toque.
+   */
   for (const zona of ZONAS_DE_COOLDOWN) {
-    const primeira = jogador.cooldown[zona][0];
-    if (primeira === undefined) continue;
-    pecas.push(
-      noEncaixe(
-        chaveDaCarta(primeira),
-        compartimentoDeCooldown(metade, zona),
-        cartaVisivel(primeira),
-        metade,
-        'cooldown',
-        zona,
-        { interativa: false, ordem: 8 },
-      ),
-    );
+    const naZona = jogador.cooldown[zona];
+    naZona.forEach((carta, posicao) => {
+      pecas.push(
+        noEncaixe(
+          chaveDaCarta(carta),
+          compartimentoDeCooldown(metade, zona),
+          cartaVisivel(carta),
+          metade,
+          'cooldown',
+          zona,
+          {
+            ordem: 8 + posicao,
+            deslocamentoX: desvioNaPilha(posicao, naZona.length, metade),
+          },
+        ),
+      );
+    });
   }
 
   return pecas;

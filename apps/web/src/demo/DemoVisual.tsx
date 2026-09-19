@@ -18,6 +18,8 @@ import { corDaClasse } from './carta/paleta.js';
 import { cartasNaMaoDaMaquina, maoDoJogador, pecasDoCampo } from './cena/montar.js';
 import { ControlesDeTurno } from './hud/ControlesDeTurno.jsx';
 import { HudV2 } from './hud/HudV2.jsx';
+import type { AlvoDaInspecao } from './inspecao/Inspetor.jsx';
+import { Inspetor } from './inspecao/Inspetor.jsx';
 import { Leque } from './mao/Leque.jsx';
 import { CAMERA, enquadrarTabuleiro } from './layout/camera.js';
 import { ehDeitado, zonasDaTela } from './layout/zonas.js';
@@ -132,6 +134,7 @@ export const DemoVisual = ({
    * preferência sem efeito.
    */
   const [andamento, definirAndamento] = useState<Andamento>('normal');
+  const [inspecionada, definirInspecionada] = useState<AlvoDaInspecao | null>(null);
   const [medida, medir] = useMedida();
   const raiz = useRef<HTMLDivElement | null>(null);
   const movimentoReduzido = useMovimentoReduzido();
@@ -252,6 +255,37 @@ export const DemoVisual = ({
   const aoEncaixar = useCallback(() => {
     palco.tocarInterface('soltar');
   }, [palco]);
+
+  /*
+   * Abrir a inspeção a partir do elemento que o dedo tocou.
+   *
+   * A origem é **medida**, e não calculada: a peça do campo é filha do
+   * elemento transformado em 3D, então o retângulo que o navegador devolve já
+   * é o projetado na tela. Recalcular a projeção por conta própria foi o que
+   * deformou a Etapa 6, e vale aqui pelo mesmo motivo que vale no voo.
+   */
+  const inspecionar = useCallback(
+    (elemento: HTMLElement | null, alvo: Omit<AlvoDaInspecao, 'origem'>) => {
+      if (elemento === null) return;
+      const caixaDaRaiz = raiz.current?.getBoundingClientRect();
+      const rect = elemento.getBoundingClientRect();
+      palco.tocarInterface('pegar');
+      definirInspecionada({
+        ...alvo,
+        origem: {
+          x: rect.x - (caixaDaRaiz?.x ?? 0),
+          y: rect.y - (caixaDaRaiz?.y ?? 0),
+          largura: rect.width,
+          altura: rect.height,
+        },
+      });
+    },
+    [palco],
+  );
+
+  const fecharInspecao = useCallback(() => {
+    definirInspecionada(null);
+  }, []);
 
   const { clones, emVoo, marcos } = useVoos({
     cena: cenaParaVoo,
@@ -377,14 +411,27 @@ export const DemoVisual = ({
 
       const candidata = jogaveis.get(String(carta));
       if (candidata === undefined) {
-        // Não dá para jogar: o segundo toque devolve a carta ao leque.
+        /*
+         * Não dá para jogar agora — mas a identidade é minha, então dá para
+         * **ler**. O segundo toque numa carta bloqueada abre a inspeção em vez
+         * de simplesmente devolvê-la ao leque: recusar o comando não é motivo
+         * para recusar a informação.
+         */
+        const naTela = document.querySelector<HTMLElement>(
+          `[data-teste="mao-do-jogador"] [data-chave="${mao[indice]?.chave ?? ''}"]`,
+        );
+        const visivel = mao[indice]?.carta ?? null;
+        if (naTela !== null && visivel !== null) {
+          inspecionar(naTela, { chave: mao[indice]?.chave ?? '', carta: visivel, giroDeOrigem: 0 });
+          return;
+        }
         definirFocada(null);
         return;
       }
       palco.tocarInterface('soltar');
       controlador.declarar(candidata.pedido);
     },
-    [controlador, focada, jogaveis, mao, palco, respostas, responder],
+    [controlador, focada, inspecionar, jogaveis, mao, palco, respostas, responder],
   );
 
   if (eu === undefined || ela === undefined) {
@@ -481,29 +528,48 @@ export const DemoVisual = ({
                 energiaDaMaquina={coresDaMaquina.energia}
                 acoesExtras={acoesExtras}
               />
-              {pecas.map((peca) => (
-                <div
-                  key={peca.chave}
-                  className={`v2-peca v2-peca--${peca.lugar}`}
-                  data-chave={peca.chave}
-                  data-teste={`peca-${peca.chave}`}
-                  style={{
-                    left: `${String(peca.caixa.x)}px`,
-                    top: `${String(peca.caixa.y)}px`,
-                    width: `${String(peca.caixa.largura)}px`,
-                    height: `${String(peca.caixa.altura)}px`,
-                    transform: `rotate(${String(peca.giro)}deg)`,
-                    zIndex: peca.ordem,
-                    opacity: emVoo.has(peca.chave) ? 0 : 1,
-                  }}
-                >
-                  {peca.carta === null ? (
-                    <VersoVetorial />
-                  ) : (
-                    <CartaVetorial carta={peca.carta} comTexto={false} />
-                  )}
-                </div>
-              ))}
+              {pecas.map((peca) => {
+                // A narrowing local: `peca.carta` num callback perde o
+                // estreitamento, e o `null` aqui é o verso — que não se lê.
+                const legivel = peca.carta;
+                return (
+                  <div
+                    key={peca.chave}
+                    className={`v2-peca v2-peca--${peca.lugar}${
+                      peca.podeInspecionar ? ' v2-peca--legivel' : ''
+                    }`}
+                    data-chave={peca.chave}
+                    data-teste={`peca-${peca.chave}`}
+                    data-pode-inspecionar={peca.podeInspecionar ? 'sim' : 'nao'}
+                    onClick={
+                      legivel === null
+                        ? undefined
+                        : (evento) => {
+                            inspecionar(evento.currentTarget, {
+                              chave: peca.chave,
+                              carta: legivel,
+                              giroDeOrigem: peca.giro,
+                            });
+                          }
+                    }
+                    style={{
+                      left: `${String(peca.caixa.x)}px`,
+                      top: `${String(peca.caixa.y)}px`,
+                      width: `${String(peca.caixa.largura)}px`,
+                      height: `${String(peca.caixa.altura)}px`,
+                      transform: `rotate(${String(peca.giro)}deg)`,
+                      zIndex: peca.ordem,
+                      opacity: emVoo.has(peca.chave) ? 0 : 1,
+                    }}
+                  >
+                    {legivel === null ? (
+                      <VersoVetorial />
+                    ) : (
+                      <CartaVetorial carta={legivel} comTexto={false} />
+                    )}
+                  </div>
+                );
+              })}
               {efeito !== null && (
                 <CamadaDeEfeitos
                   beats={efeito.beats}
@@ -637,6 +703,12 @@ export const DemoVisual = ({
           ))}
         </div>
       )}
+
+      <Inspetor
+        alvo={inspecionada}
+        tela={{ largura: medida.largura, altura: medida.altura }}
+        aoFechar={fecharInspecao}
+      />
 
       {estado.etapa.tipo === 'fim' && (
         <div className="v2__fim" data-teste="fim-da-demo">
