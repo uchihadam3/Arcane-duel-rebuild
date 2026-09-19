@@ -13,12 +13,15 @@ import { BotaoDeInstalacao } from '../components/BotaoDeInstalacao.js';
 
 export interface MenuPrincipalProps {
   readonly aoJogarLocal: () => void;
+  /** Abre o protótipo da linguagem visual nova, para comparação lado a lado. */
+  readonly aoAbrirDemo: () => void;
   readonly aoAbrirStatus: () => void;
   readonly commitCurto: string;
 }
 
 export const MenuPrincipal = ({
   aoJogarLocal,
+  aoAbrirDemo,
   aoAbrirStatus,
   commitCurto,
 }: MenuPrincipalProps): React.JSX.Element => (
@@ -31,6 +34,9 @@ export const MenuPrincipal = ({
     <div className="menu__acoes">
       <BotaoDeJogo tom="principal" aoTocar={aoJogarLocal} largo dadoDeTeste="jogar-local">
         Jogar local
+      </BotaoDeJogo>
+      <BotaoDeJogo tom="secundario" aoTocar={aoAbrirDemo} largo dadoDeTeste="abrir-demo-v2">
+        Demo Visual V2 — Guerreiro × Mago
       </BotaoDeJogo>
       <BotaoDeInstalacao />
     </div>

@@ -26,3 +26,5 @@ export const estiloDoNivel = (nivel: NivelDeIA): EstiloDeDecisao => {
   if (nivel <= 8) return 'busca-rasa';
   return 'busca-profunda';
 };
+
+export * from './vertical-slice.js';

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Contratos da IA do Desafio de doze adversários. Implementação na etapa oito.",
+  "description": "IA do Arcane Duel. A do vertical slice — Guerreiro e Mago — está implementada; as doze do Desafio entram na etapa oito.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -19,6 +19,9 @@
     "build": "tsc --build tsconfig.build.json"
   },
   "dependencies": {
-    "@arcane-duel/shared-types": "*"
+    "@arcane-duel/shared-types": "*",
+    "@arcane-duel/rules-engine": "*",
+    "@arcane-duel/card-data": "*",
+    "@arcane-duel/gameplay": "*"
   }
 }

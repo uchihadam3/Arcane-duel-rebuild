@@ -5,8 +5,12 @@ import { AvisoDeOrientacao } from './components/AvisoDeOrientacao.js';
 import { BarraDeAtualizacao } from './components/BarraDeAtualizacao.js';
 import { useAtualizacaoDoCliente } from './hooks/useAtualizacaoDoCliente.js';
 import { useOrientacao } from './hooks/useOrientacao.js';
+import type { ClassId } from '@arcane-duel/shared-types';
+
 import type { ConfiguracaoLocal as Configuracao } from './partida/controlador.js';
 import { ProvedorDePreferencias } from './preferencias/preferencias.js';
+import { DemoVisual } from './demo/DemoVisual.js';
+import { EscolhaDaDemo } from './demo/EscolhaDaDemo.js';
 import { ConfiguracaoLocal } from './telas/ConfiguracaoLocal.js';
 import { MenuPrincipal } from './telas/MenuPrincipal.js';
 import { PartidaLocal } from './telas/PartidaLocal.js';
@@ -26,6 +30,20 @@ type Tela =
   | { readonly nome: 'menu' }
   | { readonly nome: 'configuracao' }
   | { readonly nome: 'partida'; readonly configuracao: Configuracao; readonly semente: string }
+  /*
+   * A Demo Visual V2 corre em paralelo com a batalha principal, de propósito.
+   *
+   * Ela é um protótipo para aprovação: a linguagem nova precisa poder ser
+   * comparada lado a lado com a atual, e substituir a batalha antes da
+   * aprovação apagaria justamente a comparação.
+   */
+  | { readonly nome: 'escolha-da-demo' }
+  | {
+      readonly nome: 'demo';
+      readonly classeDoHumano: ClassId;
+      readonly classeDaIa: ClassId;
+      readonly semente: string;
+    }
   | { readonly nome: 'status' };
 
 export const App = (): React.JSX.Element => {
@@ -35,7 +53,7 @@ export const App = (): React.JSX.Element => {
   // A partida só é "ativa" enquanto a batalha está no ar. É esta linha que
   // segura uma versão nova do cliente até o duelo acabar.
   const atualizacao = useAtualizacaoDoCliente(
-    tela.nome === 'partida' ? 'partida-ativa' : 'sem-partida',
+    tela.nome === 'partida' || tela.nome === 'demo' ? 'partida-ativa' : 'sem-partida',
   );
 
   const textoDaAtualizacao =
@@ -57,8 +75,38 @@ export const App = (): React.JSX.Element => {
               aoJogarLocal={() => {
                 setTela({ nome: 'configuracao' });
               }}
+              aoAbrirDemo={() => {
+                setTela({ nome: 'escolha-da-demo' });
+              }}
               aoAbrirStatus={() => {
                 setTela({ nome: 'status' });
+              }}
+            />
+          )}
+
+          {tela.nome === 'escolha-da-demo' && (
+            <EscolhaDaDemo
+              aoEscolher={(classeDoHumano, classeDaIa) => {
+                setTela({
+                  nome: 'demo',
+                  classeDoHumano,
+                  classeDaIa,
+                  semente: `demo-${String(Date.now())}`,
+                });
+              }}
+              aoVoltar={() => {
+                setTela({ nome: 'menu' });
+              }}
+            />
+          )}
+
+          {tela.nome === 'demo' && (
+            <DemoVisual
+              classeDoHumano={tela.classeDoHumano}
+              classeDaIa={tela.classeDaIa}
+              semente={tela.semente}
+              aoSair={() => {
+                setTela({ nome: 'menu' });
               }}
             />
           )}
@@ -101,7 +149,9 @@ export const App = (): React.JSX.Element => {
             />
           )}
 
-          <AvisoDeOrientacao visivel={orientacao === 'portrait' && tela.nome === 'partida'} />
+          <AvisoDeOrientacao
+            visivel={orientacao === 'portrait' && (tela.nome === 'partida' || tela.nome === 'demo')}
+          />
         </div>
       </ProvedorDePreferencias>
     </AssetProvider>

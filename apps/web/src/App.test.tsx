@@ -36,6 +36,26 @@ describe('fluxo do aplicativo', () => {
     expect(screen.queryByText('Regras universais')).toBeNull();
   });
 
+  /*
+   * A Demo Visual V2 é uma porta separada, e é assim que ela precisa ficar.
+   *
+   * Ela é um protótipo para aprovação: a linguagem nova precisa poder ser
+   * comparada lado a lado com a batalha atual. Substituir a batalha antes da
+   * aprovação apagaria a comparação, que é a razão de ela existir.
+   */
+  it('o menu oferece a Demo Visual V2 sem substituir a batalha atual', () => {
+    render(<App />);
+    expect(screen.getByTestId('jogar-local')).toBeDefined();
+    const demo = screen.getByTestId('abrir-demo-v2');
+    expect(demo.textContent).toContain('Demo Visual V2');
+
+    fireEvent.click(demo);
+    expect(screen.getByTestId('escolha-da-demo')).toBeDefined();
+    // Guerreiro e Mago, e só: o slice não oferece as outras dez classes.
+    const opcoes = screen.getByTestId('classes-da-demo');
+    expect(within(opcoes).getAllByRole('button')).toHaveLength(2);
+  });
+
   it('Jogar local abre a configuração da partida', () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('jogar-local'));
@@ -85,7 +105,7 @@ describe('tela de status do desenvolvimento', () => {
     expect(screen.queryByText('Etapa 6 concluída')).toBeNull();
     expect(screen.getByText('vertical slice Guerreiro × Mago')).toBeDefined();
     expect(valorDe('Status', 'Etapa atual')).toBe(
-      'Etapa 6 — Checkpoint A da revisão visual, à espera de avaliação',
+      'Etapa 6 — Demo Visual V2, à espera de avaliação no aparelho',
     );
     expect(valorDe('Status', 'Interface de partida')).toBe(
       'Partida local completa, do menu à tela de vitória',

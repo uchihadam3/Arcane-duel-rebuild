@@ -32,6 +32,39 @@ import type { PedidoDeAcao, PedidoDeResposta } from '../partida.js';
  * aleatoriedade nenhuma.
  */
 
+/**
+ * Uma jogada legal, já com as escolhas que o motor vai exigir.
+ *
+ * É o que separa "o que é possível" de "o que é bom". A enumeração abaixo
+ * responde a primeira pergunta lendo só a projeção do jogador; quem responde a
+ * segunda é quem pontua — a política de base, a IA do vertical slice, ou
+ * qualquer outra. Ter uma fonte só de legalidade é o que impede uma IA nova de
+ * propor comando ilegal por ter esquecido uma condição impressa.
+ */
+export interface AcaoCandidata {
+  readonly pedido: PedidoDeAcao;
+  readonly definicao: DefinicaoDeCarta;
+  /** Verdadeiro quando a carta veio do slot de Ultimate, e não da mão. */
+  readonly ehUltimate: boolean;
+}
+
+/** Uma Resposta legal, com o que se sabe publicamente sobre o que ela apara. */
+export interface RespostaCandidata {
+  readonly pedido: PedidoDeResposta;
+  readonly definicao: DefinicaoDeCarta;
+  /** O quanto o texto impresso desta Reação reduz. */
+  readonly reducao: { readonly dano: number; readonly impacto: number };
+}
+
+/** O que se sabe da Ação que está para resolver contra quem vai responder. */
+export interface AmeacaNaMesa {
+  readonly dano: number;
+  readonly impacto: number;
+  readonly ehTecnica: boolean;
+  /** O Impacto derruba a Guarda de quem responde? */
+  readonly causaRuptura: boolean;
+}
+
 export interface Politica {
   readonly nome: string;
   readonly escolherAcao: (
@@ -246,6 +279,132 @@ const REDUCAO_DE_REACAO: Readonly<
 const REACOES_SO_CONTRA_RUPTURA: readonly string[] = ['W20', 'P18'];
 
 /**
+ * Todas as Ações que o motor aceitaria deste jogador agora.
+ *
+ * Lê **apenas** a projeção — a mesma que um cliente receberia — e o catálogo,
+ * que é público. Não há caminho por onde esta função conheça a mão do
+ * adversário, uma Passiva ainda oculta ou o estado canônico.
+ *
+ * A Ultimate entra na lista quando está disponível, porque ela é uma Ação como
+ * as outras do ponto de vista do comando.
+ */
+export const acoesLegais = (visao: VisaoDaPartida, eu: PlayerId): readonly AcaoCandidata[] => {
+  const jogador = meuEstado(visao, eu);
+  const adversario = oAdversario(visao, eu);
+  if (jogador === undefined || adversario === undefined) return [];
+
+  const candidatas: AcaoCandidata[] = [];
+
+  const considerar = (carta: CardId, ehUltimate: boolean): void => {
+    const definicao = CATALOGO.porId(carta);
+    if (definicao === undefined) return;
+    if (
+      definicao.tipo !== 'ataque' &&
+      definicao.tipo !== 'tecnica' &&
+      definicao.tipo !== 'ultimate'
+    ) {
+      return;
+    }
+    if (definicao.comportaComo === 'reacao') return;
+    if (!cabeNoOrcamento(definicao, jogador, jogador.condicoes.lento)) return;
+    if (FORA_DO_ALCANCE.includes(definicao.id)) return;
+    if (!respeitaOTexto(definicao, jogador, adversario)) return;
+
+    const escolhas = escolhasParaAcao(definicao, jogador);
+    if (escolhas === null) return;
+    candidatas.push({
+      pedido: Object.keys(escolhas).length === 0 ? { carta } : { carta, escolhas },
+      definicao,
+      ehUltimate,
+    });
+  };
+
+  for (const carta of minhasCartas(jogador)) considerar(carta, false);
+  if (jogador.ultimate.estado === 'disponivel') considerar(jogador.ultimate.carta, true);
+
+  return candidatas;
+};
+
+/**
+ * O que a Ação declarada ameaça contra quem vai responder.
+ *
+ * Tudo aqui é público: o perfil de uma Ação declarada está na projeção dos dois
+ * lados, e a Guarda de quem responde também. `null` quando não há Ação nenhuma
+ * naquele espaço.
+ */
+export const ameacaDaAcao = (
+  visao: VisaoDaPartida,
+  eu: PlayerId,
+  indice: IndiceDeAcao,
+): AmeacaNaMesa | null => {
+  const jogador = meuEstado(visao, eu);
+  const atacante = oAdversario(visao, eu);
+  if (jogador === undefined || atacante === undefined) return null;
+
+  const perfil = atacante.acoes.find((atual) => atual.indice === indice)?.perfil ?? null;
+  if (perfil === null) return null;
+
+  const valores = perfil.valores;
+  return {
+    dano: valores?.dano ?? 0,
+    impacto: valores?.impacto ?? 0,
+    ehTecnica: perfil.tipo === 'tecnica',
+    causaRuptura: valores !== null && jogador.guarda > 0 && valores.impacto >= jogador.guarda,
+  };
+};
+
+/**
+ * Todas as Reações que o motor aceitaria contra esta ameaça.
+ *
+ * A Defesa Inata **não** entra aqui: ela não é carta, tem regra própria de uma
+ * vez por turno inimigo, e quem decide usá-la precisa consultar
+ * `defesaInataDisponivel`.
+ */
+export const respostasLegais = (
+  visao: VisaoDaPartida,
+  eu: PlayerId,
+  ameaca: AmeacaNaMesa,
+): readonly RespostaCandidata[] => {
+  const jogador = meuEstado(visao, eu);
+  const adversario = oAdversario(visao, eu);
+  if (jogador === undefined || adversario === undefined) return [];
+
+  const candidatas: RespostaCandidata[] = [];
+  for (const carta of minhasCartas(jogador)) {
+    const definicao = CATALOGO.porId(carta);
+    if (definicao?.tipo !== 'reacao') continue;
+    if (!cabeNoOrcamento(definicao, jogador, 0)) continue;
+    // Contrafeitiço só responde a Técnica; Último Bastião só a um Ataque que
+    // causaria Ruptura. As duas restrições estão impressas e são públicas.
+    if (carta === ('M19' as CardId) && !ameaca.ehTecnica) continue;
+    if (REACOES_SO_CONTRA_RUPTURA.includes(carta) && !ameaca.causaRuptura) continue;
+    if (ameaca.ehTecnica && carta !== ('M19' as CardId)) continue;
+    if (!respeitaOTexto(definicao, jogador, adversario)) continue;
+
+    candidatas.push({
+      pedido: { tipo: 'carta-de-reacao', carta, escolhas: escolhasParaResposta(jogador) },
+      definicao,
+      reducao: REDUCAO_DE_REACAO[carta] ?? { dano: 0, impacto: 0 },
+    });
+  }
+  return candidatas;
+};
+
+/** A Defesa Inata está disponível e pagável agora? Só projeção decide. */
+export const defesaInataDisponivel = (visao: VisaoDaPartida, eu: PlayerId): boolean => {
+  const jogador = meuEstado(visao, eu);
+  if (jogador === undefined) return false;
+  if (valorDaAnotacao(jogador.anotacoes, CHAVE.defesaInataUsada) > 0) return false;
+  return defesaInataPagavel(jogador);
+};
+
+/** As escolhas que uma Resposta precisa carregar, para quem monta o comando. */
+export const escolhasDaResposta = (visao: VisaoDaPartida, eu: PlayerId): EscolhasDaAcao => {
+  const jogador = meuEstado(visao, eu);
+  return jogador === undefined ? { reforco: 'dano' } : escolhasParaResposta(jogador);
+};
+
+/**
  * Cria a política de base.
  *
  * `exploracao` é a fração de decisões em que a política escolhe uniformemente
@@ -259,37 +418,13 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
   nome: exploracao === 0 ? 'base' : `base+exploracao-${exploracao.toFixed(2)}`,
 
   escolherAcao: (visao, eu, rng) => {
-    const jogador = meuEstado(visao, eu);
     const adversario = oAdversario(visao, eu);
-    if (jogador === undefined || adversario === undefined) return null;
+    if (adversario === undefined) return null;
 
-    const candidatas: { readonly pedido: PedidoDeAcao; readonly nota: number }[] = [];
-
-    const considerar = (carta: CardId): void => {
-      const definicao = CATALOGO.porId(carta);
-      if (definicao === undefined) return;
-      if (
-        definicao.tipo !== 'ataque' &&
-        definicao.tipo !== 'tecnica' &&
-        definicao.tipo !== 'ultimate'
-      ) {
-        return;
-      }
-      if (definicao.comportaComo === 'reacao') return;
-      if (!cabeNoOrcamento(definicao, jogador, jogador.condicoes.lento)) return;
-      if (FORA_DO_ALCANCE.includes(definicao.id)) return;
-      if (!respeitaOTexto(definicao, jogador, adversario)) return;
-
-      const escolhas = escolhasParaAcao(definicao, jogador);
-      if (escolhas === null) return;
-      candidatas.push({
-        pedido: Object.keys(escolhas).length === 0 ? { carta } : { carta, escolhas },
-        nota: pontuarAcao(definicao, adversario),
-      });
-    };
-
-    for (const carta of minhasCartas(jogador)) considerar(carta);
-    if (jogador.ultimate.estado === 'disponivel') considerar(jogador.ultimate.carta);
+    const candidatas = acoesLegais(visao, eu).map((item) => ({
+      pedido: item.pedido,
+      nota: pontuarAcao(item.definicao, adversario),
+    }));
 
     if (candidatas.length === 0) return null;
 
@@ -304,47 +439,25 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
 
   escolherResposta: (visao, eu, indice, rng) => {
     const jogador = meuEstado(visao, eu);
-    const adversario = oAdversario(visao, eu);
-    if (jogador === undefined || adversario === undefined) return { tipo: 'sem-resposta' };
+    if (jogador === undefined) return { tipo: 'sem-resposta' };
 
-    const slot = adversario.acoes.find((atual) => atual.indice === indice);
-    const perfil = slot?.perfil ?? null;
-    if (perfil === null) return { tipo: 'sem-resposta' };
+    const ameaca = ameacaDaAcao(visao, eu, indice);
+    if (ameaca === null) return { tipo: 'sem-resposta' };
 
-    const ameaca = perfil.valores;
-    const ehTecnica = perfil.tipo === 'tecnica';
-    if (ameaca === null && !ehTecnica) return { tipo: 'sem-resposta' };
-
-    const ameacaDeRuptura =
-      ameaca !== null && jogador.guarda > 0 && ameaca.impacto >= jogador.guarda;
-    const ameacaDeDano = ameaca !== null && ameaca.dano >= 3;
+    const ehTecnica = ameaca.ehTecnica;
+    const ameacaDeRuptura = ameaca.causaRuptura;
+    const ameacaDeDano = ameaca.dano >= 3;
     if (!ameacaDeRuptura && !ameacaDeDano && !ehTecnica) return { tipo: 'sem-resposta' };
 
     const candidatas: { readonly pedido: PedidoDeResposta; readonly nota: number }[] = [];
 
-    for (const carta of minhasCartas(jogador)) {
-      const definicao = CATALOGO.porId(carta);
-      if (definicao?.tipo !== 'reacao') continue;
-      if (!cabeNoOrcamento(definicao, jogador, 0)) continue;
-      // Contrafeitiço só responde a Técnica; Último Bastião só a um Ataque que
-      // causaria Ruptura. As duas restrições estão impressas e são públicas.
-      if (carta === ('M19' as CardId) && !ehTecnica) continue;
-      if (REACOES_SO_CONTRA_RUPTURA.includes(carta) && !ameacaDeRuptura) continue;
-      if (ehTecnica && carta !== ('M19' as CardId)) continue;
-      if (!respeitaOTexto(definicao, jogador, adversario)) continue;
-
-      const reducao = REDUCAO_DE_REACAO[carta] ?? { dano: 0, impacto: 0 };
-      const util =
-        ameaca === null
-          ? 5
-          : Math.min(reducao.dano, ameaca.dano) * 2 +
-            (ameacaDeRuptura ? Math.min(reducao.impacto, ameaca.impacto) * 3 : 0);
+    for (const item of respostasLegais(visao, eu, ameaca)) {
+      const util = ehTecnica
+        ? 5
+        : Math.min(item.reducao.dano, ameaca.dano) * 2 +
+          (ameacaDeRuptura ? Math.min(item.reducao.impacto, ameaca.impacto) * 3 : 0);
       if (util <= 0) continue;
-
-      candidatas.push({
-        pedido: { tipo: 'carta-de-reacao', carta, escolhas: escolhasParaResposta(jogador) },
-        nota: util,
-      });
+      candidatas.push({ pedido: item.pedido, nota: util });
     }
 
     if (candidatas.length > 0) {
@@ -360,13 +473,10 @@ export const criarPoliticaDeBase = (exploracao = 0): Politica => ({
 
     if (ehTecnica) return { tipo: 'sem-resposta' };
 
-    // Sem carta que compense, resta a Defesa Inata da classe.
-    // A Defesa Inata vale uma vez por turno inimigo, e isso está visível na
-    // própria projeção: oferecer de novo seria um comando ilegal.
-    if (valorDaAnotacao(jogador.anotacoes, CHAVE.defesaInataUsada) > 0) {
-      return { tipo: 'sem-resposta' };
-    }
-    if (!defesaInataPagavel(jogador)) return { tipo: 'sem-resposta' };
+    // Sem carta que compense, resta a Defesa Inata da classe. Ela vale uma vez
+    // por turno inimigo, e isso está visível na própria projeção: oferecer de
+    // novo seria um comando ilegal.
+    if (!defesaInataDisponivel(visao, eu)) return { tipo: 'sem-resposta' };
 
     // A Guarda Marcial reduz 1 D **ou** 1 I, e a escolha é do jogador: a
     // política a manda explicitamente, como um cliente faria.

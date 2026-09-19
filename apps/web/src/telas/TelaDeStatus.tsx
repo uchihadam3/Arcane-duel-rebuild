@@ -77,7 +77,7 @@ export const TelaDeStatus = ({
                 O vertical slice foi reprovado em aparelho real; declará-lo
                 concluído aqui seria a mesma coisa que declarar no relatório.
               */}
-              <dd>Etapa 6 — Checkpoint A da revisão visual, à espera de avaliação</dd>
+              <dd>Etapa 6 — Demo Visual V2, à espera de avaliação no aparelho</dd>
               <dt>Interface de partida</dt>
               <dd>Partida local completa, do menu à tela de vitória</dd>
             </dl>

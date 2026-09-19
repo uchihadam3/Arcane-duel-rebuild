@@ -14,13 +14,29 @@
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
   "references": [
-    { "path": "../../packages/shared-types/tsconfig.build.json" },
-    { "path": "../../packages/rules-engine/tsconfig.build.json" },
-    { "path": "../../packages/card-data/tsconfig.build.json" },
-    { "path": "../../packages/gameplay/tsconfig.build.json" },
-    { "path": "../../packages/ai/tsconfig.build.json" },
-    { "path": "../../packages/audio/tsconfig.build.json" },
-    { "path": "../../packages/vfx/tsconfig.build.json" },
-    { "path": "../../packages/ui/tsconfig.build.json" }
+    {
+      "path": "../../packages/shared-types/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/rules-engine/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/card-data/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/gameplay/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ai/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/audio/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/vfx/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ui/tsconfig.build.json"
+    }
   ]
 }

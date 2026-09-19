@@ -7,5 +7,18 @@
     "noEmit": true
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../shared-types/tsconfig.build.json" }]
+  "references": [
+    {
+      "path": "../shared-types/tsconfig.build.json"
+    },
+    {
+      "path": "../rules-engine/tsconfig.build.json"
+    },
+    {
+      "path": "../card-data/tsconfig.build.json"
+    },
+    {
+      "path": "../gameplay/tsconfig.build.json"
+    }
+  ]
 }

@@ -1,0 +1,455 @@
+/*
+ * A Demo Visual V2.
+ *
+ * Toda a profundidade vem de uma transformação 3D **só**, aplicada ao
+ * tabuleiro. Tudo o que mora na mesa é filho dele e herda a perspectiva pelo
+ * navegador — é isso que faz o toque cair exatamente onde a carta está
+ * desenhada, sem nenhuma conta de projeção nossa. A Etapa 6 errava justamente
+ * aí.
+ *
+ * A mão fica **dentro** do tabuleiro, mas com a inclinação desfeita: assim ela
+ * ocupa uma posição da mesa e ainda assim olha de frente para quem joga.
+ */
+
+.v2 {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(120% 80% at 50% -10%, #1b1424 0%, #0b0810 46%, #050406 100%), #040305;
+  color: #d8cfbe;
+  font-family: 'Iowan Old Style', Palatino, Georgia, 'Times New Roman', serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* ------------------------------------------------------------------ */
+/* Palco                                                               */
+/* ------------------------------------------------------------------ */
+
+.v2__palco {
+  position: absolute;
+  inset: 0;
+  perspective: var(--v2-perspectiva);
+  perspective-origin: 50% var(--v2-origem);
+}
+
+/*
+ * O tabuleiro é posicionado, e não alinhado por grade.
+ *
+ * Com `place-items: center` a coluna implícita da grade nascia do tamanho do
+ * conteúdo — 1240 px — e transbordava para a direita a partir da borda
+ * esquerda do palco. O item ficava centrado **na coluna**, não na tela, e o
+ * campo aparecia deslocado em 177 px. Posicionar por metade e desfazer por
+ * `translate(-50%, -50%)` não depende de nenhuma decisão de layout.
+ */
+.v2__tabuleiro {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--v2-largura);
+  height: var(--v2-altura);
+  transform: translate(-50%, -50%) translateY(var(--v2-deslocamento)) rotateX(var(--v2-inclinacao))
+    scale(var(--v2-escala));
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  /*
+   * A sombra do tabuleiro sobre o nada.
+   *
+   * Ela é o que separa a mesa do fundo. Sem ela o campo flutua, que foi
+   * exatamente a leitura reprovada na etapa anterior.
+   */
+  filter: drop-shadow(0 40px 60px rgb(0 0 0 / 85%));
+}
+
+/*
+ * A camada de efeitos mora no plano do campo.
+ *
+ * Ela é filha do tabuleiro transformado, então um golpe que atravessa o campo
+ * atravessa o campo de verdade — em perspectiva — e não um plano colado na
+ * tela. `pointer-events: none` porque efeito não é comando.
+ */
+.v2-efeitos {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.v2-tabuleiro__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ------------------------------------------------------------------ */
+/* Peças                                                               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Uma peça.
+ *
+ * A ordem das transformações importa: posição, depois altura sobre a mesa,
+ * depois a inclinação que a levanta em direção à câmera, depois o giro no
+ * plano, e só então a escala. Trocar as duas últimas faria a carta crescer na
+ * diagonal errada quando estivesse girada.
+ */
+.v2-peca {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--v2-carta-largura);
+  height: var(--v2-carta-altura);
+  margin-top: calc(var(--v2-carta-altura) / -2);
+  margin-left: calc(var(--v2-carta-largura) / -2);
+  transform: translate3d(var(--px), var(--py), var(--pz)) rotateX(var(--inclinacao))
+    rotate(var(--giro)) scale(var(--escala));
+  transform-style: preserve-3d;
+  will-change: transform;
+  opacity: var(--presenca);
+}
+
+.v2-peca__face,
+.v2-peca__verso {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.v2-peca__face svg,
+.v2-peca__verso svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 60%));
+}
+
+/* A sombra de contato: ela cresce e desbota conforme a carta sobe. */
+.v2-peca__sombra {
+  position: absolute;
+  inset: 6%;
+  z-index: -1;
+  transform: translateZ(calc(var(--pz) * -1)) scale(var(--sombra-escala));
+  border-radius: 12px;
+  background: radial-gradient(60% 55% at 50% 55%, rgb(0 0 0 / 70%), rgb(0 0 0 / 0%) 72%);
+  opacity: var(--sombra-opacidade);
+}
+
+.v2-peca--tocavel {
+  cursor: pointer;
+}
+
+/* O realce de carta jogável: um fio de luz na borda, e nada mais. */
+.v2-peca--jogavel .v2-peca__face svg {
+  filter: drop-shadow(0 0 7px var(--v2-energia)) drop-shadow(0 6px 10px rgb(0 0 0 / 60%));
+}
+
+.v2-peca--focada .v2-peca__face svg {
+  filter: drop-shadow(0 0 16px var(--v2-energia)) drop-shadow(0 12px 22px rgb(0 0 0 / 70%));
+}
+
+/* O alvo de toque, invisível e grande: o dedo não erra por causa do desenho. */
+.v2-peca__toque {
+  position: absolute;
+  inset: -8%;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.v2-peca__toque:focus-visible {
+  outline: 3px solid #ffd166;
+  outline-offset: 4px;
+}
+
+/* O encaixe aceso: para onde a carta escolhida pode ir. */
+.v2-alvo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate3d(var(--px), var(--py), 2px);
+  margin-top: calc(var(--alvo-altura) / -2);
+  margin-left: calc(var(--alvo-largura) / -2);
+  width: var(--alvo-largura);
+  height: var(--alvo-altura);
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  padding: 0;
+  box-shadow:
+    inset 0 0 0 3px var(--v2-energia),
+    0 0 24px color-mix(in srgb, var(--v2-energia) 60%, transparent);
+  animation: v2-alvo-pulsa 1.5s ease-in-out infinite;
+  cursor: pointer;
+}
+
+@keyframes v2-alvo-pulsa {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Camada de interface                                                 */
+/* ------------------------------------------------------------------ */
+
+.v2__interface {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.v2__interface > * {
+  pointer-events: auto;
+}
+
+.v2-hud {
+  position: absolute;
+  width: min(34vw, 272px);
+  filter: drop-shadow(0 10px 20px rgb(0 0 0 / 70%));
+}
+
+.v2-hud__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.v2-hud--maquina {
+  inset-block-start: max(8px, env(safe-area-inset-top));
+  inset-inline-start: max(8px, env(safe-area-inset-left));
+}
+
+.v2-hud--jogador {
+  inset-block-end: max(8px, env(safe-area-inset-bottom));
+  inset-inline-start: max(8px, env(safe-area-inset-left));
+}
+
+.v2-hud--da-vez .v2-hud__svg {
+  filter: drop-shadow(0 0 10px var(--v2-energia));
+}
+
+/* O comando: encerrar turno e o que resta de AP. */
+.v2__comando {
+  position: absolute;
+  inset-block-end: max(10px, env(safe-area-inset-bottom));
+  inset-inline-end: max(10px, env(safe-area-inset-right));
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.v2__botao {
+  border: 1px solid color-mix(in srgb, var(--v2-energia) 65%, #6b5a33);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgb(32 28 24 / 95%), rgb(14 12 11 / 98%));
+  padding: 10px 18px;
+  min-height: 44px;
+  color: #f0e4c8;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+}
+
+.v2__botao:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.v2__botao--forte {
+  border-color: var(--v2-energia);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--v2-energia) 45%, transparent);
+}
+
+.v2__sair {
+  position: absolute;
+  inset-block-start: max(8px, env(safe-area-inset-top));
+  inset-inline-end: max(8px, env(safe-area-inset-right));
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  min-height: 44px;
+  color: #8e8474;
+  font-family: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* O aviso de que a máquina está decidindo. */
+.v2__pensando {
+  position: absolute;
+  inset-block-start: 14%;
+  inset-inline: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: #cbbfa6;
+  font-size: 15px;
+  letter-spacing: 3px;
+  pointer-events: none;
+}
+
+.v2__pensando-pontos {
+  display: flex;
+  gap: 6px;
+}
+
+.v2__pensando-ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v2-energia-maquina);
+  animation: v2-pensa 1s ease-in-out infinite;
+}
+
+.v2__pensando-ponto:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.v2__pensando-ponto:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes v2-pensa {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+/* O painel de decisão: usar a carta focada, ou responder. */
+.v2__painel {
+  position: absolute;
+  inset-block-end: 22%;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.v2__aviso {
+  position: absolute;
+  inset-block-start: 26%;
+  inset-inline: 0;
+  text-align: center;
+  color: #ffd9a0;
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 90%);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fim de partida                                                      */
+/* ------------------------------------------------------------------ */
+
+.v2__fim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 18px;
+  justify-items: center;
+  background: radial-gradient(70% 60% at 50% 50%, rgb(0 0 0 / 55%), rgb(0 0 0 / 88%));
+}
+
+.v2__fim-titulo {
+  margin: 0;
+  color: var(--v2-energia);
+  font-size: clamp(28px, 7vw, 54px);
+  letter-spacing: 10px;
+  text-shadow: 0 0 30px color-mix(in srgb, var(--v2-energia) 60%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Escolha de classe                                                   */
+/* ------------------------------------------------------------------ */
+
+.v2-escolha {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 20px;
+  background: radial-gradient(120% 80% at 50% -10%, #1b1424 0%, #0b0810 46%, #050406 100%);
+  padding: 20px;
+  overflow-y: auto;
+  color: #d8cfbe;
+  font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+}
+
+.v2-escolha__titulo {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 30px);
+  letter-spacing: 6px;
+}
+
+.v2-escolha__linha {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.v2-escolha__opcao {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  border: 1px solid rgb(150 120 70 / 45%);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgb(28 25 22 / 95%), rgb(12 11 10 / 98%));
+  padding: 16px 22px;
+  min-width: 160px;
+  min-height: 44px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.v2-escolha__opcao[aria-pressed='true'] {
+  border-color: var(--v2-energia);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--v2-energia) 45%, transparent);
+}
+
+.v2-escolha__nome {
+  font-size: 20px;
+  letter-spacing: 3px;
+}
+
+.v2-escolha__receita {
+  color: #8e8474;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Acessibilidade                                                      */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-peca {
+    will-change: auto;
+  }
+
+  .v2-alvo,
+  .v2__pensando-ponto {
+    animation: none;
+  }
+}
